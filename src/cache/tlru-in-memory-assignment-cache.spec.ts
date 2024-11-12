@@ -1,8 +1,10 @@
+import { DEFAULT_TLRU_TTL_MS } from '../constants';
+
 import { TLRUInMemoryAssignmentCache } from './tlru-in-memory-assignment-cache';
 
 describe('ExpiringLRUInMemoryAssignmentCache', () => {
   let cache: TLRUInMemoryAssignmentCache;
-  const defaultTimout = 600_000; // 10 minutes
+  const defaultTimout = DEFAULT_TLRU_TTL_MS; // 10 minutes
 
   beforeAll(() => {
     jest.useFakeTimers();

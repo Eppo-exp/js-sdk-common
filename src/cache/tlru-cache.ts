@@ -11,45 +11,45 @@ export class TLRUCache extends LRUCache {
     super(maxSize);
   }
 
-  private clearCacheEntryTimeout(key: string): void {
-    const timeoutId = this.cacheEntriesTimoutIds.get(key);
-    clearTimeout(timeoutId);
-    this.cacheEntriesTimoutIds.delete(key);
+  private clearCacheEntryTimeoutIfExists(key: string): void {
+    if (this.cacheEntriesTimoutIds.has(key)) {
+      const timeoutId = this.cacheEntriesTimoutIds.get(key);
+      clearTimeout(timeoutId);
+      this.cacheEntriesTimoutIds.delete(key);
+    }
   }
 
-  private setCacheEntryTimout(key: string): void {
-    const timeOutId = setTimeout(() => {
+  private setCacheEntryTimeout(key: string): void {
+    const timeoutId = setTimeout(() => {
       this.delete(key);
     }, this.ttl);
 
-    this.cacheEntriesTimoutIds.set(key, timeOutId);
+    this.cacheEntriesTimoutIds.set(key, timeoutId);
   }
 
   delete(key: string): boolean {
-    this.clearCacheEntryTimeout(key);
+    this.clearCacheEntryTimeoutIfExists(key);
     return super.delete(key);
   }
 
   get(key: string): string | undefined {
     const value = super.get(key);
 
-    // Whenever we get a cache hit, we need to reset the timer
-    // for eviction, because it is now considered most recently
-    // accessed thus the timer should start over. Not doing that
-    // will cause a de-sync that will stop proper eviction
-    this.clearCacheEntryTimeout(key);
     if (value) {
-      this.setCacheEntryTimout(key);
+      // Whenever we get a cache hit, we need to reset the timer
+      // for eviction, because it is now considered most recently
+      // accessed thus the timer should start over. Not doing that
+      // will cause a de-sync that will stop proper eviction
+      this.clearCacheEntryTimeoutIfExists(key);
+      this.setCacheEntryTimeout(key);
     }
     return value;
   }
 
   set(key: string, value: string): this {
     const cache = super.set(key, value);
-    if (this.cacheEntriesTimoutIds.has(key)) {
-      this.clearCacheEntryTimeout(key);
-    }
-    this.setCacheEntryTimout(key);
+    this.clearCacheEntryTimeoutIfExists(key);
+    this.setCacheEntryTimeout(key);
 
     return cache;
   }
