@@ -1,12 +1,12 @@
-import { ExpiringLRUInMemoryAssignmentCache } from './expiring-lru-in-memory-assignment-cache';
+import { TLRUInMemoryAssignmentCache } from './tlru-in-memory-assignment-cache';
 
 describe('ExpiringLRUInMemoryAssignmentCache', () => {
-  let cache: ExpiringLRUInMemoryAssignmentCache;
+  let cache: TLRUInMemoryAssignmentCache;
   const defaultTimout = 60_000; // 10 minutes
 
   beforeAll(() => {
     jest.useFakeTimers();
-    cache = new ExpiringLRUInMemoryAssignmentCache(2);
+    cache = new TLRUInMemoryAssignmentCache(2);
   });
 
   it(`assignment cache's timeout should default to 10 minutes `, () => {
@@ -18,7 +18,7 @@ describe('ExpiringLRUInMemoryAssignmentCache', () => {
 
   it(`assignment cache's timeout value is used on construction`, () => {
     const expectedTimout = 88;
-    cache = new ExpiringLRUInMemoryAssignmentCache(2, expectedTimout);
+    cache = new TLRUInMemoryAssignmentCache(2, expectedTimout);
     const key1 = { subjectKey: 'a', flagKey: 'b', banditKey: 'c', actionKey: 'd' };
     cache.set(key1);
     jest.advanceTimersByTime(expectedTimout);

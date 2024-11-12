@@ -1,4 +1,4 @@
-import { ExpiringLRUCache, LRUCache } from './lru-cache';
+import { LRUCache } from './lru-cache';
 
 describe('LRUCache', () => {
   let cache: LRUCache;
@@ -60,30 +60,5 @@ describe('LRUCache', () => {
     oneCache.set('b', 'banana');
     expect(oneCache.get('a')).toBeFalsy();
     expect(oneCache.get('b')).toBe('banana');
-  });
-});
-
-describe('Expiring LRU Cache', () => {
-  let cache: ExpiringLRUCache;
-  const expectedCacheTimeoutMs = 50;
-
-  beforeEach(async () => {
-    cache = new ExpiringLRUCache(2, expectedCacheTimeoutMs);
-  });
-
-  afterAll(async () => {
-    jest.restoreAllMocks();
-  });
-
-  it('should evict cache after timeout', async () => {
-    jest.useFakeTimers();
-    jest.spyOn(global, 'setTimeout');
-
-    cache.set('a', 'apple');
-    jest.advanceTimersByTime(expectedCacheTimeoutMs);
-
-    expect(setTimeout).toHaveBeenCalledTimes(1);
-    expect(setTimeout).toHaveBeenLastCalledWith(expect.any(Function), expectedCacheTimeoutMs);
-    expect(cache.get('a')).toBeUndefined();
   });
 });

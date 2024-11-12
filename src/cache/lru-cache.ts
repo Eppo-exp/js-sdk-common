@@ -99,12 +99,12 @@ export class LRUCache implements Map<string, string> {
 }
 
 /**
- * Variation of LRUCache that expires after set time in milliseconds
+ * Time-aware, least-recently-used (TLRU), variant of LRU where entries have valid lifetime.
  * @param {number} maxSize - Maximum cache size
- * @param {number} timeout - Time in milliseconds after which cache entry will evict itself
+ * @param {number} ttl - Time in milliseconds after which cache entry will evict itself
  **/
-export class ExpiringLRUCache extends LRUCache {
-  constructor(readonly maxSize: number, readonly timeout: number) {
+export class TLRUCache extends LRUCache {
+  constructor(readonly maxSize: number, readonly ttl: number) {
     super(maxSize);
   }
 
@@ -112,7 +112,7 @@ export class ExpiringLRUCache extends LRUCache {
     const cache = super.set(key, value);
     setTimeout(() => {
       this.delete(key);
-    }, this.timeout);
+    }, this.ttl);
     return cache;
   }
 }
