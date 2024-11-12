@@ -11,7 +11,7 @@ import { TLRUCache } from './tlru-cache';
  * @param {number} ttl - Time in milliseconds after cache will expire.
  */
 export class TLRUInMemoryAssignmentCache extends AbstractAssignmentCache<TLRUCache> {
-  constructor(maxSize: number, ttl = 60_000) {
+  constructor(maxSize: number, ttl = 600_000) {
     super(new TLRUCache(maxSize, ttl));
   }
 }

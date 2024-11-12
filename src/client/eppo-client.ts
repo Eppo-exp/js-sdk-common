@@ -254,6 +254,25 @@ export default class EppoClient {
   }
 
   /**
+   * Maps a subject to a boolean variation for a given experiment.
+   *
+   * @param flagKey feature flag identifier
+   * @param subjectKey an identifier of the experiment subject, for example a user ID.
+   * @param subjectAttributes optional attributes associated with the subject, for example name and email.
+   * @param defaultValue default value to return if the subject is not part of the experiment sample
+   * @returns a boolean variation value if the subject is part of the experiment sample, otherwise the default value
+   */
+  public getBooleanAssignment(
+    flagKey: string,
+    subjectKey: string,
+    subjectAttributes: Attributes,
+    defaultValue: boolean,
+  ): boolean {
+    return this.getBooleanAssignmentDetails(flagKey, subjectKey, subjectAttributes, defaultValue)
+      .variation;
+  }
+
+  /**
    * Maps a subject to a boolean variation for a given experiment and provides additional details about the
    * variation assigned and the reason for the assignment.
    *
@@ -635,25 +654,6 @@ export default class EppoClient {
       result = this.deduceAttributeContext(subjectAttributes as Attributes);
     }
     return result;
-  }
-
-  /**
-   * Maps a subject to a boolean variation for a given experiment.
-   *
-   * @param flagKey feature flag identifier
-   * @param subjectKey an identifier of the experiment subject, for example a user ID.
-   * @param subjectAttributes optional attributes associated with the subject, for example name and email.
-   * @param defaultValue default value to return if the subject is not part of the experiment sample
-   * @returns a boolean variation value if the subject is part of the experiment sample, otherwise the default value
-   */
-  public getBooleanAssignment(
-    flagKey: string,
-    subjectKey: string,
-    subjectAttributes: Attributes,
-    defaultValue: boolean,
-  ): boolean {
-    return this.getBooleanAssignmentDetails(flagKey, subjectKey, subjectAttributes, defaultValue)
-      .variation;
   }
 
   private ensureActionsWithContextualAttributes(
