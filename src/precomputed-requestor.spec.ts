@@ -24,7 +24,10 @@ const MOCK_PRECOMPUTED_RESPONSE = {
       doLog: true,
     },
   },
-  environment: 'production',
+  environment: {
+    name: 'production',
+  },
+  format: 'PRECOMPUTED',
   createdAt: '2024-03-20T00:00:00Z',
 };
 
@@ -89,7 +92,12 @@ describe('PrecomputedRequestor', () => {
       expect(flag2?.extraLogging).toEqual({});
       expect(flag2?.doLog).toBe(true);
 
-      expect(precomputedFlagStore.getEnvironment()).toBe('production');
+      // TODO: create a method get format from the response
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const response = await fetchSpy.mock.results[0].value.json();
+      expect(response.format).toBe('PRECOMPUTED');
+
+      expect(precomputedFlagStore.getEnvironment()).toBe({ name: 'production' });
       expect(precomputedFlagStore.getConfigPublishedAt()).toBe('2024-03-20T00:00:00Z');
     });
 
