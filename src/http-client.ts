@@ -45,6 +45,7 @@ export interface IPrecomputedFlagsResponse {
 export interface IHttpClient {
   getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined>;
   getBanditParameters(): Promise<IBanditParametersResponse | undefined>;
+  getPrecomputedFlags(): Promise<IPrecomputedFlagsResponse | undefined>;
   rawGet<T>(url: URL): Promise<T | undefined>;
 }
 
@@ -59,6 +60,11 @@ export default class FetchHttpClient implements IHttpClient {
   async getBanditParameters(): Promise<IBanditParametersResponse | undefined> {
     const url = this.apiEndpoints.banditParametersEndpoint();
     return await this.rawGet<IBanditParametersResponse>(url);
+  }
+
+  async getPrecomputedFlags(): Promise<IPrecomputedFlagsResponse | undefined> {
+    const url = this.apiEndpoints.precomputedFlagsEndpoint();
+    return await this.rawGet<IPrecomputedFlagsResponse>(url);
   }
 
   async rawGet<T>(url: URL): Promise<T | undefined> {

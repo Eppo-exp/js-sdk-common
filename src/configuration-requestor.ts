@@ -1,8 +1,14 @@
 import { IConfigurationStore } from './configuration-store/configuration-store';
 import { IHttpClient } from './http-client';
-import { BanditVariation, BanditParameters, Flag, Environment } from './interfaces';
+import {
+  BanditVariation,
+  BanditParameters,
+  Flag,
+  Environment,
+  PrecomputedFlag,
+} from './interfaces';
 
-type Entry = Flag | BanditVariation[] | BanditParameters;
+type Entry = Flag | BanditVariation[] | BanditParameters | PrecomputedFlag;
 
 // Requests AND stores flag configurations
 export default class ConfigurationRequestor {
@@ -12,6 +18,7 @@ export default class ConfigurationRequestor {
     private readonly banditVariationConfigurationStore: IConfigurationStore<
       BanditVariation[]
     > | null,
+    private readonly precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
     private readonly banditModelConfigurationStore: IConfigurationStore<BanditParameters> | null,
   ) {}
 
@@ -90,5 +97,18 @@ export default class ConfigurationRequestor {
       });
     });
     return banditVariationsByFlagKey;
+  }
+
+  async fetchAndStorePrecomputedFlags(): Promise<void> {
+    const precomputedResponse = await this.httpClient.getPrecomputedFlags();
+    if (!precomputedResponse?.flags) {
+      return;
+    }
+
+    await this.hydrateConfigurationStore(this.precomputedFlagStore, {
+      entries: precomputedResponse.flags,
+      environment: precomputedResponse.environment,
+      createdAt: precomputedResponse.createdAt,
+    });
   }
 }
