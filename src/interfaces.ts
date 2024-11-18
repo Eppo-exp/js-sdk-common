@@ -133,3 +133,18 @@ export interface BanditCategoricalAttributeCoefficients {
   valueCoefficients: Record<string, number>;
   missingValueCoefficient: number;
 }
+
+export enum FormatEnum {
+  SERVER = 'SERVER',
+  CLIENT = 'CLIENT',
+  PRECOMPUTED = 'PRECOMPUTED',
+}
+
+export interface PrecomputedFlag {
+  allocationKey: string;
+  variationKey: string;
+  variationType: VariationType;
+  variationValue: string;
+  extraLogging: Record<string, string>;
+  doLog: boolean;
+}
