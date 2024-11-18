@@ -3,7 +3,7 @@ import { hydrateConfigurationStore } from './configuration-store/configuration-s
 import { IHttpClient } from './http-client';
 import { PrecomputedFlag } from './interfaces';
 
-// Requests AND stores flag configurations
+// Requests AND stores precomputed flags, reuses the configuration store
 export default class ConfigurationRequestor {
   constructor(
     private readonly httpClient: IHttpClient,
