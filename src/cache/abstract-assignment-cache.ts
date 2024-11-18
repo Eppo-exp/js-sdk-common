@@ -58,7 +58,7 @@ export abstract class AbstractAssignmentCache<T extends Map<string, string>>
     return this.get(entry) === assignmentCacheValueToString(entry);
   }
 
-  private get(key: AssignmentCacheKey): string | undefined {
+  get(key: AssignmentCacheKey): string | undefined {
     return this.delegate.get(assignmentCacheKeyToString(key));
   }
 

@@ -13,15 +13,24 @@ describe('TLRU Cache', () => {
     jest.clearAllTimers();
   });
 
-  it('should evict cache after timeout', () => {
+  it('should evict cache after expiration', () => {
     jest.useFakeTimers();
-    jest.spyOn(global, 'setTimeout');
 
     cache.set('a', 'apple');
     jest.advanceTimersByTime(expectedCacheTimeoutMs);
 
-    expect(setTimeout).toHaveBeenCalledTimes(1);
-    expect(setTimeout).toHaveBeenLastCalledWith(expect.any(Function), expectedCacheTimeoutMs);
+    expect(cache.get('a')).toBeUndefined();
+  });
+
+  it('should evict all expired entries', () => {
+    jest.useFakeTimers();
+
+    cache.set('a', 'avocado');
+    jest.advanceTimersByTime(expectedCacheTimeoutMs);
+    cache.set('b', 'banana');
+    jest.advanceTimersByTime(expectedCacheTimeoutMs);
+
+    expect(cache.get('b')).toBeUndefined();
     expect(cache.get('a')).toBeUndefined();
   });
 
@@ -31,16 +40,11 @@ describe('TLRU Cache', () => {
    **/
   it('should overwrite existing cache entry', () => {
     jest.useFakeTimers();
-    jest.spyOn(global, 'setTimeout');
-    jest.spyOn(global, 'clearTimeout');
 
     cache.set('a', 'apple');
     jest.advanceTimersByTime(expectedCacheTimeoutMs - 1);
     cache.set('a', 'avocado');
 
-    expect(setTimeout).toHaveBeenCalledTimes(2);
-    expect(setTimeout).toHaveBeenLastCalledWith(expect.any(Function), expectedCacheTimeoutMs);
-    expect(clearTimeout).toHaveBeenCalledTimes(1);
     // spin the clock by 5sec. After that time cache entry should be still valid.
     jest.advanceTimersByTime(expectedCacheTimeoutMs / 2);
 
@@ -56,6 +60,32 @@ describe('TLRU Cache', () => {
 
     // after another spin of 5 sec, cache entry should evict itself
     jest.advanceTimersByTime(expectedCacheTimeoutMs / 2);
-    expect(cache.has('a')).toBeFalsy();
+    expect(cache.get('a')).toBeUndefined();
+  });
+
+  it('should check if a key exists', () => {
+    cache.set('a', 'apple');
+    expect(cache.has('a')).toBeTruthy();
+    expect(cache.has('b')).toBeFalsy();
+  });
+
+  it('should handle the cache capacity of zero', () => {
+    const zeroCache = new TLRUCache(0, expectedCacheTimeoutMs);
+    zeroCache.set('a', 'apple');
+    expect(zeroCache.get('a')).toBeFalsy();
+  });
+
+  it('should handle the cache capacity of one', () => {
+    jest.useFakeTimers();
+    const oneCache = new TLRUCache(1, expectedCacheTimeoutMs);
+    oneCache.set('a', 'apple');
+    jest.advanceTimersByTime(expectedCacheTimeoutMs);
+    expect(oneCache.get('a')).toBeUndefined();
+
+    oneCache.set('a', 'avocado');
+    expect(oneCache.get('a')).toBe('avocado');
+    oneCache.set('b', 'banana');
+    expect(oneCache.get('a')).toBeFalsy();
+    expect(oneCache.get('b')).toBe('banana');
   });
 });
