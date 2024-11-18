@@ -982,15 +982,11 @@ export default class EppoClient {
     this.banditAssignmentCache = new NonExpiringInMemoryAssignmentCache();
   }
 
-  public useLRUInMemoryBanditAssignmentCache(maxSize: number) {
-    this.banditAssignmentCache = new TLRUInMemoryAssignmentCache(maxSize);
-  }
-
   /**
    * @param {number} maxSize - Maximum cache size
    * @param {number} timeout - TTL of cache entries
    */
-  public useTLRUInMemoryAssignmentCache(maxSize: number, timeout?: number) {
+  public useExpiringInMemoryBanditAssignmentCache(maxSize: number, timeout?: number) {
     this.banditAssignmentCache = new TLRUInMemoryAssignmentCache(maxSize, timeout);
   }
 
