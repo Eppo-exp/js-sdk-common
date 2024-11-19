@@ -1,7 +1,14 @@
 import { IConfigurationStore } from './configuration-store/configuration-store';
 import { hydrateConfigurationStore } from './configuration-store/configuration-store-utils';
 import { IHttpClient } from './http-client';
-import { BanditVariation, BanditParameters, Flag } from './interfaces';
+import {
+  BanditVariation,
+  BanditParameters,
+  Flag,
+  BanditReference,
+} from './interfaces';
+
+type Entry = Flag | BanditVariation[] | BanditParameters;
 
 // Requests AND stores flag configurations
 export default class ConfigurationRequestor {
@@ -77,7 +84,7 @@ export default class ConfigurationRequestor {
       throw new Error('Bandit parameters fetched but no bandit configuration store provided');
     }
     const referencedModelVersions = Object.values(banditReferences).map(
-      (banditReference: BanditReference) => banditReference.modelVersion
+      (banditReference: BanditReference) => banditReference.modelVersion,
     );
 
     const banditModelVersionsInStore = this.getLoadedBanditModelVersions(
