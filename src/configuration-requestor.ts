@@ -49,9 +49,6 @@ export default class ConfigurationRequestor {
         createdAt: configResponse.createdAt,
       });
 
-      if (!this.banditModelConfigurationStore) {
-        throw new Error('Bandit parameters fetched but no bandit configuration store provided');
-      }
       if (
         this.requiresBanditModelConfigurationStoreUpdate(
           this.banditModelVersions,
@@ -97,13 +94,9 @@ export default class ConfigurationRequestor {
       (banditReference: BanditReference) => banditReference.modelVersion,
     );
 
-    referencedModelVersions.forEach((modelVersion) => {
-      if (!currentBanditModelVersions.includes(modelVersion)) {
-        return false;
-      }
-    });
-
-    return true;
+    return !referencedModelVersions.every((modelVersion) =>
+      currentBanditModelVersions.includes(modelVersion),
+    );
   }
 
   private async hydrateConfigurationStore<T extends Entry>(
