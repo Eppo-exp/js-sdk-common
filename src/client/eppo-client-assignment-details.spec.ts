@@ -13,6 +13,7 @@ import { AllocationEvaluationCode } from '../flag-evaluation-details-builder';
 import FetchHttpClient from '../http-client';
 import { Flag, ObfuscatedFlag, Variation, VariationType } from '../interfaces';
 import { OperatorType } from '../rules';
+import { AttributeType } from '../types';
 
 import EppoClient, { IAssignmentDetails } from './eppo-client';
 
@@ -345,7 +346,12 @@ describe('EppoClient get*AssignmentDetails', () => {
                 [VariationType.STRING]: client.getStringAssignmentDetails.bind(client),
                 [VariationType.JSON]: client.getJSONAssignmentDetails.bind(client),
               };
-              const assignmentFn = typeAssignmentDetailsFunctions[variationType];
+              const assignmentFn = typeAssignmentDetailsFunctions[variationType] as (
+                flagKey: string,
+                subjectKey: string,
+                subjectAttributes: Record<string, AttributeType>,
+                defaultValue: boolean | string | number | object,
+              ) => IAssignmentDetails<boolean | string | number | object>;
               if (!assignmentFn) {
                 throw new Error(`Unknown variation type: ${variationType}`);
               }
