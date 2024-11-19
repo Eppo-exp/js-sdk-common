@@ -103,7 +103,7 @@ export interface BanditVariation {
 
 export interface BanditReference {
   modelVersion: string;
-  flagVariation: BanditVariation[];
+  flagVariations: BanditVariation[];
 }
 
 export interface BanditParameters {
