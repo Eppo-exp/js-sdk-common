@@ -41,20 +41,55 @@ export default class ConfigurationRequestor {
         createdAt: configResponse.createdAt,
       });
 
-      // TODO: different polling intervals for bandit parameters
-      const banditResponse = await this.httpClient.getBanditParameters();
-      if (banditResponse?.bandits) {
-        if (!this.banditModelConfigurationStore) {
-          throw new Error('Bandit parameters fetched but no bandit configuration store provided');
-        }
+      if (this.requiresBanditModelConfigurationStoreUpdate(configResponse.banditReferences)) {
+        const banditResponse = await this.httpClient.getBanditParameters();
+        if (banditResponse?.bandits) {
+          if (!this.banditModelConfigurationStore) {
+            throw new Error('Bandit parameters fetched but no bandit configuration store provided');
+          }
 
-        await this.hydrateConfigurationStore(this.banditModelConfigurationStore, {
-          entries: banditResponse.bandits,
-          environment: configResponse.environment,
-          createdAt: configResponse.createdAt,
-        });
+          await this.hydrateConfigurationStore(this.banditModelConfigurationStore, {
+            entries: banditResponse.bandits,
+            environment: configResponse.environment,
+            createdAt: configResponse.createdAt,
+          });
+        }
       }
     }
+  }
+
+  private getLoadedBanditModelVersions(
+    banditModelConfigurationStore: IConfigurationStore<BanditParameters> | null,
+  ) {
+    if (banditModelConfigurationStore === null) {
+      return [];
+    }
+    return Object.values(banditModelConfigurationStore.entries()).map(
+      (banditParam: BanditParameters) => banditParam.modelVersion,
+    );
+  }
+
+  private requiresBanditModelConfigurationStoreUpdate(
+    banditReferences: Record<string, BanditReference>,
+  ): boolean {
+    if (!this.banditModelConfigurationStore) {
+      throw new Error('Bandit parameters fetched but no bandit configuration store provided');
+    }
+    const referencedModelVersions = Object.values(banditReferences).map(
+      (banditReference: BanditReference) => banditReference.modelVersion
+    );
+
+    const banditModelVersionsInStore = this.getLoadedBanditModelVersions(
+      this.banditModelConfigurationStore,
+    );
+
+    referencedModelVersions.forEach((modelVersion) => {
+      if (!banditModelVersionsInStore.includes(modelVersion)) {
+        return false;
+      }
+    });
+
+    return true;
   }
 
   private async hydrateConfigurationStore<T extends Entry>(
