@@ -101,6 +101,11 @@ export interface BanditVariation {
   variationValue: string;
 }
 
+export interface BanditReference {
+  modelVersion: string;
+  flagVariation: BanditVariation[];
+}
+
 export interface BanditParameters {
   banditKey: string;
   modelName: string;

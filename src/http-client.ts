@@ -1,6 +1,7 @@
 import ApiEndpoints from './api-endpoints';
 import {
   BanditParameters,
+  BanditReference,
   BanditVariation,
   Environment,
   Flag,
@@ -36,6 +37,7 @@ export interface IUniversalFlagConfigResponse {
   environment: Environment;
   flags: Record<string, Flag>;
   bandits: Record<string, BanditVariation[]>;
+  banditReferences: Record<string, BanditReference>;
 }
 
 export interface IBanditParametersResponse {
