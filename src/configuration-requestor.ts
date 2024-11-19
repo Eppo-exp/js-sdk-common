@@ -12,6 +12,8 @@ type Entry = Flag | BanditVariation[] | BanditParameters;
 
 // Requests AND stores flag configurations
 export default class ConfigurationRequestor {
+  private banditModelVersions: string[] = [];
+
   constructor(
     private readonly httpClient: IHttpClient,
     private readonly flagConfigurationStore: IConfigurationStore<Flag>,
@@ -34,13 +36,13 @@ export default class ConfigurationRequestor {
       format: configResponse.format,
     });
 
-    const flagsHaveBandits = Object.keys(configResponse.bandits ?? {}).length > 0;
+    const flagsHaveBandits = Object.keys(configResponse.banditReferences ?? {}).length > 0;
     const banditStoresProvided = Boolean(
       this.banditVariationConfigurationStore && this.banditModelConfigurationStore,
     );
     if (flagsHaveBandits && banditStoresProvided) {
       // Map bandit flag associations by flag key for quick lookup (instead of bandit key as provided by the UFC)
-      const banditVariations = this.indexBanditVariationsByFlagKey(configResponse.bandits);
+      const banditVariations = this.indexBanditVariationsByFlagKey(configResponse.banditReferences);
 
       await hydrateConfigurationStore(this.banditVariationConfigurationStore, {
         entries: banditVariations,
@@ -49,26 +51,34 @@ export default class ConfigurationRequestor {
         format: configResponse.format,
       });
 
-      if (this.requiresBanditModelConfigurationStoreUpdate(configResponse.banditReferences)) {
+      if (!this.banditModelConfigurationStore) {
+        throw new Error('Bandit parameters fetched but no bandit configuration store provided');
+      }
+      if (
+        this.requiresBanditModelConfigurationStoreUpdate(
+          this.banditModelVersions,
+          configResponse.banditReferences,
+        )
+      ) {
         const banditResponse = await this.httpClient.getBanditParameters();
         if (banditResponse?.bandits) {
-          if (!this.banditModelConfigurationStore) {
-            throw new Error('Bandit parameters fetched but no bandit configuration store provided');
-          }
-
           await hydrateConfigurationStore(this.banditModelConfigurationStore, {
             entries: banditResponse.bandits,
             environment: configResponse.environment,
             createdAt: configResponse.createdAt,
             format: configResponse.format,});
+
+          this.setBanditModelVersions(
+            this.getLoadedBanditModelVersionsFromStore(this.banditModelConfigurationStore),
+          );
         }
       }
     }
   }
 
-  private getLoadedBanditModelVersions(
+  private getLoadedBanditModelVersionsFromStore(
     banditModelConfigurationStore: IConfigurationStore<BanditParameters> | null,
-  ) {
+  ): string[] {
     if (banditModelConfigurationStore === null) {
       return [];
     }
@@ -77,22 +87,20 @@ export default class ConfigurationRequestor {
     );
   }
 
+  private setBanditModelVersions(modelVersions: string[]) {
+    this.banditModelVersions = modelVersions;
+  }
+
   private requiresBanditModelConfigurationStoreUpdate(
+    currentBanditModelVersions: string[],
     banditReferences: Record<string, BanditReference>,
   ): boolean {
-    if (!this.banditModelConfigurationStore) {
-      throw new Error('Bandit parameters fetched but no bandit configuration store provided');
-    }
     const referencedModelVersions = Object.values(banditReferences).map(
       (banditReference: BanditReference) => banditReference.modelVersion,
     );
 
-    const banditModelVersionsInStore = this.getLoadedBanditModelVersions(
-      this.banditModelConfigurationStore,
-    );
-
     referencedModelVersions.forEach((modelVersion) => {
-      if (!banditModelVersionsInStore.includes(modelVersion)) {
+      if (!currentBanditModelVersions.includes(modelVersion)) {
         return false;
       }
     });
@@ -101,11 +109,11 @@ export default class ConfigurationRequestor {
   }
 
   private indexBanditVariationsByFlagKey(
-    banditVariationsByBanditKey: Record<string, BanditVariation[]>,
+    banditVariationsByBanditKey: Record<string, BanditReference>,
   ): Record<string, BanditVariation[]> {
     const banditVariationsByFlagKey: Record<string, BanditVariation[]> = {};
-    Object.values(banditVariationsByBanditKey).forEach((banditVariations) => {
-      banditVariations.forEach((banditVariation) => {
+    Object.values(banditVariationsByBanditKey).forEach((banditReference) => {
+      banditReference.flagVariations.forEach((banditVariation) => {
         let banditVariations = banditVariationsByFlagKey[banditVariation.flagKey];
         if (!banditVariations) {
           banditVariations = [];
