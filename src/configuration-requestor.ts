@@ -51,9 +51,6 @@ export default class ConfigurationRequestor {
         format: configResponse.format,
       });
 
-      if (!this.banditModelConfigurationStore) {
-        throw new Error('Bandit parameters fetched but no bandit configuration store provided');
-      }
       if (
         this.requiresBanditModelConfigurationStoreUpdate(
           this.banditModelVersions,
@@ -99,13 +96,9 @@ export default class ConfigurationRequestor {
       (banditReference: BanditReference) => banditReference.modelVersion,
     );
 
-    referencedModelVersions.forEach((modelVersion) => {
-      if (!currentBanditModelVersions.includes(modelVersion)) {
-        return false;
-      }
-    });
-
-    return true;
+    return !referencedModelVersions.every((modelVersion) =>
+      currentBanditModelVersions.includes(modelVersion),
+    );
   }
 
   private indexBanditVariationsByFlagKey(
