@@ -20,7 +20,7 @@ import { Rule, matchesRule } from './rules';
 import { MD5Sharder, Sharder } from './sharders';
 import { Attributes } from './types';
 
-export interface FlagEvaluation {
+export interface FlagEvaluationWithoutDetails {
   flagKey: string;
   subjectKey: string;
   subjectAttributes: Attributes;
@@ -28,6 +28,9 @@ export interface FlagEvaluation {
   variation: Variation | null;
   extraLogging: Record<string, string>;
   doLog: boolean;
+}
+
+export interface FlagEvaluation extends FlagEvaluationWithoutDetails {
   flagEvaluationDetails: IFlagEvaluationDetails;
 }
 

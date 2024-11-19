@@ -1,34 +1,39 @@
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
-import { BanditEvaluator } from '../bandit-evaluator';
-import { IBanditEvent, IBanditLogger } from '../bandit-logger';
-import { AssignmentCache } from '../cache/abstract-assignment-cache';
-import ConfigurationRequestor from '../configuration-requestor';
+import {
+  AssignmentCache,
+  LRUInMemoryAssignmentCache,
+  NonExpiringInMemoryAssignmentCache,
+} from '../cache/abstract-assignment-cache';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
   DEFAULT_REQUEST_TIMEOUT_MS,
   DEFAULT_POLL_INTERVAL_MS,
+  MAX_EVENT_QUEUE_SIZE,
 } from '../constants';
-import { Evaluator } from '../evaluator';
-import { IFlagEvaluationDetails } from '../flag-evaluation-details-builder';
+import { decodePrecomputedFlag } from '../decoding';
+import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
-import { BanditParameters, BanditVariation, Flag, ObfuscatedFlag, Variation } from '../interfaces';
+import { PrecomputedFlag } from '../interfaces';
+import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
+import PrecomputedRequestor from '../precomputed-requestor';
+import { Attributes } from '../types';
+import { validateNotBlank } from '../validation';
+import { LIB_VERSION } from '../version';
 
-export interface IAssignmentDetails<T extends Variation['value'] | object> {
-  variation: T;
-  action: string | null;
-  evaluationDetails: IFlagEvaluationDetails;
-}
-
-export type FlagConfigurationRequestParameters = {
+export type PrecomputedFlagsRequestParameters = {
   apiKey: string;
   sdkVersion: string;
   sdkName: string;
   baseUrl?: string;
+  precompute: {
+    subjectKey: string;
+    subjectAttributes: Attributes;
+  };
   requestTimeoutMs?: number;
   pollingIntervalMs?: number;
   numInitialRequestRetries?: number;
@@ -39,64 +44,35 @@ export type FlagConfigurationRequestParameters = {
   skipInitialPoll?: boolean;
 };
 
-export interface IContainerExperiment<T> {
-  flagKey: string;
-  controlVariationEntry: T;
-  treatmentVariationEntries: Array<T>;
-}
-
-export default class EppoClient {
+export default class EppoPrecomputedClient {
   private readonly queuedAssignmentEvents: IAssignmentEvent[] = [];
   private assignmentLogger?: IAssignmentLogger;
-  private readonly queuedBanditEvents: IBanditEvent[] = [];
-  private banditLogger?: IBanditLogger;
-  private isGracefulFailureMode = true;
   private assignmentCache?: AssignmentCache;
-  private banditAssignmentCache?: AssignmentCache;
   private requestPoller?: IPoller;
-  private readonly evaluator = new Evaluator();
-  private readonly banditEvaluator = new BanditEvaluator();
 
   constructor(
-    private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>,
-    private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>,
-    private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>,
-    private configurationRequestParameters?: FlagConfigurationRequestParameters,
+    private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
+    private precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters,
+    private isObfuscated = false,
   ) {}
 
-  public setConfigurationRequestParameters(
-    configurationRequestParameters: FlagConfigurationRequestParameters,
+  public setPrecomputedFlagsRequestParameters(
+    precomputedFlagsRequestParameters: PrecomputedFlagsRequestParameters,
   ) {
-    this.configurationRequestParameters = configurationRequestParameters;
+    this.precomputedFlagsRequestParameters = precomputedFlagsRequestParameters;
   }
 
-  public setFlagConfigurationStore(
-    flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>,
-  ) {
-    this.flagConfigurationStore = flagConfigurationStore;
-  }
-
-  public setBanditVariationConfigurationStore(
-    banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]>,
-  ) {
-    this.banditVariationConfigurationStore = banditVariationConfigurationStore;
-  }
-
-  public setBanditModelConfigurationStore(
-    banditModelConfigurationStore: IConfigurationStore<BanditParameters>,
-  ) {
-    this.banditModelConfigurationStore = banditModelConfigurationStore;
+  public setPrecomputedFlagStore(precomputedFlagStore: IConfigurationStore<PrecomputedFlag>) {
+    this.precomputedFlagStore = precomputedFlagStore;
   }
 
   public setIsObfuscated(isObfuscated: boolean) {
     this.isObfuscated = isObfuscated;
   }
 
-  public async fetchFlagConfigurations() {
-    if (!this.configurationRequestParameters) {
-      throw new Error(
-        'Eppo SDK unable to fetch flag configurations without configuration request parameters',
-      );
+  public async fetchPrecomputedFlags() {
+    if (!this.precomputedFlagsRequestParameters) {
+      throw new Error('Eppo SDK unable to fetch precomputed flags without the request parameters');
     }
     // if fetchFlagConfigurations() was previously called, stop any polling process from that call
     this.requestPoller?.stop();
@@ -106,6 +82,7 @@ export default class EppoClient {
       sdkName,
       sdkVersion,
       baseUrl, // Default is set in ApiEndpoints constructor if undefined
+      precompute: { subjectKey, subjectAttributes },
       requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
       numInitialRequestRetries = DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
       numPollRequestRetries = DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -113,9 +90,9 @@ export default class EppoClient {
       pollAfterFailedInitialization = false,
       throwOnFailedInitialization = false,
       skipInitialPoll = false,
-    } = this.configurationRequestParameters;
+    } = this.precomputedFlagsRequestParameters;
 
-    let { pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS } = this.configurationRequestParameters;
+    let { pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS } = this.precomputedFlagsRequestParameters;
     if (pollingIntervalMs <= 0) {
       logger.error('pollingIntervalMs must be greater than 0. Using default');
       pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS;
@@ -124,19 +101,14 @@ export default class EppoClient {
     // todo: Inject the chain of dependencies below
     const apiEndpoints = new ApiEndpoints({
       baseUrl,
-      queryParams: { apiKey, sdkName, sdkVersion },
+      queryParams: { apiKey, sdkName, sdkVersion, subjectKey, subjectAttributes },
     });
     const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
-    const configurationRequestor = new ConfigurationRequestor(
-      httpClient,
-      this.flagConfigurationStore,
-      this.banditVariationConfigurationStore ?? null,
-      this.banditModelConfigurationStore ?? null,
-    );
+    const precomputedRequestor = new PrecomputedRequestor(httpClient, this.precomputedFlagStore);
 
     const pollingCallback = async () => {
-      if (await this.flagConfigurationStore.isExpired()) {
-        return configurationRequestor.fetchAndStoreConfigurations();
+      if (await this.precomputedFlagStore.isExpired()) {
+        return precomputedRequestor.fetchAndStorePrecomputedFlags();
       }
     };
 
@@ -156,5 +128,160 @@ export default class EppoClient {
     if (this.requestPoller) {
       this.requestPoller.stop();
     }
+  }
+
+  /**
+   * Maps a subject to a string variation for a given experiment.
+   *
+   * @param flagKey feature flag identifier
+   * @param defaultValue default value to return if the subject is not part of the experiment sample
+   * The subject attributes are used for evaluating any targeting rules tied to the experiment.
+   * @returns a variation value if the subject is part of the experiment sample, otherwise the default value
+   * @public
+   */
+  public getStringAssignment(flagKey: string, defaultValue: string): string {
+    validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
+
+    const preComputedFlag = this.getPrecomputedFlag(flagKey);
+
+    if (preComputedFlag == null) {
+      logger.warn(`[Eppo SDK] No assigned variation. Flag not found: ${flagKey}`);
+      return defaultValue;
+    }
+
+    const result: FlagEvaluationWithoutDetails = {
+      flagKey,
+      subjectKey: this.precomputedFlagsRequestParameters?.precompute.subjectKey ?? '',
+      subjectAttributes: this.precomputedFlagsRequestParameters?.precompute.subjectAttributes ?? {},
+      variation: {
+        key: preComputedFlag.variationKey,
+        value: preComputedFlag.variationValue,
+      },
+      allocationKey: preComputedFlag.allocationKey,
+      extraLogging: preComputedFlag.extraLogging,
+      doLog: preComputedFlag.doLog,
+    };
+
+    try {
+      if (result?.doLog) {
+        this.logAssignment(result);
+      }
+    } catch (error) {
+      logger.error(`[Eppo SDK] Error logging assignment event: ${error}`);
+    }
+    return (result.variation?.value as string) ?? defaultValue;
+  }
+
+  private getPrecomputedFlag(flagKey: string): PrecomputedFlag | null {
+    return this.isObfuscated
+      ? this.getObfuscatedFlag(flagKey)
+      : this.precomputedFlagStore.get(flagKey);
+  }
+
+  private getObfuscatedFlag(flagKey: string): PrecomputedFlag | null {
+    const precomputedFlag: PrecomputedFlag | null = this.precomputedFlagStore.get(
+      getMD5Hash(flagKey),
+    ) as PrecomputedFlag;
+    return precomputedFlag ? decodePrecomputedFlag(precomputedFlag) : null;
+  }
+
+  public isInitialized() {
+    return this.precomputedFlagStore.isInitialized();
+  }
+
+  public setAssignmentLogger(logger: IAssignmentLogger) {
+    this.assignmentLogger = logger;
+    // log any assignment events that may have been queued while initializing
+    this.flushQueuedEvents(this.queuedAssignmentEvents, this.assignmentLogger?.logAssignment);
+  }
+
+  /**
+   * Assignment cache methods.
+   */
+  public disableAssignmentCache() {
+    this.assignmentCache = undefined;
+  }
+
+  public useNonExpiringInMemoryAssignmentCache() {
+    this.assignmentCache = new NonExpiringInMemoryAssignmentCache();
+  }
+
+  public useLRUInMemoryAssignmentCache(maxSize: number) {
+    this.assignmentCache = new LRUInMemoryAssignmentCache(maxSize);
+  }
+
+  public useCustomAssignmentCache(cache: AssignmentCache) {
+    this.assignmentCache = cache;
+  }
+
+  private flushQueuedEvents<T>(eventQueue: T[], logFunction?: (event: T) => void) {
+    const eventsToFlush = [...eventQueue]; // defensive copy
+    eventQueue.length = 0; // Truncate the array
+
+    if (!logFunction) {
+      return;
+    }
+
+    eventsToFlush.forEach((event) => {
+      try {
+        logFunction(event);
+      } catch (error) {
+        logger.error(`[Eppo SDK] Error flushing event to logger: ${error.message}`);
+      }
+    });
+  }
+
+  private logAssignment(result: FlagEvaluationWithoutDetails) {
+    const { flagKey, subjectKey, allocationKey, subjectAttributes, variation } = result;
+    const event: IAssignmentEvent = {
+      ...(result.extraLogging ?? {}),
+      allocation: allocationKey ?? null,
+      experiment: allocationKey ? `${flagKey}-${allocationKey}` : null,
+      featureFlag: flagKey,
+      variation: variation?.key ?? null,
+      subject: subjectKey,
+      timestamp: new Date().toISOString(),
+      subjectAttributes,
+      metaData: this.buildLoggerMetadata(),
+      evaluationDetails: null,
+    };
+
+    if (variation && allocationKey) {
+      const hasLoggedAssignment = this.assignmentCache?.has({
+        flagKey,
+        subjectKey,
+        allocationKey,
+        variationKey: variation.key,
+      });
+      if (hasLoggedAssignment) {
+        return;
+      }
+    }
+
+    try {
+      if (this.assignmentLogger) {
+        this.assignmentLogger.logAssignment(event);
+      } else if (this.queuedAssignmentEvents.length < MAX_EVENT_QUEUE_SIZE) {
+        // assignment logger may be null while waiting for initialization, queue up events (up to a max)
+        // to be flushed when set
+        this.queuedAssignmentEvents.push(event);
+      }
+      this.assignmentCache?.set({
+        flagKey,
+        subjectKey,
+        allocationKey: allocationKey ?? '__eppo_no_allocation',
+        variationKey: variation?.key ?? '__eppo_no_variation',
+      });
+    } catch (error) {
+      logger.error(`[Eppo SDK] Error logging assignment event: ${error.message}`);
+    }
+  }
+
+  private buildLoggerMetadata(): Record<string, unknown> {
+    return {
+      obfuscated: this.isObfuscated,
+      sdkLanguage: 'javascript',
+      sdkLibVersion: LIB_VERSION,
+    };
   }
 }

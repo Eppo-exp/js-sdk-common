@@ -9,6 +9,7 @@ import {
   Split,
   Shard,
   ObfuscatedSplit,
+  PrecomputedFlag,
 } from './interfaces';
 import { decodeBase64 } from './obfuscation';
 
@@ -75,4 +76,14 @@ export function decodeObject(obj: Record<string, string>): Record<string, string
   return Object.fromEntries(
     Object.entries(obj).map(([key, value]) => [decodeBase64(key), decodeBase64(value)]),
   );
+}
+
+export function decodePrecomputedFlag(precomputedFlag: PrecomputedFlag): PrecomputedFlag {
+  return {
+    ...precomputedFlag,
+    allocationKey: decodeBase64(precomputedFlag.allocationKey),
+    variationKey: decodeBase64(precomputedFlag.variationKey),
+    variationValue: decodeBase64(precomputedFlag.variationValue),
+    extraLogging: decodeObject(precomputedFlag.extraLogging),
+  };
 }

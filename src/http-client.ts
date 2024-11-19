@@ -14,6 +14,11 @@ export interface IQueryParams {
   sdkName: string;
 }
 
+export interface IQueryParamsWithSubject extends IQueryParams {
+  subjectKey: string;
+  subjectAttributes: Record<string, any>;
+}
+
 export class HttpRequestError extends Error {
   constructor(public message: string, public status: number, public cause?: Error) {
     super(message);

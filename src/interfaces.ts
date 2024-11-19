@@ -148,3 +148,9 @@ export interface PrecomputedFlag {
   extraLogging: Record<string, string>;
   doLog: boolean;
 }
+
+export interface PrecomputedFlagsDetails {
+  precomputedFlagsFetchedAt: string;
+  precomputedFlagsPublishedAt: string;
+  precomputedFlagsEnvironment: Environment;
+}

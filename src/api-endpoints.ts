@@ -4,10 +4,10 @@ import {
   BANDIT_ENDPOINT,
   PRECOMPUTED_FLAGS_ENDPOINT,
 } from './constants';
-import { IQueryParams } from './http-client';
+import { IQueryParams, IQueryParamsWithSubject } from './http-client';
 
 interface IApiEndpointsParams {
-  queryParams?: IQueryParams;
+  queryParams?: IQueryParams | IQueryParamsWithSubject;
   baseUrl?: string;
 }
 

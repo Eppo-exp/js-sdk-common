@@ -4,7 +4,7 @@ import { IHttpClient } from './http-client';
 import { PrecomputedFlag } from './interfaces';
 
 // Requests AND stores precomputed flags, reuses the configuration store
-export default class ConfigurationRequestor {
+export default class PrecomputedFlagRequestor {
   constructor(
     private readonly httpClient: IHttpClient,
     private readonly precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
