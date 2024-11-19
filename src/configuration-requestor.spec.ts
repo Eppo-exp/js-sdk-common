@@ -203,5 +203,13 @@ describe('ConfigurationRequestor', () => {
       await configurationRequestor.fetchAndStoreConfigurations();
       expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
+
+    it('Requests bandits only when model versions are different', async () => {
+      await configurationRequestor.fetchAndStoreConfigurations();
+      expect(fetchSpy).toHaveBeenCalledTimes(2); // Once for UFC, another for bandits
+
+      await configurationRequestor.fetchAndStoreConfigurations();
+      expect(fetchSpy).toHaveBeenCalledTimes(3); // Once just for UFC, bandits should be skipped
+    });
   });
 });
