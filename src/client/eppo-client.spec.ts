@@ -2,51 +2,25 @@ import { times } from 'lodash';
 import * as td from 'testdouble';
 
 import {
+  ASSIGNMENT_TEST_DATA_DIR,
   IAssignmentTestCase,
   MOCK_UFC_RESPONSE_FILE,
   OBFUSCATED_MOCK_UFC_RESPONSE_FILE,
   SubjectTestCase,
   getTestAssignments,
   readMockUFCResponse,
-  validateTestAssignments,
   testCasesByFileName,
-  ASSIGNMENT_TEST_DATA_DIR,
+  validateTestAssignments,
 } from '../../test/testHelpers';
-import ApiEndpoints from '../api-endpoints';
 import { IAssignmentLogger } from '../assignment-logger';
-import ConfigurationRequestor from '../configuration-requestor';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
-import { MAX_EVENT_QUEUE_SIZE, POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
-import FetchHttpClient from '../http-client';
+import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
 import { AttributeType } from '../types';
 
-import EppoClient, {
-  FlagConfigurationRequestParameters,
-  checkTypeMatch,
-  IAssignmentDetails,
-} from './eppo-client';
-
-export async function init(configurationStore: IConfigurationStore<Flag | ObfuscatedFlag>) {
-  const apiEndpoints = new ApiEndpoints({
-    baseUrl: 'http://127.0.0.1:4000',
-    queryParams: {
-      apiKey: 'dummy',
-      sdkName: 'js-client-sdk-common',
-      sdkVersion: '1.0.0',
-    },
-  });
-  const httpClient = new FetchHttpClient(apiEndpoints, 1000);
-  const configurationRequestor = new ConfigurationRequestor(
-    httpClient,
-    configurationStore,
-    // Leave bandit stores empty for this test
-    null,
-    null,
-  );
-  await configurationRequestor.fetchAndStoreConfigurations();
-}
+import EppoClient, { FlagConfigurationRequestParameters, checkTypeMatch } from './eppo-client';
+import { initConfiguration } from './test-utils';
 
 describe('EppoClient E2E test', () => {
   global.fetch = jest.fn(() => {
@@ -61,7 +35,7 @@ describe('EppoClient E2E test', () => {
   const storage = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
 
   beforeAll(async () => {
-    await init(storage);
+    await initConfiguration(storage);
   });
 
   const flagKey = 'mock-flag';
@@ -216,7 +190,7 @@ describe('EppoClient E2E test', () => {
           });
         }) as jest.Mock;
 
-        await init(storage);
+        await initConfiguration(storage);
       });
 
       afterAll(() => {
@@ -270,7 +244,7 @@ describe('EppoClient E2E test', () => {
           });
         }) as jest.Mock;
 
-        await init(storage);
+        await initConfiguration(storage);
       });
 
       afterAll(() => {
@@ -591,7 +565,7 @@ describe('EppoClient E2E test', () => {
     const subject = 'alice';
     const pi = 3.1415926;
 
-    const maxRetryDelay = POLL_INTERVAL_MS * POLL_JITTER_PCT;
+    const maxRetryDelay = DEFAULT_POLL_INTERVAL_MS * POLL_JITTER_PCT;
 
     beforeAll(async () => {
       global.fetch = jest.fn(() => {
@@ -667,6 +641,38 @@ describe('EppoClient E2E test', () => {
       expect(variation).toBe(pi);
     });
 
+    describe('Poll after successful start', () => {
+      it('Continues to poll when cache has not expired', async () => {
+        class MockStore<T> extends MemoryOnlyConfigurationStore<T> {
+          public static expired = false;
+
+          async isExpired(): Promise<boolean> {
+            return MockStore.expired;
+          }
+        }
+
+        client = new EppoClient(new MockStore(), undefined, undefined, {
+          ...requestConfiguration,
+          pollAfterSuccessfulInitialization: true,
+        });
+        client.setIsGracefulFailureMode(false);
+        // no configuration loaded
+        let variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
+        expect(variation).toBe(0.0);
+
+        // have client fetch configurations; cache is not expired so assignment stays
+        await client.fetchFlagConfigurations();
+        variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
+        expect(variation).toBe(0.0);
+
+        // Expire the cache and advance time until a reload should happen
+        MockStore.expired = true;
+        await jest.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS * 1.5);
+
+        variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
+        expect(variation).toBe(pi);
+      });
+    });
     it('Does not fetch configurations if the configuration store is unexpired', async () => {
       class MockStore<T> extends MemoryOnlyConfigurationStore<T> {
         async isExpired(): Promise<boolean> {
@@ -735,7 +741,7 @@ describe('EppoClient E2E test', () => {
       expect(variation).toBe(pi);
       expect(callCount).toBe(2);
 
-      await jest.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+      await jest.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS);
       // By default, no more polling
       expect(callCount).toBe(pollAfterSuccessfulInitialization ? 3 : 2);
     });
@@ -797,7 +803,7 @@ describe('EppoClient E2E test', () => {
       expect(client.getNumericAssignment(flagKey, subject, {}, 10.0)).toBe(10.0);
 
       // Advance timers so a post-init poll can take place
-      await jest.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 1.5);
+      await jest.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS * 1.5);
 
       // if pollAfterFailedInitialization = true, we will poll later and get a config, otherwise not
       expect(callCount).toBe(pollAfterFailedInitialization ? 2 : 1);

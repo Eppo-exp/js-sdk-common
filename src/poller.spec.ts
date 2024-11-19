@@ -1,10 +1,10 @@
 import * as td from 'testdouble';
 
-import { POLL_INTERVAL_MS, POLL_JITTER_PCT } from './constants';
+import { DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from './constants';
 import initPoller from './poller';
 
 describe('poller', () => {
-  const testIntervalMs = POLL_INTERVAL_MS;
+  const testIntervalMs = DEFAULT_POLL_INTERVAL_MS;
   const maxRetryDelay = testIntervalMs * POLL_JITTER_PCT;
   const noOpCallback = td.func<() => Promise<void>>();
 

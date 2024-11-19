@@ -2,6 +2,7 @@
 set -eo pipefail
 
 ## usage: local-install.sh <package-to-install-dir> <consuming-app-dir>'
+## note: will run into issues on node >=23, better use older version
 ##
 ## examples:
 ##

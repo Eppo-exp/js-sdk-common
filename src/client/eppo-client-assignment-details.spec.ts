@@ -5,36 +5,14 @@ import {
   MOCK_UFC_RESPONSE_FILE,
   readMockUFCResponse,
 } from '../../test/testHelpers';
-import ApiEndpoints from '../api-endpoints';
-import ConfigurationRequestor from '../configuration-requestor';
-import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { AllocationEvaluationCode } from '../flag-evaluation-details-builder';
-import FetchHttpClient from '../http-client';
 import { Flag, ObfuscatedFlag, Variation, VariationType } from '../interfaces';
 import { OperatorType } from '../rules';
 import { AttributeType } from '../types';
 
 import EppoClient, { IAssignmentDetails } from './eppo-client';
-
-async function init(configurationStore: IConfigurationStore<Flag | ObfuscatedFlag>) {
-  const apiEndpoints = new ApiEndpoints({
-    baseUrl: 'http://127.0.0.1:4000',
-    queryParams: {
-      apiKey: 'dummy',
-      sdkName: 'js-client-sdk-common',
-      sdkVersion: '1.0.0',
-    },
-  });
-  const httpClient = new FetchHttpClient(apiEndpoints, 1000);
-  const configurationRequestor = new ConfigurationRequestor(
-    httpClient,
-    configurationStore,
-    null,
-    null,
-  );
-  await configurationRequestor.fetchAndStoreConfigurations();
-}
+import { initConfiguration } from './test-utils';
 
 describe('EppoClient get*AssignmentDetails', () => {
   const testStart = Date.now();
@@ -51,7 +29,7 @@ describe('EppoClient get*AssignmentDetails', () => {
   const storage = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
 
   beforeAll(async () => {
-    await init(storage);
+    await initConfiguration(storage);
   });
 
   it('should set the details for a matched rule', () => {
@@ -308,7 +286,7 @@ describe('EppoClient get*AssignmentDetails', () => {
         });
       }) as jest.Mock;
 
-      await init(storage);
+      await initConfiguration(storage);
     });
 
     afterAll(() => {

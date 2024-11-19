@@ -15,7 +15,7 @@ import {
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
   DEFAULT_REQUEST_TIMEOUT_MS,
   MAX_EVENT_QUEUE_SIZE,
-  POLL_INTERVAL_MS,
+  DEFAULT_POLL_INTERVAL_MS,
 } from '../constants';
 import { decodeFlag } from '../decoding';
 import { EppoValue } from '../eppo_value';
@@ -60,6 +60,7 @@ export type FlagConfigurationRequestParameters = {
   sdkName: string;
   baseUrl?: string;
   requestTimeoutMs?: number;
+  pollingIntervalMs?: number;
   numInitialRequestRetries?: number;
   numPollRequestRetries?: number;
   pollAfterSuccessfulInitialization?: boolean;
@@ -67,6 +68,12 @@ export type FlagConfigurationRequestParameters = {
   throwOnFailedInitialization?: boolean;
   skipInitialPoll?: boolean;
 };
+
+export interface IContainerExperiment<T> {
+  flagKey: string;
+  controlVariationEntry: T;
+  treatmentVariationEntries: Array<T>;
+}
 
 export default class EppoClient {
   private readonly queuedAssignmentEvents: IAssignmentEvent[] = [];
@@ -122,19 +129,9 @@ export default class EppoClient {
         'Eppo SDK unable to fetch flag configurations without configuration request parameters',
       );
     }
+    // if fetchFlagConfigurations() was previously called, stop any polling process from that call
+    this.requestPoller?.stop();
 
-    if (this.requestPoller) {
-      // if fetchFlagConfigurations() was previously called, stop any polling process from that call
-      this.requestPoller.stop();
-    }
-
-    const isExpired = await this.flagConfigurationStore.isExpired();
-    if (!isExpired) {
-      logger.info(
-        '[Eppo SDK] Configuration store is not expired. Skipping fetching flag configurations',
-      );
-      return;
-    }
     const {
       apiKey,
       sdkName,
@@ -148,6 +145,13 @@ export default class EppoClient {
       throwOnFailedInitialization = false,
       skipInitialPoll = false,
     } = this.configurationRequestParameters;
+
+    let { pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS } = this.configurationRequestParameters;
+    if (pollingIntervalMs <= 0) {
+      logger.error('pollingIntervalMs must be greater than 0. Using default');
+      pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS;
+    }
+
     // todo: Inject the chain of dependencies below
     const apiEndpoints = new ApiEndpoints({
       baseUrl,
@@ -161,18 +165,20 @@ export default class EppoClient {
       this.banditModelConfigurationStore ?? null,
     );
 
-    this.requestPoller = initPoller(
-      POLL_INTERVAL_MS,
-      configurationRequestor.fetchAndStoreConfigurations.bind(configurationRequestor),
-      {
-        maxStartRetries: numInitialRequestRetries,
-        maxPollRetries: numPollRequestRetries,
-        pollAfterSuccessfulStart: pollAfterSuccessfulInitialization,
-        pollAfterFailedStart: pollAfterFailedInitialization,
-        errorOnFailedStart: throwOnFailedInitialization,
-        skipInitialPoll: skipInitialPoll,
-      },
-    );
+    const pollingCallback = async () => {
+      if (await this.flagConfigurationStore.isExpired()) {
+        return configurationRequestor.fetchAndStoreConfigurations();
+      }
+    };
+
+    this.requestPoller = initPoller(pollingIntervalMs, pollingCallback, {
+      maxStartRetries: numInitialRequestRetries,
+      maxPollRetries: numPollRequestRetries,
+      pollAfterSuccessfulStart: pollAfterSuccessfulInitialization,
+      pollAfterFailedStart: pollAfterFailedInitialization,
+      errorOnFailedStart: throwOnFailedInitialization,
+      skipInitialPoll: skipInitialPoll,
+    });
 
     await this.requestPoller.start();
   }
@@ -522,6 +528,52 @@ export default class EppoClient {
       evaluationDetails.flagEvaluationDescription = `Error evaluating bandit action: ${err.message}`;
     }
     return { variation, action, evaluationDetails };
+  }
+
+  /**
+   * For use with 3rd party CMS tooling, such as the Contentful Eppo plugin.
+   *
+   * CMS plugins that integrate with Eppo will follow a common format for
+   * creating a feature flag. The flag created by the CMS plugin will have
+   * variations with values 'control', 'treatment-1', 'treatment-2', etc.
+   * This function allows users to easily return the CMS container entry
+   * for the assigned variation.
+   *
+   * @param flagExperiment the flag key, control container entry and treatment container entries.
+   * @param subjectKey an identifier of the experiment subject, for example a user ID.
+   * @param subjectAttributes optional attributes associated with the subject, for example name and email.
+   * @returns The container entry associated with the experiment.
+   */
+  public getExperimentContainerEntry<T>(
+    flagExperiment: IContainerExperiment<T>,
+    subjectKey: string,
+    subjectAttributes: Attributes,
+  ): T {
+    const { flagKey, controlVariationEntry, treatmentVariationEntries } = flagExperiment;
+    const assignment = this.getStringAssignment(flagKey, subjectKey, subjectAttributes, 'control');
+    if (assignment === 'control') {
+      return controlVariationEntry;
+    }
+    if (!assignment.startsWith('treatment-')) {
+      logger.warn(
+        `Variation '${assignment}' cannot be mapped to a container. Defaulting to control variation.`,
+      );
+      return controlVariationEntry;
+    }
+    const treatmentVariationIndex = Number.parseInt(assignment.split('-')[1]) - 1;
+    if (isNaN(treatmentVariationIndex)) {
+      logger.warn(
+        `Variation '${assignment}' cannot be mapped to a container. Defaulting to control variation.`,
+      );
+      return controlVariationEntry;
+    }
+    if (treatmentVariationIndex >= treatmentVariationEntries.length) {
+      logger.warn(
+        `Selected treatment variation (${treatmentVariationIndex}) index is out of bounds. Defaulting to control variation.`,
+      );
+      return controlVariationEntry;
+    }
+    return treatmentVariationEntries[treatmentVariationIndex];
   }
 
   private evaluateBanditAction(

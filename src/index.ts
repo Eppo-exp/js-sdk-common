@@ -18,6 +18,7 @@ import {
 import EppoClient, {
   FlagConfigurationRequestParameters,
   IAssignmentDetails,
+  IContainerExperiment,
 } from './client/eppo-client';
 import FlagConfigRequestor from './configuration-requestor';
 import {
@@ -48,6 +49,7 @@ export {
   IAssignmentEvent,
   IBanditLogger,
   IBanditEvent,
+  IContainerExperiment,
   EppoClient,
   constants,
   ApiEndpoints,
