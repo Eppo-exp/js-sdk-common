@@ -136,7 +136,7 @@ export default class EppoPrecomputedClient {
    * @param flagKey feature flag identifier
    * @param defaultValue default value to return if the subject is not part of the experiment sample
    * The subject attributes are used for evaluating any targeting rules tied to the experiment.
-   * @returns a variation value if the subject is part of the experiment sample, otherwise the default value
+   * @returns a variation value if a flag was precomputed for the subject, otherwise the default value
    * @public
    */
   public getStringAssignment(flagKey: string, defaultValue: string): string {
