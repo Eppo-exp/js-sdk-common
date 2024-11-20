@@ -31,7 +31,7 @@ describe('getExperimentContainerEntry', () => {
   beforeEach(async () => {
     const storage = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
     await initConfiguration(storage);
-    client = new EppoClient(storage);
+    client = new EppoClient({ flagConfigurationStore: storage });
     client.setIsGracefulFailureMode(true);
     flagExperiment = {
       flagKey: 'my-key',

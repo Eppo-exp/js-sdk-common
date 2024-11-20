@@ -13,16 +13,14 @@ import { IConfigurationStore } from '../configuration-store/configuration-store'
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
-  DEFAULT_REQUEST_TIMEOUT_MS,
-  MAX_EVENT_QUEUE_SIZE,
   DEFAULT_POLL_INTERVAL_MS,
+  DEFAULT_REQUEST_TIMEOUT_MS,
 } from '../constants';
 import { decodeFlag } from '../decoding';
 import { EppoValue } from '../eppo_value';
 import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
 import ArrayBackedNamedEventQueue from '../events/array-backed-named-event-queue';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
-import EventQueueFactory from '../events/event-queue-factory';
 import NamedEventQueue from '../events/named-event-queue';
 import {
   FlagEvaluationDetailsBuilder,
@@ -42,8 +40,8 @@ import {
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import {
-  AttributeType,
   Attributes,
+  AttributeType,
   BanditActions,
   BanditSubjectAttributes,
   ContextAttributes,
@@ -80,33 +78,50 @@ export interface IContainerExperiment<T> {
 }
 
 export default class EppoClient {
-  private readonly assignmentEventsQueue = new BoundedEventQueue<IAssignmentEvent>(
-    new ArrayBackedNamedEventQueue<IAssignmentEvent>('assignments'),
-  );
-  private readonly banditEventsQueue = new BoundedEventQueue<IBanditEvent>(
-    new ArrayBackedNamedEventQueue<IBanditEvent>('bandit'),
-  );
+  private readonly eventQueue: NamedEventQueue<unknown>;
+  private readonly assignmentEventsQueue: BoundedEventQueue<IAssignmentEvent> =
+    newBoundedArrayEventQueue<IAssignmentEvent>('assignments');
+  private readonly banditEventsQueue: BoundedEventQueue<IBanditEvent> =
+    newBoundedArrayEventQueue<IBanditEvent>('bandit');
   private readonly banditEvaluator = new BanditEvaluator();
   private banditLogger?: IBanditLogger;
   private banditAssignmentCache?: AssignmentCache;
-
+  private configurationRequestParameters?: FlagConfigurationRequestParameters;
+  private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
+  private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
+  private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
   // whether to suppress any errors and return default values instead
   private isGracefulFailureMode = true;
+  private isObfuscated: boolean;
   private requestPoller?: IPoller;
   private readonly evaluator = new Evaluator();
 
-  constructor(
-    private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>,
+  constructor({
+    eventQueue = new ArrayBackedNamedEventQueue('events'),
+    isObfuscated = false,
+    flagConfigurationStore,
+    banditVariationConfigurationStore,
+    banditModelConfigurationStore,
+    configurationRequestParameters,
+  }: {
     // Queue for arbitrary, application-level events (not to be confused with Eppo specific assignment
     // or bandit events). These events are application-specific and captures by EppoClient#track API.
-    private readonly eventQueue: NamedEventQueue<unknown>,
-    private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>,
-    private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>,
-    private configurationRequestParameters?: FlagConfigurationRequestParameters,
-    private isObfuscated = false,
-  ) {}
+    eventQueue?: NamedEventQueue<unknown>;
+    flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
+    banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
+    banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
+    configurationRequestParameters?: FlagConfigurationRequestParameters;
+    isObfuscated?: boolean;
+  }) {
+    this.eventQueue = eventQueue;
+    this.flagConfigurationStore = flagConfigurationStore;
+    this.banditVariationConfigurationStore = banditVariationConfigurationStore;
+    this.banditModelConfigurationStore = banditModelConfigurationStore;
+    this.configurationRequestParameters = configurationRequestParameters;
+    this.isObfuscated = isObfuscated;
+  }
 
   setConfigurationRequestParameters(
     configurationRequestParameters: FlagConfigurationRequestParameters,
@@ -1111,4 +1126,8 @@ export function checkValueTypeMatch(
     default:
       return false;
   }
+}
+
+export function newBoundedArrayEventQueue<T>(name: string): BoundedEventQueue<T> {
+  return new BoundedEventQueue<T>(new ArrayBackedNamedEventQueue<T>(name));
 }

@@ -66,7 +66,12 @@ describe('EppoClient Bandits E2E test', () => {
   });
 
   beforeEach(() => {
-    client = new EppoClient(flagStore, banditVariationStore, banditModelStore, undefined, false);
+    client = new EppoClient({
+      flagConfigurationStore: flagStore,
+      banditVariationConfigurationStore: banditVariationStore,
+      banditModelConfigurationStore: banditModelStore,
+      isObfuscated: false,
+    });
     client.setIsGracefulFailureMode(false);
     client.setAssignmentLogger({ logAssignment: mockLogAssignment });
     client.setBanditLogger({ logBanditAction: mockLogBanditAction });
