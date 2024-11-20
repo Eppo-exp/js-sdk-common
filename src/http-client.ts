@@ -36,7 +36,6 @@ export interface IUniversalFlagConfigResponse {
   format: FormatEnum;
   environment: Environment;
   flags: Record<string, Flag>;
-  bandits: Record<string, BanditVariation[]>;
   banditReferences: Record<string, BanditReference>;
 }
 
