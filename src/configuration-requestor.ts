@@ -63,8 +63,8 @@ export default class ConfigurationRequestor {
             createdAt: configResponse.createdAt,
           });
 
-          this.setBanditModelVersions(
-            this.getLoadedBanditModelVersionsFromStore(this.banditModelConfigurationStore),
+          this.banditModelVersions = this.getLoadedBanditModelVersionsFromStore(
+            this.banditModelConfigurationStore,
           );
         }
       }
@@ -80,10 +80,6 @@ export default class ConfigurationRequestor {
     return Object.values(banditModelConfigurationStore.entries()).map(
       (banditParam: BanditParameters) => banditParam.modelVersion,
     );
-  }
-
-  private setBanditModelVersions(modelVersions: string[]) {
-    this.banditModelVersions = modelVersions;
   }
 
   private requiresBanditModelConfigurationStoreUpdate(
