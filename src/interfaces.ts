@@ -46,6 +46,7 @@ export interface ConfigDetails {
   configFetchedAt: string;
   configPublishedAt: string;
   configEnvironment: Environment;
+  configFormat: string;
 }
 
 export interface Flag {

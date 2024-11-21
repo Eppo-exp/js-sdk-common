@@ -24,6 +24,7 @@ export default class ConfigurationRequestor {
       entries: configResponse.flags,
       environment: configResponse.environment,
       createdAt: configResponse.createdAt,
+      format: configResponse.format,
     });
 
     const flagsHaveBandits = Object.keys(configResponse.bandits ?? {}).length > 0;
@@ -38,6 +39,7 @@ export default class ConfigurationRequestor {
         entries: banditVariations,
         environment: configResponse.environment,
         createdAt: configResponse.createdAt,
+        format: configResponse.format,
       });
 
       // TODO: different polling intervals for bandit parameters
@@ -51,6 +53,7 @@ export default class ConfigurationRequestor {
           entries: banditResponse.bandits,
           environment: configResponse.environment,
           createdAt: configResponse.createdAt,
+          format: configResponse.format,
         });
       }
     }

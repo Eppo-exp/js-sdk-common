@@ -17,7 +17,7 @@ import {
 import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
-import { PrecomputedFlag } from '../interfaces';
+import { FormatEnum, PrecomputedFlag } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
@@ -151,6 +151,7 @@ export default class EppoPrecomputedClient {
 
     const result: FlagEvaluationWithoutDetails = {
       flagKey,
+      format: this.precomputedFlagStore.getFormat() ?? '',
       subjectKey: this.precomputedFlagsRequestParameters?.precompute.subjectKey ?? '',
       subjectAttributes: this.precomputedFlagsRequestParameters?.precompute.subjectAttributes ?? {},
       variation: {
@@ -225,6 +226,7 @@ export default class EppoPrecomputedClient {
     eventsToFlush.forEach((event) => {
       try {
         logFunction(event);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         logger.error(`[Eppo SDK] Error flushing event to logger: ${error.message}`);
       }
@@ -232,12 +234,13 @@ export default class EppoPrecomputedClient {
   }
 
   private logAssignment(result: FlagEvaluationWithoutDetails) {
-    const { flagKey, subjectKey, allocationKey, subjectAttributes, variation } = result;
+    const { flagKey, subjectKey, allocationKey, subjectAttributes, variation, format } = result;
     const event: IAssignmentEvent = {
       ...(result.extraLogging ?? {}),
       allocation: allocationKey ?? null,
       experiment: allocationKey ? `${flagKey}-${allocationKey}` : null,
       featureFlag: flagKey,
+      format,
       variation: variation?.key ?? null,
       subject: subjectKey,
       timestamp: new Date().toISOString(),
@@ -272,6 +275,7 @@ export default class EppoPrecomputedClient {
         allocationKey: allocationKey ?? '__eppo_no_allocation',
         variationKey: variation?.key ?? '__eppo_no_variation',
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       logger.error(`[Eppo SDK] Error logging assignment event: ${error.message}`);
     }

@@ -613,4 +613,18 @@ describe('EppoPrecomputedClient E2E test', () => {
       );
     });
   });
+
+  it('logs variation assignment with format from precomputed flags response', () => {
+    const mockLogger = td.object<IAssignmentLogger>();
+    storage.setEntries({ [precomputedFlagKey]: mockPrecomputedFlag });
+    const client = new EppoPrecomputedClient(storage);
+    client.setAssignmentLogger(mockLogger);
+
+    client.getStringAssignment(precomputedFlagKey, 'default');
+
+    expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
+    const loggedEvent = td.explain(mockLogger.logAssignment).calls[0].args[0];
+
+    expect(loggedEvent.format).toEqual('PRECOMPUTED');
+  });
 });

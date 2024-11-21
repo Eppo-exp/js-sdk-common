@@ -20,6 +20,7 @@ export default class PrecomputedFlagRequestor {
       entries: precomputedResponse.flags,
       environment: precomputedResponse.environment,
       createdAt: precomputedResponse.createdAt,
+      format: precomputedResponse.format,
     });
   }
 }
