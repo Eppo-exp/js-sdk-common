@@ -515,7 +515,7 @@ export default class EppoClient {
         );
         evaluationDetails.banditAction = action;
       }
-    } catch (err) {
+    } catch (err: any) {
       logger.error('Error determining bandit action', err);
       if (!this.isGracefulFailureMode) {
         throw err;
@@ -752,7 +752,7 @@ export default class EppoClient {
         expectedVariationType,
       );
       return this.parseVariationWithDetails(result, defaultValue, expectedVariationType);
-    } catch (error) {
+    } catch (error: any) {
       const eppoValue = this.rethrowIfNotGraceful(error, defaultValue);
       if (error instanceof FlagEvaluationError && error.flagEvaluationDetails) {
         return {
@@ -790,7 +790,7 @@ export default class EppoClient {
         eppoValue: EppoValue.valueOf(result.variation.value, expectedVariationType),
         flagEvaluationDetails: result.flagEvaluationDetails,
       };
-    } catch (error) {
+    } catch (error: any) {
       const eppoValue = this.rethrowIfNotGraceful(error, defaultValue);
       return {
         eppoValue,
@@ -1010,7 +1010,7 @@ export default class EppoClient {
     eventsToFlush.forEach((event) => {
       try {
         logFunction(event);
-      } catch (error) {
+      } catch (error: any) {
         logger.error(`[Eppo SDK] Error flushing event to logger: ${error.message}`);
       }
     });
@@ -1057,7 +1057,7 @@ export default class EppoClient {
         allocationKey: allocationKey ?? '__eppo_no_allocation',
         variationKey: variation?.key ?? '__eppo_no_variation',
       });
-    } catch (error) {
+    } catch (error: any) {
       logger.error(`[Eppo SDK] Error logging assignment event: ${error.message}`);
     }
   }

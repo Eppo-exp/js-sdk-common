@@ -141,7 +141,7 @@ describe('ConfigurationRequestor', () => {
       const bannerBandit = banditModelStore.get('banner_bandit');
       expect(bannerBandit?.banditKey).toBe('banner_bandit');
       expect(bannerBandit?.modelName).toBe('falcon');
-      expect(bannerBandit?.modelVersion).toBe('v123');
+      expect(bannerBandit?.modelVersion).toBe('123');
       const bannerModelData = bannerBandit?.modelData;
       expect(bannerModelData?.gamma).toBe(1);
       expect(bannerModelData?.defaultActionScore).toBe(0);

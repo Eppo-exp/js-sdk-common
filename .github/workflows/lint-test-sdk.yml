@@ -7,16 +7,25 @@ on:
 jobs:
   lint-test-sdk:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [ '18', '20', '22', '23' ]
     steps:
       - uses: actions/checkout@v3
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.x'
-      - uses: actions/cache@v2
+          node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v4
+        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
         with:
-          path: './node_modules'
-          key: ${{ runner.os }}-root-node-modules-${{ hashFiles('./yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
       - name: 'Set up GCP SDK for downloading test data'
         uses: 'google-github-actions/setup-gcloud@v0'
       - name: Install SDK dependencies
@@ -30,16 +39,25 @@ jobs:
         working-directory: ./
   typecheck:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [ '18', '20', '22', '23' ]
     steps:
       - uses: actions/checkout@v3
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.x'
-      - uses: actions/cache@v2
+          node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v4
+        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
         with:
-          path: './node_modules'
-          key: ${{ runner.os }}-root-node-modules-${{ hashFiles('./yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
       - name: Install SDK dependencies
         run: yarn --frozen-lockfile
         working-directory: ./

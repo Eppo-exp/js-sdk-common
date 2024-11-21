@@ -87,7 +87,7 @@ export default class FetchHttpClient implements IHttpClient {
         throw new HttpRequestError('Failed to fetch data', response?.status);
       }
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
       if (error.name === 'AbortError') {
         throw new HttpRequestError('Request timed out', 408, error);
       } else if (error instanceof HttpRequestError) {
