@@ -61,4 +61,19 @@ describe('LRUCache', () => {
     expect(oneCache.get('a')).toBeFalsy();
     expect(oneCache.get('b')).toBe('banana');
   });
+
+  /**
+   This test case might be an overkill but in case Map() changes,
+   or we want to ditch it completely this will remind us that insertion
+   order is crucial for this cache to work properly
+   **/
+  it('should preserve insertion order when inserting on capacity limit', () => {
+    cache.set('a', 'apple');
+    cache.set('b', 'banana');
+    cache.set('c', 'cherry');
+
+    const keys = Array.from(cache.keys());
+    expect(keys[0]).toBe('b');
+    expect(keys[1]).toBe('c');
+  });
 });

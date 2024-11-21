@@ -6,8 +6,6 @@ import { IBanditLogger, IBanditEvent } from './bandit-logger';
 import {
   AbstractAssignmentCache,
   AssignmentCache,
-  NonExpiringInMemoryAssignmentCache,
-  LRUInMemoryAssignmentCache,
   AsyncMap,
   AssignmentCacheKey,
   AssignmentCacheValue,
@@ -15,6 +13,8 @@ import {
   assignmentCacheKeyToString,
   assignmentCacheValueToString,
 } from './cache/abstract-assignment-cache';
+import { LRUInMemoryAssignmentCache } from './cache/lru-in-memory-assignment-cache';
+import { NonExpiringInMemoryAssignmentCache } from './cache/non-expiring-in-memory-cache-assignment';
 import EppoClient, {
   FlagConfigurationRequestParameters,
   IAssignmentDetails,
