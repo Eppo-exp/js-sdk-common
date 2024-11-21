@@ -17,7 +17,7 @@ import {
 import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
-import { FormatEnum, PrecomputedFlag } from '../interfaces';
+import { PrecomputedFlag, VariationType } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
@@ -130,22 +130,26 @@ export default class EppoPrecomputedClient {
     }
   }
 
-  /**
-   * Maps a subject to a string variation for a given experiment.
-   *
-   * @param flagKey feature flag identifier
-   * @param defaultValue default value to return if the subject is not part of the experiment sample
-   * The subject attributes are used for evaluating any targeting rules tied to the experiment.
-   * @returns a variation value if a flag was precomputed for the subject, otherwise the default value
-   * @public
-   */
-  public getStringAssignment(flagKey: string, defaultValue: string): string {
+  private getPrecomputedAssignment<T>(
+    flagKey: string,
+    defaultValue: T,
+    expectedType: VariationType,
+    valueTransformer: (value: unknown) => T = (v) => v as T,
+  ): T {
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
 
     const preComputedFlag = this.getPrecomputedFlag(flagKey);
 
     if (preComputedFlag == null) {
       logger.warn(`[Eppo SDK] No assigned variation. Flag not found: ${flagKey}`);
+      return defaultValue;
+    }
+
+    // Check variation type
+    if (preComputedFlag.variationType !== expectedType) {
+      logger.error(
+        `[Eppo SDK] Type mismatch: expected ${expectedType} but flag ${flagKey} has type ${preComputedFlag.variationType}`,
+      );
       return defaultValue;
     }
 
@@ -170,7 +174,77 @@ export default class EppoPrecomputedClient {
     } catch (error) {
       logger.error(`[Eppo SDK] Error logging assignment event: ${error}`);
     }
-    return (result.variation?.value as string) ?? defaultValue;
+
+    try {
+      return result.variation?.value !== undefined
+        ? valueTransformer(result.variation.value)
+        : defaultValue;
+    } catch (error) {
+      logger.error(`[Eppo SDK] Error transforming value: ${error}`);
+      return defaultValue;
+    }
+  }
+
+  /**
+   * Maps a subject to a string variation for a given experiment.
+   *
+   * @param flagKey feature flag identifier
+   * @param defaultValue default value to return if the subject is not part of the experiment sample
+   * @returns a variation value if a flag was precomputed for the subject, otherwise the default value
+   * @public
+   */
+  public getStringAssignment(flagKey: string, defaultValue: string): string {
+    return this.getPrecomputedAssignment(flagKey, defaultValue, VariationType.STRING);
+  }
+
+  /**
+   * Maps a subject to a boolean variation for a given experiment.
+   *
+   * @param flagKey feature flag identifier
+   * @param defaultValue default value to return if the subject is not part of the experiment sample
+   * @returns a variation value if a flag was precomputed for the subject, otherwise the default value
+   * @public
+   */
+  public getBooleanAssignment(flagKey: string, defaultValue: boolean): boolean {
+    return this.getPrecomputedAssignment(flagKey, defaultValue, VariationType.BOOLEAN);
+  }
+
+  /**
+   * Maps a subject to an integer variation for a given experiment.
+   *
+   * @param flagKey feature flag identifier
+   * @param defaultValue default value to return if the subject is not part of the experiment sample
+   * @returns a variation value if a flag was precomputed for the subject, otherwise the default value
+   * @public
+   */
+  public getIntegerAssignment(flagKey: string, defaultValue: number): number {
+    return this.getPrecomputedAssignment(flagKey, defaultValue, VariationType.INTEGER);
+  }
+
+  /**
+   * Maps a subject to a numeric (floating point) variation for a given experiment.
+   *
+   * @param flagKey feature flag identifier
+   * @param defaultValue default value to return if the subject is not part of the experiment sample
+   * @returns a variation value if a flag was precomputed for the subject, otherwise the default value
+   * @public
+   */
+  public getNumericAssignment(flagKey: string, defaultValue: number): number {
+    return this.getPrecomputedAssignment(flagKey, defaultValue, VariationType.NUMERIC);
+  }
+
+  /**
+   * Maps a subject to a JSON object variation for a given experiment.
+   *
+   * @param flagKey feature flag identifier
+   * @param defaultValue default value to return if the subject is not part of the experiment sample
+   * @returns a parsed JSON object if a flag was precomputed for the subject, otherwise the default value
+   * @public
+   */
+  public getJSONAssignment(flagKey: string, defaultValue: object): object {
+    return this.getPrecomputedAssignment(flagKey, defaultValue, VariationType.JSON, (value) =>
+      typeof value === 'string' ? JSON.parse(value) : defaultValue,
+    );
   }
 
   private getPrecomputedFlag(flagKey: string): PrecomputedFlag | null {
