@@ -48,7 +48,7 @@ export default function initPoller(
         startRequestSuccess = true;
         previousPollFailed = false;
         logger.info('Eppo SDK successfully requested initial configuration');
-      } catch (pollingError) {
+      } catch (pollingError: any) {
         previousPollFailed = true;
         logger.warn(
           `Eppo SDK encountered an error with initial poll of configurations: ${pollingError.message}`,
@@ -116,7 +116,7 @@ export default function initPoller(
         previousPollFailed = false;
         logger.info('Eppo SDK poll successful; resuming normal polling');
       }
-    } catch (error) {
+    } catch (error: any) {
       previousPollFailed = true;
       logger.warn(`Eppo SDK encountered an error polling configurations: ${error.message}`);
       const maxTries = 1 + (options?.maxPollRetries ?? DEFAULT_POLL_CONFIG_REQUEST_RETRIES);

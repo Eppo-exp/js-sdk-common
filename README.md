@@ -1,4 +1,4 @@
-# Eppo JS Common SDK for library
+# Common library for Eppo's JavasScript SDK
 
 [![](https://img.shields.io/npm/v/@eppo/js-client-sdk-common)](https://www.npmjs.com/package/@eppo/js-client-sdk-common)
 [![](https://img.shields.io/static/v1?label=GitHub+Pages&message=API+reference&color=00add8)](https://eppo-exp.github.io/js-client-sdk/js-client-sdk-common.html)

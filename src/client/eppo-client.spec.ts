@@ -17,6 +17,7 @@ import { IConfigurationStore } from '../configuration-store/configuration-store'
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
+import { AttributeType } from '../types';
 
 import EppoClient, { FlagConfigurationRequestParameters, checkTypeMatch } from './eppo-client';
 import { initConfiguration } from './test-utils';
@@ -214,7 +215,12 @@ describe('EppoClient E2E test', () => {
           [VariationType.JSON]: client.getJSONAssignment.bind(client),
         };
 
-        const assignmentFn = typeAssignmentFunctions[variationType];
+        const assignmentFn = typeAssignmentFunctions[variationType] as (
+          flagKey: string,
+          subjectKey: string,
+          subjectAttributes: Record<string, AttributeType>,
+          defaultValue: boolean | string | number | object,
+        ) => never;
         if (!assignmentFn) {
           throw new Error(`Unknown variation type: ${variationType}`);
         }
@@ -258,7 +264,12 @@ describe('EppoClient E2E test', () => {
           [VariationType.JSON]: client.getJSONAssignment.bind(client),
         };
 
-        const assignmentFn = typeAssignmentFunctions[variationType];
+        const assignmentFn = typeAssignmentFunctions[variationType] as (
+          flagKey: string,
+          subjectKey: string,
+          subjectAttributes: Record<string, AttributeType>,
+          defaultValue: boolean | string | number | object,
+        ) => never;
         if (!assignmentFn) {
           throw new Error(`Unknown variation type: ${variationType}`);
         }

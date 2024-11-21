@@ -163,7 +163,7 @@ describe('EppoClient Bandits E2E test', () => {
       expect(banditEvent.action).toBe('adidas');
       expect(banditEvent.actionProbability).toBeCloseTo(0.099);
       expect(banditEvent.optimalityGap).toBe(7.1);
-      expect(banditEvent.modelVersion).toBe('v123');
+      expect(banditEvent.modelVersion).toBe('123');
       expect(banditEvent.subjectNumericAttributes).toStrictEqual({ age: 25 });
       expect(banditEvent.subjectCategoricalAttributes).toStrictEqual({
         country: 'USA',
