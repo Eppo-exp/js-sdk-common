@@ -9,8 +9,12 @@ import ApiEndpoints from './api-endpoints';
 import ConfigurationRequestor from './configuration-requestor';
 import { IConfigurationStore } from './configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
-import FetchHttpClient, { IHttpClient } from './http-client';
-import { BanditVariation, BanditParameters, Flag } from './interfaces';
+import FetchHttpClient, {
+  IBanditParametersResponse,
+  IHttpClient,
+  IUniversalFlagConfigResponse,
+} from './http-client';
+import { BanditParameters, BanditVariation, Flag } from './interfaces';
 
 describe('ConfigurationRequestor', () => {
   let flagStore: IConfigurationStore<Flag>;
@@ -111,13 +115,13 @@ describe('ConfigurationRequestor', () => {
   describe('Flags with bandits', () => {
     let fetchSpy: jest.Mock;
 
-    beforeAll(() => {
+    function initiateFetchSpy(
+      responseMockGenerator: (
+        url: string,
+      ) => IUniversalFlagConfigResponse | IBanditParametersResponse,
+    ) {
       fetchSpy = jest.fn((url: string) => {
-        const responseFile = url.includes('bandits')
-          ? MOCK_BANDIT_MODELS_RESPONSE_FILE
-          : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
-        const response = readMockUFCResponse(responseFile);
-
+        const response = responseMockGenerator(url);
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -125,91 +129,203 @@ describe('ConfigurationRequestor', () => {
         });
       }) as jest.Mock;
       global.fetch = fetchSpy;
-    });
+    }
 
-    it('Fetches and populates bandit parameters', async () => {
-      await configurationRequestor.fetchAndStoreConfigurations();
+    function responseMockGenerator(url: string) {
+      const responseFile = url.includes('bandits')
+        ? MOCK_BANDIT_MODELS_RESPONSE_FILE
+        : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
+      return readMockUFCResponse(responseFile);
+    }
 
-      expect(fetchSpy).toHaveBeenCalledTimes(2); // Once for UFC, another for bandits
-
-      expect(flagStore.getKeys().length).toBeGreaterThanOrEqual(2);
-      expect(flagStore.get('banner_bandit_flag')).toBeDefined();
-      expect(flagStore.get('cold_start_bandit')).toBeDefined();
-
-      expect(banditModelStore.getKeys().length).toBeGreaterThanOrEqual(2);
-
-      const bannerBandit = banditModelStore.get('banner_bandit');
-      expect(bannerBandit?.banditKey).toBe('banner_bandit');
-      expect(bannerBandit?.modelName).toBe('falcon');
-      expect(bannerBandit?.modelVersion).toBe('123');
-      const bannerModelData = bannerBandit?.modelData;
-      expect(bannerModelData?.gamma).toBe(1);
-      expect(bannerModelData?.defaultActionScore).toBe(0);
-      expect(bannerModelData?.actionProbabilityFloor).toBe(0);
-      const bannerCoefficients = bannerModelData?.coefficients || {};
-      expect(Object.keys(bannerCoefficients).length).toBe(2);
-
-      // Deep dive for the nike action
-      const nikeCoefficients = bannerCoefficients['nike'];
-      expect(nikeCoefficients.actionKey).toBe('nike');
-      expect(nikeCoefficients.intercept).toBe(1);
-      expect(nikeCoefficients.actionNumericCoefficients).toHaveLength(1);
-      const nikeBrandAffinityCoefficient = nikeCoefficients.actionNumericCoefficients[0];
-      expect(nikeBrandAffinityCoefficient.attributeKey).toBe('brand_affinity');
-      expect(nikeBrandAffinityCoefficient.coefficient).toBe(1);
-      expect(nikeBrandAffinityCoefficient.missingValueCoefficient).toBe(-0.1);
-      expect(nikeCoefficients.actionCategoricalCoefficients).toHaveLength(2);
-      const nikeLoyaltyTierCoefficient = nikeCoefficients.actionCategoricalCoefficients[0];
-      expect(nikeLoyaltyTierCoefficient.attributeKey).toBe('loyalty_tier');
-      expect(nikeLoyaltyTierCoefficient.missingValueCoefficient).toBe(0);
-      expect(nikeLoyaltyTierCoefficient.valueCoefficients).toStrictEqual({
-        gold: 4.5,
-        silver: 3.2,
-        bronze: 1.9,
-      });
-      expect(nikeCoefficients.subjectNumericCoefficients).toHaveLength(1);
-      const nikeAccountAgeCoefficient = nikeCoefficients.subjectNumericCoefficients[0];
-      expect(nikeAccountAgeCoefficient.attributeKey).toBe('account_age');
-      expect(nikeAccountAgeCoefficient.coefficient).toBe(0.3);
-      expect(nikeAccountAgeCoefficient.missingValueCoefficient).toBe(0);
-      expect(nikeCoefficients.subjectCategoricalCoefficients).toHaveLength(1);
-      const nikeGenderIdentityCoefficient = nikeCoefficients.subjectCategoricalCoefficients[0];
-      expect(nikeGenderIdentityCoefficient.attributeKey).toBe('gender_identity');
-      expect(nikeGenderIdentityCoefficient.missingValueCoefficient).toBe(2.3);
-      expect(nikeGenderIdentityCoefficient.valueCoefficients).toStrictEqual({
-        female: 0.5,
-        male: -0.5,
+    describe('Fetching bandits', () => {
+      beforeAll(() => {
+        initiateFetchSpy(responseMockGenerator);
       });
 
-      // Just spot check the adidas parameters
-      expect(bannerCoefficients['adidas'].subjectNumericCoefficients).toHaveLength(0);
-      expect(
-        bannerCoefficients['adidas'].subjectCategoricalCoefficients[0].valueCoefficients['female'],
-      ).toBe(0);
+      it('Fetches and populates bandit parameters', async () => {
+        await configurationRequestor.fetchAndStoreConfigurations();
 
-      const coldStartBandit = banditModelStore.get('cold_start_bandit');
-      expect(coldStartBandit?.banditKey).toBe('cold_start_bandit');
-      expect(coldStartBandit?.modelName).toBe('falcon');
-      expect(coldStartBandit?.modelVersion).toBe('cold start');
-      const coldStartModelData = coldStartBandit?.modelData;
-      expect(coldStartModelData?.gamma).toBe(1);
-      expect(coldStartModelData?.defaultActionScore).toBe(0);
-      expect(coldStartModelData?.actionProbabilityFloor).toBe(0);
-      expect(coldStartModelData?.coefficients).toStrictEqual({});
-    });
+        expect(fetchSpy).toHaveBeenCalledTimes(2); // Once for UFC, another for bandits
 
-    it('Will not fetch bandit parameters if there is no store', async () => {
-      configurationRequestor = new ConfigurationRequestor(httpClient, flagStore, null, null);
-      await configurationRequestor.fetchAndStoreConfigurations();
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-    });
+        expect(flagStore.getKeys().length).toBeGreaterThanOrEqual(2);
+        expect(flagStore.get('banner_bandit_flag')).toBeDefined();
+        expect(flagStore.get('cold_start_bandit')).toBeDefined();
 
-    it('Requests bandits only when model versions are different', async () => {
-      await configurationRequestor.fetchAndStoreConfigurations();
-      expect(fetchSpy).toHaveBeenCalledTimes(2); // Once for UFC, another for bandits
+        expect(banditModelStore.getKeys().length).toBeGreaterThanOrEqual(2);
 
-      await configurationRequestor.fetchAndStoreConfigurations();
-      expect(fetchSpy).toHaveBeenCalledTimes(3); // Once just for UFC, bandits should be skipped
+        const bannerBandit = banditModelStore.get('banner_bandit');
+        expect(bannerBandit?.banditKey).toBe('banner_bandit');
+        expect(bannerBandit?.modelName).toBe('falcon');
+        expect(bannerBandit?.modelVersion).toBe('123');
+        const bannerModelData = bannerBandit?.modelData;
+        expect(bannerModelData?.gamma).toBe(1);
+        expect(bannerModelData?.defaultActionScore).toBe(0);
+        expect(bannerModelData?.actionProbabilityFloor).toBe(0);
+        const bannerCoefficients = bannerModelData?.coefficients || {};
+        expect(Object.keys(bannerCoefficients).length).toBe(2);
+
+        // Deep dive for the nike action
+        const nikeCoefficients = bannerCoefficients['nike'];
+        expect(nikeCoefficients.actionKey).toBe('nike');
+        expect(nikeCoefficients.intercept).toBe(1);
+        expect(nikeCoefficients.actionNumericCoefficients).toHaveLength(1);
+        const nikeBrandAffinityCoefficient = nikeCoefficients.actionNumericCoefficients[0];
+        expect(nikeBrandAffinityCoefficient.attributeKey).toBe('brand_affinity');
+        expect(nikeBrandAffinityCoefficient.coefficient).toBe(1);
+        expect(nikeBrandAffinityCoefficient.missingValueCoefficient).toBe(-0.1);
+        expect(nikeCoefficients.actionCategoricalCoefficients).toHaveLength(2);
+        const nikeLoyaltyTierCoefficient = nikeCoefficients.actionCategoricalCoefficients[0];
+        expect(nikeLoyaltyTierCoefficient.attributeKey).toBe('loyalty_tier');
+        expect(nikeLoyaltyTierCoefficient.missingValueCoefficient).toBe(0);
+        expect(nikeLoyaltyTierCoefficient.valueCoefficients).toStrictEqual({
+          gold: 4.5,
+          silver: 3.2,
+          bronze: 1.9,
+        });
+        expect(nikeCoefficients.subjectNumericCoefficients).toHaveLength(1);
+        const nikeAccountAgeCoefficient = nikeCoefficients.subjectNumericCoefficients[0];
+        expect(nikeAccountAgeCoefficient.attributeKey).toBe('account_age');
+        expect(nikeAccountAgeCoefficient.coefficient).toBe(0.3);
+        expect(nikeAccountAgeCoefficient.missingValueCoefficient).toBe(0);
+        expect(nikeCoefficients.subjectCategoricalCoefficients).toHaveLength(1);
+        const nikeGenderIdentityCoefficient = nikeCoefficients.subjectCategoricalCoefficients[0];
+        expect(nikeGenderIdentityCoefficient.attributeKey).toBe('gender_identity');
+        expect(nikeGenderIdentityCoefficient.missingValueCoefficient).toBe(2.3);
+        expect(nikeGenderIdentityCoefficient.valueCoefficients).toStrictEqual({
+          female: 0.5,
+          male: -0.5,
+        });
+
+        // Just spot check the adidas parameters
+        expect(bannerCoefficients['adidas'].subjectNumericCoefficients).toHaveLength(0);
+        expect(
+          bannerCoefficients['adidas'].subjectCategoricalCoefficients[0].valueCoefficients[
+            'female'
+          ],
+        ).toBe(0);
+
+        const coldStartBandit = banditModelStore.get('cold_start_bandit');
+        expect(coldStartBandit?.banditKey).toBe('cold_start_bandit');
+        expect(coldStartBandit?.modelName).toBe('falcon');
+        expect(coldStartBandit?.modelVersion).toBe('cold start');
+        const coldStartModelData = coldStartBandit?.modelData;
+        expect(coldStartModelData?.gamma).toBe(1);
+        expect(coldStartModelData?.defaultActionScore).toBe(0);
+        expect(coldStartModelData?.actionProbabilityFloor).toBe(0);
+        expect(coldStartModelData?.coefficients).toStrictEqual({});
+      });
+
+      it('Will not fetch bandit parameters if there is no store', async () => {
+        configurationRequestor = new ConfigurationRequestor(httpClient, flagStore, null, null);
+        await configurationRequestor.fetchAndStoreConfigurations();
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it('Should not fetch bandits if model version is un-changed', async () => {
+        await configurationRequestor.fetchAndStoreConfigurations();
+        expect(fetchSpy).toHaveBeenCalledTimes(2); // Once for UFC, another for bandits
+
+        await configurationRequestor.fetchAndStoreConfigurations();
+        expect(fetchSpy).toHaveBeenCalledTimes(3); // Once just for UFC, bandits should be skipped
+      });
+
+      it('Should fetch bandits if new bandit references model versions appeared', async () => {
+        let updateUFC = false;
+        await configurationRequestor.fetchAndStoreConfigurations();
+        await configurationRequestor.fetchAndStoreConfigurations();
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+        const customResponseMockGenerator = (url: string) => {
+          const responseFile = url.includes('bandits')
+            ? MOCK_BANDIT_MODELS_RESPONSE_FILE
+            : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
+
+          const response = readMockUFCResponse(responseFile);
+
+          if (updateUFC === true) {
+            // this if is needed to appease linter
+            if (url.includes('config') && 'banditReferences' in response) {
+              response.banditReferences.warm_start = {
+                modelVersion: 'warm start',
+                flagVariations: [
+                  {
+                    key: 'warm_start_bandit',
+                    flagKey: 'warm_start_bandit_flag',
+                    variationKey: 'warm_start_bandit',
+                    variationValue: 'warm_start_bandit',
+                  },
+                ],
+              };
+            }
+
+            if (url.includes('bandits') && 'bandits' in response) {
+              response.bandits.warm_start = {
+                banditKey: 'warm_start_bandit',
+                modelName: 'pigeon',
+                modelVersion: 'warm start',
+                modelData: {
+                  gamma: 1.0,
+                  defaultActionScore: 0.0,
+                  actionProbabilityFloor: 0.0,
+                  coefficients: {},
+                },
+              };
+            }
+          }
+          return response;
+        };
+        updateUFC = true;
+        initiateFetchSpy(customResponseMockGenerator);
+
+        await configurationRequestor.fetchAndStoreConfigurations();
+        expect(fetchSpy).toHaveBeenCalledTimes(2); // 2 because fetchSpy was re-initiated, 1UFC and 1bandits
+
+        // let's check if warm start was hydrated properly!
+        const warm_start_bandit = banditModelStore.get('warm_start');
+        expect(warm_start_bandit).toBeTruthy();
+        expect(warm_start_bandit?.banditKey).toBe('warm_start_bandit');
+        expect(warm_start_bandit?.modelVersion).toBe('warm start');
+        expect(warm_start_bandit?.modelName).toBe('pigeon');
+        expect(warm_start_bandit?.modelData.gamma).toBe(1);
+        expect(warm_start_bandit?.modelData.defaultActionScore).toBe(0);
+        expect(warm_start_bandit?.modelData.actionProbabilityFloor).toBe(0);
+        expect(warm_start_bandit?.modelData.coefficients).toStrictEqual({});
+      });
+
+      it('Should not fetch bandits if bandit references model versions shrunk', async () => {
+        // Initial fetch
+        await configurationRequestor.fetchAndStoreConfigurations();
+
+        // Let's mock UFC response so that cold_start is no longer retrieved
+        const customResponseMockGenerator = (url: string) => {
+          const responseFile = url.includes('bandits')
+            ? MOCK_BANDIT_MODELS_RESPONSE_FILE
+            : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
+
+          const response = readMockUFCResponse(responseFile);
+
+          if (url.includes('config') && 'banditReferences' in response) {
+            delete response.banditReferences.cold_start_bandit;
+          }
+          return response;
+        };
+
+        initiateFetchSpy(customResponseMockGenerator);
+        await configurationRequestor.fetchAndStoreConfigurations();
+        expect(fetchSpy).toHaveBeenCalledTimes(1); // only once for UFC
+
+        // cold start should still be in memory
+        const warm_start_bandit = banditModelStore.get('cold_start_bandit');
+        expect(warm_start_bandit).toBeTruthy();
+        expect(warm_start_bandit?.banditKey).toBe('cold_start_bandit');
+        expect(warm_start_bandit?.modelVersion).toBe('cold start');
+        expect(warm_start_bandit?.modelName).toBe('falcon');
+        expect(warm_start_bandit?.modelData.gamma).toBe(1);
+        expect(warm_start_bandit?.modelData.defaultActionScore).toBe(0);
+        expect(warm_start_bandit?.modelData.actionProbabilityFloor).toBe(0);
+        expect(warm_start_bandit?.modelData.coefficients).toStrictEqual({});
+      });
     });
   });
 });
