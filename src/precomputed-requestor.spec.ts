@@ -94,10 +94,10 @@ describe('PrecomputedRequestor', () => {
 
       // TODO: create a method get format from the response
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      const response = await fetchSpy.mock.results[0].value.json();
+      const response = await (await fetchSpy.mock.results[0].value).json();
       expect(response.format).toBe('PRECOMPUTED');
 
-      expect(precomputedFlagStore.getEnvironment()).toBe({ name: 'production' });
+      expect(precomputedFlagStore.getEnvironment()).toStrictEqual({ name: 'production' });
       expect(precomputedFlagStore.getConfigPublishedAt()).toBe('2024-03-20T00:00:00Z');
     });
 
