@@ -16,7 +16,6 @@ import { IAssignmentLogger } from '../assignment-logger';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
-import ArrayBackedNamedEventQueue from '../events/array-backed-named-event-queue';
 import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
 import { AttributeType } from '../types';
 

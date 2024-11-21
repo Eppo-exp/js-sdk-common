@@ -6,7 +6,6 @@ import {
   readMockUFCResponse,
 } from '../../test/testHelpers';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
-import ArrayBackedNamedEventQueue from '../events/array-backed-named-event-queue';
 import { AllocationEvaluationCode } from '../flag-evaluation-details-builder';
 import { Flag, ObfuscatedFlag, Variation, VariationType } from '../interfaces';
 import { OperatorType } from '../rules';
