@@ -6,7 +6,7 @@ import { IConfigurationStore } from '../configuration-store/configuration-store'
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { DEFAULT_POLL_INTERVAL_MS, MAX_EVENT_QUEUE_SIZE, POLL_JITTER_PCT } from '../constants';
 import FetchHttpClient from '../http-client';
-import { PrecomputedFlag, VariationType } from '../interfaces';
+import { FormatEnum, PrecomputedFlag, VariationType } from '../interfaces';
 import { encodeBase64, getMD5Hash } from '../obfuscation';
 import PrecomputedRequestor from '../precomputed-requestor';
 
@@ -625,6 +625,6 @@ describe('EppoPrecomputedClient E2E test', () => {
     expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
     const loggedEvent = td.explain(mockLogger.logAssignment).calls[0].args[0];
 
-    expect(loggedEvent.format).toEqual('PRECOMPUTED');
+    expect(loggedEvent.format).toEqual(FormatEnum.PRECOMPUTED);
   });
 });
