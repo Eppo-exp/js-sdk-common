@@ -22,7 +22,15 @@ describe('TLRU Cache', () => {
     expect(cache.get('a')).toBeUndefined();
   });
 
-  it('should evict all expired entries', () => {
+  it('should not evict cache before expiration', () => {
+    jest.useFakeTimers();
+
+    cache.set('a', 'apple');
+    jest.advanceTimersByTime(expectedCacheTimeoutMs - 1);
+    expect(cache.get('a')).toBe('apple');
+  });
+
+  it('should evict all expired entries on .entries() call', () => {
     jest.useFakeTimers();
 
     cache.set('a', 'avocado');
@@ -30,14 +38,49 @@ describe('TLRU Cache', () => {
     cache.set('b', 'banana');
     jest.advanceTimersByTime(expectedCacheTimeoutMs);
 
-    expect(cache.get('b')).toBeUndefined();
-    expect(cache.get('a')).toBeUndefined();
+    const cacheEntries = [];
+
+    for (const entry of cache.entries()) {
+      cacheEntries.push(entry);
+    }
+
+    expect(cacheEntries.length).toBe(0);
   });
 
-  /**
-   * This test assumes implementation which is not ideal, but that's
-   * the only way I know of how to go around timers in jest
-   **/
+  it('should evict all expired entries on .keys() call', () => {
+    jest.useFakeTimers();
+
+    cache.set('a', 'avocado');
+    jest.advanceTimersByTime(expectedCacheTimeoutMs);
+    cache.set('b', 'banana');
+    jest.advanceTimersByTime(expectedCacheTimeoutMs);
+
+    const cacheKeys = [];
+
+    for (const key of cache.keys()) {
+      cacheKeys.push(key);
+    }
+
+    expect(cacheKeys.length).toBe(0);
+  });
+
+  it('should evict all expired entries on .values() call', () => {
+    jest.useFakeTimers();
+
+    cache.set('a', 'avocado');
+    jest.advanceTimersByTime(expectedCacheTimeoutMs);
+    cache.set('b', 'banana');
+    jest.advanceTimersByTime(expectedCacheTimeoutMs);
+
+    const cacheValues = [];
+
+    for (const value of cache.values()) {
+      cacheValues.push(value);
+    }
+
+    expect(cacheValues.length).toBe(0);
+  });
+
   it('should overwrite existing cache entry', () => {
     jest.useFakeTimers();
 
@@ -87,5 +130,30 @@ describe('TLRU Cache', () => {
     oneCache.set('b', 'banana');
     expect(oneCache.get('a')).toBeFalsy();
     expect(oneCache.get('b')).toBe('banana');
+  });
+
+  it('should evict oldest entry when capacity limit is reached', () => {
+    cache.set('a', 'apple');
+    cache.set('b', 'banana');
+    cache.set('c', 'cherry');
+
+    expect(cache.get('a')).toBeUndefined();
+    expect(cache.has('b')).toBeTruthy();
+    expect(cache.has('c')).toBeTruthy();
+  });
+
+  /**
+    This test case might be an overkill but in case Map() changes,
+    or we want to ditch it completely this will remind us that insertion
+    order is crucial for this cache to work properly
+  **/
+  it('should preserve insertion order when inserting on capacity limit', () => {
+    cache.set('a', 'apple');
+    cache.set('b', 'banana');
+    cache.set('c', 'cherry');
+
+    const keys = Array.from(cache.keys());
+    expect(keys[0]).toBe('b');
+    expect(keys[1]).toBe('c');
   });
 });

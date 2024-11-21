@@ -22,6 +22,12 @@ export class TLRUCache extends LRUCache {
     }
   }
 
+  private isCacheEntryValid(key: string): boolean {
+    const now = new Date(Date.now());
+    const evictionDate = this.cacheEntriesTTLRegistry.get(key);
+    return evictionDate !== undefined ? now < evictionDate : false;
+  }
+
   private setCacheEntryEvictionTime(key: string): void {
     this.cacheEntriesTTLRegistry.set(key, this.getCacheEntryEvictionTime());
   }
@@ -32,15 +38,14 @@ export class TLRUCache extends LRUCache {
   }
 
   private evictExpiredCacheEntries() {
-    const now = new Date(Date.now());
     let cacheKey: string;
-    let evictionDate: Date;
 
     // Not using this.cache.forEach so we can break the loop once
     // we find the fist non-expired entry. Each entry after that
-    // is guaranteed to also be non-expired, because they are oldest->newest
-    for ([cacheKey, evictionDate] of this.cacheEntriesTTLRegistry.entries()) {
-      if (now >= evictionDate) {
+    // is guaranteed to also be non-expired, because iteration happens
+    // in insertion order
+    for (cacheKey of this.cache.keys()) {
+      if (!this.isCacheEntryValid(cacheKey)) {
         this.delete(cacheKey);
       } else {
         break;
@@ -48,16 +53,50 @@ export class TLRUCache extends LRUCache {
     }
   }
 
+  entries(): IterableIterator<[string, string]> {
+    this.evictExpiredCacheEntries();
+    return super.entries();
+  }
+
+  keys(): IterableIterator<string> {
+    this.evictExpiredCacheEntries();
+    return super.keys();
+  }
+
+  values(): IterableIterator<string> {
+    this.evictExpiredCacheEntries();
+    return super.values();
+  }
+
   delete(key: string): boolean {
     this.clearCacheEntryEvictionTimeIfExists(key);
     return super.delete(key);
   }
 
-  get(key: string): string | undefined {
-    this.evictExpiredCacheEntries();
+  // has(key: string): boolean {
+  //   const hasValue = this.cache.has(key);
+  //
+  //   if (!this.isCacheEntryValid(key)) {
+  //     this.delete(key);
+  //     return false;
+  //   }
+  //
+  //   return hasValue;
+  // }
 
-    const value = super.get(key);
+  get(key: string): string | undefined {
+    if (!this.cache.has(key)) {
+      return undefined;
+    }
+
+    const value = this.cache.get(key);
+
     if (value !== undefined) {
+      if (!this.isCacheEntryValid(key)) {
+        this.delete(key);
+        return undefined;
+      }
+
       // Whenever we get a cache hit, we need to reset the timer
       // for eviction, because it is now considered most recently
       // accessed thus the timer should start over. Not doing that
@@ -68,8 +107,6 @@ export class TLRUCache extends LRUCache {
   }
 
   set(key: string, value: string): this {
-    this.evictExpiredCacheEntries();
-
     const cache = super.set(key, value);
     this.resetCacheEntryEvictionTime(key);
     return cache;
