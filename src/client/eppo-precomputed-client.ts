@@ -225,7 +225,7 @@ export default class EppoPrecomputedClient {
     eventsToFlush.forEach((event) => {
       try {
         logFunction(event);
-      } catch (error) {
+      } catch (error: any) {
         logger.error(`[Eppo SDK] Error flushing event to logger: ${error.message}`);
       }
     });
@@ -272,7 +272,7 @@ export default class EppoPrecomputedClient {
         allocationKey: allocationKey ?? '__eppo_no_allocation',
         variationKey: variation?.key ?? '__eppo_no_variation',
       });
-    } catch (error) {
+    } catch (error: any) {
       logger.error(`[Eppo SDK] Error logging assignment event: ${error.message}`);
     }
   }
