@@ -20,8 +20,8 @@ export interface BanditEvaluation {
 }
 
 export class BanditEvaluator {
-  private assignmentShards = BANDIT_ASSIGNMENT_SHARDS; // We just hard code this for now
-  private sharder: Sharder = new MD5Sharder();
+  private readonly assignmentShards = BANDIT_ASSIGNMENT_SHARDS; // We just hard code this for now
+  private readonly sharder: Sharder = new MD5Sharder();
 
   public evaluateBandit(
     flagKey: string,
