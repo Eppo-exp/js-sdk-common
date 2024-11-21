@@ -33,7 +33,7 @@ import { HybridConfigurationStore } from './configuration-store/hybrid.store';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import * as constants from './constants';
 import HttpClient from './http-client';
-import { Flag, ObfuscatedFlag, VariationType } from './interfaces';
+import { PrecomputedFlag, Flag, ObfuscatedFlag, VariationType } from './interfaces';
 import {
   AttributeType,
   Attributes,
@@ -85,6 +85,7 @@ export {
   FlagConfigurationRequestParameters,
   Flag,
   ObfuscatedFlag,
+  PrecomputedFlag,
   VariationType,
   AttributeType,
   Attributes,
