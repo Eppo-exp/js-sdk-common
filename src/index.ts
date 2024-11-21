@@ -20,6 +20,9 @@ import EppoClient, {
   IAssignmentDetails,
   IContainerExperiment,
 } from './client/eppo-client';
+import EppoPrecomputedClient, {
+  PrecomputedFlagsRequestParameters,
+} from './client/eppo-precomputed-client';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -50,12 +53,14 @@ export {
   IBanditLogger,
   IBanditEvent,
   IContainerExperiment,
+  PrecomputedFlagsRequestParameters,
   EppoClient,
   constants,
   ApiEndpoints,
   FlagConfigRequestor,
   HttpClient,
   validation,
+  EppoPrecomputedClient,
 
   // Configuration store
   IConfigurationStore,
