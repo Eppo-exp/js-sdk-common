@@ -155,6 +155,7 @@ export default class EppoPrecomputedClient {
 
     const result: FlagEvaluationWithoutDetails = {
       flagKey,
+      format: this.precomputedFlagStore.getFormat() ?? '',
       subjectKey: this.precomputedFlagsRequestParameters?.precompute.subjectKey ?? '',
       subjectAttributes: this.precomputedFlagsRequestParameters?.precompute.subjectAttributes ?? {},
       variation: {
@@ -307,12 +308,13 @@ export default class EppoPrecomputedClient {
   }
 
   private logAssignment(result: FlagEvaluationWithoutDetails) {
-    const { flagKey, subjectKey, allocationKey, subjectAttributes, variation } = result;
+    const { flagKey, subjectKey, allocationKey, subjectAttributes, variation, format } = result;
     const event: IAssignmentEvent = {
       ...(result.extraLogging ?? {}),
       allocation: allocationKey ?? null,
       experiment: allocationKey ? `${flagKey}-${allocationKey}` : null,
       featureFlag: flagKey,
+      format,
       variation: variation?.key ?? null,
       subject: subjectKey,
       timestamp: new Date().toISOString(),

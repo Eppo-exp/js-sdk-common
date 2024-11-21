@@ -839,7 +839,13 @@ export default class EppoClient {
         'FLAG_UNRECOGNIZED_OR_DISABLED',
         `Unrecognized or disabled flag: ${flagKey}`,
       );
-      return noneResult(flagKey, subjectKey, subjectAttributes, flagEvaluationDetails);
+      return noneResult(
+        flagKey,
+        subjectKey,
+        subjectAttributes,
+        flagEvaluationDetails,
+        configDetails.configFormat,
+      );
     }
 
     if (!checkTypeMatch(expectedVariationType, flag.variationType)) {
@@ -849,7 +855,13 @@ export default class EppoClient {
           'TYPE_MISMATCH',
           errorMessage,
         );
-        return noneResult(flagKey, subjectKey, subjectAttributes, flagEvaluationDetails);
+        return noneResult(
+          flagKey,
+          subjectKey,
+          subjectAttributes,
+          flagEvaluationDetails,
+          configDetails.configFormat,
+        );
       }
       throw new TypeError(errorMessage);
     }
@@ -861,7 +873,13 @@ export default class EppoClient {
         'FLAG_UNRECOGNIZED_OR_DISABLED',
         `Unrecognized or disabled flag: ${flagKey}`,
       );
-      return noneResult(flagKey, subjectKey, subjectAttributes, flagEvaluationDetails);
+      return noneResult(
+        flagKey,
+        subjectKey,
+        subjectAttributes,
+        flagEvaluationDetails,
+        configDetails.configFormat,
+      );
     }
 
     const result = this.evaluator.evaluateFlag(
@@ -904,6 +922,7 @@ export default class EppoClient {
       configFetchedAt: this.flagConfigurationStore.getConfigFetchedAt() ?? '',
       configPublishedAt: this.flagConfigurationStore.getConfigPublishedAt() ?? '',
       configEnvironment: this.flagConfigurationStore.getEnvironment() ?? { name: '' },
+      configFormat: this.flagConfigurationStore.getFormat() ?? '',
     };
   }
 
