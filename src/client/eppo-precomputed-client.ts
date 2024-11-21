@@ -13,6 +13,7 @@ import {
   DEFAULT_REQUEST_TIMEOUT_MS,
   DEFAULT_POLL_INTERVAL_MS,
   MAX_EVENT_QUEUE_SIZE,
+  PRECOMPUTED_BASE_URL,
 } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
@@ -81,7 +82,7 @@ export default class EppoPrecomputedClient {
       apiKey,
       sdkName,
       sdkVersion,
-      baseUrl, // Default is set in ApiEndpoints constructor if undefined
+      baseUrl, // Default is set before passing to ApiEndpoints constructor if undefined
       precompute: { subjectKey, subjectAttributes },
       requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
       numInitialRequestRetries = DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
@@ -100,7 +101,7 @@ export default class EppoPrecomputedClient {
 
     // todo: Inject the chain of dependencies below
     const apiEndpoints = new ApiEndpoints({
-      baseUrl,
+      baseUrl: baseUrl ?? PRECOMPUTED_BASE_URL,
       queryParams: { apiKey, sdkName, sdkVersion, subjectKey, subjectAttributes },
     });
     const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
