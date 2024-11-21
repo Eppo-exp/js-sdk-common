@@ -22,11 +22,43 @@ describe('EppoPrecomputedClient E2E test', () => {
       name: 'Test',
     },
     flags: {
-      'new-user-onboarding': {
+      'string-flag': {
         allocationKey: 'allocation-123',
         variationKey: 'variation-123',
         variationType: 'STRING',
         variationValue: 'red',
+        extraLogging: {},
+        doLog: true,
+      },
+      'boolean-flag': {
+        allocationKey: 'allocation-124',
+        variationKey: 'variation-124',
+        variationType: 'BOOLEAN',
+        variationValue: true,
+        extraLogging: {},
+        doLog: true,
+      },
+      'integer-flag': {
+        allocationKey: 'allocation-125',
+        variationKey: 'variation-125',
+        variationType: 'INTEGER',
+        variationValue: 42,
+        extraLogging: {},
+        doLog: true,
+      },
+      'numeric-flag': {
+        allocationKey: 'allocation-126',
+        variationKey: 'variation-126',
+        variationType: 'NUMERIC',
+        variationValue: 3.14,
+        extraLogging: {},
+        doLog: true,
+      },
+      'json-flag': {
+        allocationKey: 'allocation-127',
+        variationKey: 'variation-127',
+        variationType: 'JSON',
+        variationValue: '{"key": "value", "number": 123}',
         extraLogging: {},
         doLog: true,
       },
@@ -337,7 +369,7 @@ describe('EppoPrecomputedClient E2E test', () => {
     let precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
     let requestParameters: PrecomputedFlagsRequestParameters;
 
-    const precomputedFlagKey = 'new-user-onboarding';
+    const precomputedFlagKey = 'string-flag';
     const red = 'red';
 
     const maxRetryDelay = DEFAULT_POLL_INTERVAL_MS * POLL_JITTER_PCT;
@@ -465,6 +497,50 @@ describe('EppoPrecomputedClient E2E test', () => {
       await client.fetchPrecomputedFlags();
       variation = client.getStringAssignment(precomputedFlagKey, 'default');
       expect(variation).toBe('default');
+    });
+
+    describe('Gets typed assignments', () => {
+      let client: EppoPrecomputedClient;
+
+      beforeEach(async () => {
+        client = new EppoPrecomputedClient(storage, requestParameters);
+        await client.fetchPrecomputedFlags();
+      });
+
+      it('returns string assignment', () => {
+        expect(client.getStringAssignment('string-flag', 'default')).toBe('red');
+        expect(client.getStringAssignment('non-existent', 'default')).toBe('default');
+      });
+
+      it('returns boolean assignment', () => {
+        expect(client.getBooleanAssignment('boolean-flag', false)).toBe(true);
+        expect(client.getBooleanAssignment('non-existent', false)).toBe(false);
+      });
+
+      it('returns integer assignment', () => {
+        expect(client.getIntegerAssignment('integer-flag', 0)).toBe(42);
+        expect(client.getIntegerAssignment('non-existent', 0)).toBe(0);
+      });
+
+      it('returns numeric assignment', () => {
+        expect(client.getNumericAssignment('numeric-flag', 0)).toBe(3.14);
+        expect(client.getNumericAssignment('non-existent', 0)).toBe(0);
+      });
+
+      it('returns JSON assignment', () => {
+        expect(client.getJSONAssignment('json-flag', {})).toEqual({
+          key: 'value',
+          number: 123,
+        });
+        expect(client.getJSONAssignment('non-existent', {})).toEqual({});
+      });
+
+      it('returns default value when type mismatches', () => {
+        // Try to get a string value from a boolean flag
+        expect(client.getStringAssignment('boolean-flag', 'default')).toBe('default');
+        // Try to get a boolean value from a string flag
+        expect(client.getBooleanAssignment('string-flag', false)).toBe(false);
+      });
     });
 
     it.each([
