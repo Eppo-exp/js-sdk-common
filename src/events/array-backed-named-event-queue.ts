@@ -1,7 +1,14 @@
-import NamedEventQueue from './named-event-queue';
+import NamedEventQueue from "./named-event-queue";
 
-/** A named event queue backed by an array. */
-export default class ArrayBackedNamedEventQueue<T> implements NamedEventQueue<T> {
+/**
+ * @internal
+ * A named event queue backed by an **unbounded** array.
+ * This class probably should NOT be used directly, but only as a backing store for
+ * {@link BoundedEventQueue}.
+ */
+export default class ArrayBackedNamedEventQueue<T>
+  implements NamedEventQueue<T>
+{
   private readonly events: T[] = [];
 
   constructor(public readonly name: string) {}
@@ -22,7 +29,11 @@ export default class ArrayBackedNamedEventQueue<T> implements NamedEventQueue<T>
     return this.events[Symbol.iterator]();
   }
 
-  shift(): T | undefined {
-    return this.events.shift();
+  splice(count: number): T[] {
+    return this.events.splice(0, count);
+  }
+
+  isEmpty(): boolean {
+    return this.events.length === 0;
   }
 }

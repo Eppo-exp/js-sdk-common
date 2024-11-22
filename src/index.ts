@@ -29,6 +29,8 @@ import {
 import { HybridConfigurationStore } from './configuration-store/hybrid.store';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import * as constants from './constants';
+import ArrayBackedNamedEventQueue from './events/array-backed-named-event-queue';
+import NamedEventQueue from './events/named-event-queue';
 import HttpClient from './http-client';
 import { Flag, ObfuscatedFlag, VariationType } from './interfaces';
 import {
@@ -86,4 +88,8 @@ export {
   ContextAttributes,
   BanditSubjectAttributes,
   BanditActions,
+
+  // event queue types
+  ArrayBackedNamedEventQueue,
+  NamedEventQueue,
 };
