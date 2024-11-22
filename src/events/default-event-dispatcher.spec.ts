@@ -18,9 +18,9 @@ const createDispatcher = (
     EventDispatcherConfig & { networkStatusListener: NetworkStatusListener }
   > = {},
 ) => {
+  const batchSize = 2;
   const defaultConfig: EventDispatcherConfig = {
     ingestionUrl: 'http://example.com',
-    batchSize: 2,
     deliveryIntervalMs: 100,
     retryIntervalMs: 300,
     maxRetryDelayMs: 5000,
@@ -28,7 +28,7 @@ const createDispatcher = (
   };
   const config = { ...defaultConfig, ...configOverrides };
   const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
-  const batchProcessor = new BatchEventProcessor(eventQueue, config.batchSize);
+  const batchProcessor = new BatchEventProcessor(eventQueue, batchSize);
   const dispatcher = new DefaultEventDispatcher(
     batchProcessor,
     configOverrides.networkStatusListener || mockNetworkStatusListener,
@@ -44,7 +44,7 @@ describe('DefaultEventDispatcher', () => {
 
   describe('BatchEventProcessor', () => {
     it('processes events in batches of the configured size', () => {
-      const { dispatcher, batchProcessor } = createDispatcher({ batchSize: 2 });
+      const { dispatcher, batchProcessor } = createDispatcher();
 
       // Add three events to the queue
       dispatcher.dispatch({ id: 'foo-1', data: 'event1', params: {} });
@@ -162,7 +162,7 @@ describe('DefaultEventDispatcher', () => {
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it.only('resumes delivery when back online', async () => {
+    it('resumes delivery when back online', async () => {
       let isOffline = true;
       let cb = (_: boolean) => null as unknown as void;
       const networkStatusListener = {

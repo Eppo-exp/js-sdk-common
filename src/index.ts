@@ -30,9 +30,11 @@ import { HybridConfigurationStore } from './configuration-store/hybrid.store';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import * as constants from './constants';
 import ArrayBackedNamedEventQueue from './events/array-backed-named-event-queue';
+import BatchEventProcessor from './events/batch-event-processor';
 import DefaultEventDispatcher from './events/default-event-dispatcher';
 import EventDispatcher from './events/event-dispatcher';
 import NamedEventQueue from './events/named-event-queue';
+import NetworkStatusListener from './events/network-status-listener';
 import HttpClient from './http-client';
 import { Flag, ObfuscatedFlag, VariationType } from './interfaces';
 import {
@@ -95,5 +97,7 @@ export {
   ArrayBackedNamedEventQueue,
   NamedEventQueue,
   EventDispatcher,
+  BatchEventProcessor,
+  NetworkStatusListener,
   DefaultEventDispatcher,
 };

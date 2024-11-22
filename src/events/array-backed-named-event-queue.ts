@@ -1,4 +1,4 @@
-import NamedEventQueue from "./named-event-queue";
+import NamedEventQueue from './named-event-queue';
 
 /**
  * @internal
@@ -6,9 +6,7 @@ import NamedEventQueue from "./named-event-queue";
  * This class probably should NOT be used directly, but only as a backing store for
  * {@link BoundedEventQueue}.
  */
-export default class ArrayBackedNamedEventQueue<T>
-  implements NamedEventQueue<T>
-{
+export default class ArrayBackedNamedEventQueue<T> implements NamedEventQueue<T> {
   private readonly events: T[] = [];
 
   constructor(public readonly name: string) {}
