@@ -6,7 +6,9 @@ import {
   Flag,
   FormatEnum,
   PrecomputedFlag,
+  PrecomputedFlagsPayload,
 } from './interfaces';
+import { Attributes } from './types';
 
 export interface IQueryParams {
   apiKey: string;
@@ -16,7 +18,7 @@ export interface IQueryParams {
 
 export interface IQueryParamsWithSubject extends IQueryParams {
   subjectKey: string;
-  subjectAttributes: Record<string, any>;
+  subjectAttributes: Attributes;
 }
 
 export class HttpRequestError extends Error {
@@ -50,7 +52,9 @@ export interface IPrecomputedFlagsResponse {
 export interface IHttpClient {
   getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined>;
   getBanditParameters(): Promise<IBanditParametersResponse | undefined>;
-  getPrecomputedFlags(): Promise<IPrecomputedFlagsResponse | undefined>;
+  getPrecomputedFlags(
+    payload: PrecomputedFlagsPayload,
+  ): Promise<IPrecomputedFlagsResponse | undefined>;
   rawGet<T>(url: URL): Promise<T | undefined>;
 }
 
@@ -67,9 +71,11 @@ export default class FetchHttpClient implements IHttpClient {
     return await this.rawGet<IBanditParametersResponse>(url);
   }
 
-  async getPrecomputedFlags(): Promise<IPrecomputedFlagsResponse | undefined> {
+  async getPrecomputedFlags(
+    payload: PrecomputedFlagsPayload,
+  ): Promise<IPrecomputedFlagsResponse | undefined> {
     const url = this.apiEndpoints.precomputedFlagsEndpoint();
-    return await this.rawGet<IPrecomputedFlagsResponse>(url);
+    return await this.rawPost<IPrecomputedFlagsResponse, PrecomputedFlagsPayload>(url, payload);
   }
 
   async rawGet<T>(url: URL): Promise<T | undefined> {

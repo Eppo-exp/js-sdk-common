@@ -1,4 +1,5 @@
 import { Rule } from './rules';
+import { Attributes } from './types';
 
 export enum VariationType {
   STRING = 'STRING',
@@ -154,4 +155,9 @@ export interface PrecomputedFlagsDetails {
   precomputedFlagsFetchedAt: string;
   precomputedFlagsPublishedAt: string;
   precomputedFlagsEnvironment: Environment;
+}
+
+export interface PrecomputedFlagsPayload {
+  subjectKey: string;
+  subjectAttributes: Attributes;
 }
