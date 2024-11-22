@@ -27,6 +27,7 @@ export interface FlagEvaluation {
   allocationKey: string | null;
   variation: Variation | null;
   extraLogging: Record<string, string>;
+  // whether to log assignment event
   doLog: boolean;
   flagEvaluationDetails: IFlagEvaluationDetails;
 }
