@@ -73,30 +73,22 @@ export class TLRUCache extends LRUCache {
     return super.delete(key);
   }
 
-  // has(key: string): boolean {
-  //   const hasValue = this.cache.has(key);
-  //
-  //   if (!this.isCacheEntryValid(key)) {
-  //     this.delete(key);
-  //     return false;
-  //   }
-  //
-  //   return hasValue;
-  // }
+  has(key: string): boolean {
+    if (!this.isCacheEntryValid(key)) {
+      this.delete(key);
+      return false;
+    }
+    return this.cache.has(key);
+  }
 
   get(key: string): string | undefined {
-    if (!this.cache.has(key)) {
+    if (!this.isCacheEntryValid(key)) {
+      this.delete(key);
       return undefined;
     }
 
-    const value = this.cache.get(key);
-
+    const value = super.get(key);
     if (value !== undefined) {
-      if (!this.isCacheEntryValid(key)) {
-        this.delete(key);
-        return undefined;
-      }
-
       // Whenever we get a cache hit, we need to reset the timer
       // for eviction, because it is now considered most recently
       // accessed thus the timer should start over. Not doing that

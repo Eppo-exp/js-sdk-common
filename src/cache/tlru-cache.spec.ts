@@ -50,10 +50,12 @@ describe('TLRU Cache', () => {
   it('should evict all expired entries on .keys() call', () => {
     jest.useFakeTimers();
 
+    cache = new TLRUCache(3, expectedCacheTimeoutMs);
     cache.set('a', 'avocado');
     jest.advanceTimersByTime(expectedCacheTimeoutMs);
     cache.set('b', 'banana');
     jest.advanceTimersByTime(expectedCacheTimeoutMs);
+    cache.set('c', 'cherry');
 
     const cacheKeys = [];
 
@@ -61,16 +63,19 @@ describe('TLRU Cache', () => {
       cacheKeys.push(key);
     }
 
-    expect(cacheKeys.length).toBe(0);
+    expect(cacheKeys.length).toBe(1);
+    expect(cache.get('c')).toBe('cherry');
   });
 
   it('should evict all expired entries on .values() call', () => {
     jest.useFakeTimers();
+    cache = new TLRUCache(3, expectedCacheTimeoutMs);
 
     cache.set('a', 'avocado');
     jest.advanceTimersByTime(expectedCacheTimeoutMs);
     cache.set('b', 'banana');
     jest.advanceTimersByTime(expectedCacheTimeoutMs);
+    cache.set('c', 'cherry');
 
     const cacheValues = [];
 
@@ -78,7 +83,8 @@ describe('TLRU Cache', () => {
       cacheValues.push(value);
     }
 
-    expect(cacheValues.length).toBe(0);
+    expect(cacheValues.length).toBe(1);
+    expect(cache.get('c')).toBe('cherry');
   });
 
   it('should overwrite existing cache entry', () => {
@@ -152,8 +158,18 @@ describe('TLRU Cache', () => {
     cache.set('b', 'banana');
     cache.set('c', 'cherry');
 
-    const keys = Array.from(cache.keys());
+    let keys = Array.from(cache.keys());
     expect(keys[0]).toBe('b');
+    expect(keys[1]).toBe('c');
+
+    cache = new TLRUCache(2, expectedCacheTimeoutMs);
+    cache.set('a', 'apple');
+    cache.set('b', 'banana');
+    cache.get('a');
+    cache.set('c', 'cherry');
+
+    keys = Array.from(cache.keys());
+    expect(keys[0]).toBe('a');
     expect(keys[1]).toBe('c');
   });
 });
