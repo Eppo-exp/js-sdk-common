@@ -50,6 +50,11 @@ export interface IAssignmentEvent {
   metaData?: Record<string, unknown>;
 
   /**
+   * The format of the flag.
+   */
+  format: string;
+
+  /**
    * The flag evaluation details. Null if the flag was precomputed.
    */
   evaluationDetails: IFlagEvaluationDetails | null;

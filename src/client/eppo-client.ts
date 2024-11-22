@@ -1036,12 +1036,13 @@ export default class EppoClient {
   }
 
   private logAssignment(result: FlagEvaluation) {
-    const { flagKey, subjectKey, allocationKey, subjectAttributes, variation } = result;
+    const { flagKey, format, subjectKey, allocationKey, subjectAttributes, variation } = result;
     const event: IAssignmentEvent = {
       ...(result.extraLogging ?? {}),
       allocation: allocationKey ?? null,
       experiment: allocationKey ? `${flagKey}-${allocationKey}` : null,
       featureFlag: flagKey,
+      format,
       variation: variation?.key ?? null,
       subject: subjectKey,
       timestamp: new Date().toISOString(),
