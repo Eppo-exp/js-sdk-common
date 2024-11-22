@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { v4 as randomUUID } from 'uuid';
 
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
@@ -23,9 +23,7 @@ import { EppoValue } from '../eppo_value';
 import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
 import ArrayBackedNamedEventQueue from '../events/array-backed-named-event-queue';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
-import DefaultEventDispatcher from '../events/default-event-dispatcher';
 import EventDispatcher from '../events/event-dispatcher';
-import NamedEventQueue from '../events/named-event-queue';
 import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
 import {
   FlagEvaluationDetailsBuilder,
