@@ -102,10 +102,15 @@ export default class EppoPrecomputedClient {
     // todo: Inject the chain of dependencies below
     const apiEndpoints = new ApiEndpoints({
       baseUrl: baseUrl ?? PRECOMPUTED_BASE_URL,
-      queryParams: { apiKey, sdkName, sdkVersion, subjectKey, subjectAttributes },
+      queryParams: { apiKey, sdkName, sdkVersion },
     });
     const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
-    const precomputedRequestor = new PrecomputedRequestor(httpClient, this.precomputedFlagStore);
+    const precomputedRequestor = new PrecomputedRequestor(
+      httpClient,
+      this.precomputedFlagStore,
+      subjectKey,
+      subjectAttributes,
+    );
 
     const pollingCallback = async () => {
       if (await this.precomputedFlagStore.isExpired()) {

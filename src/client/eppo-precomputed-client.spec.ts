@@ -84,7 +84,9 @@ describe('EppoPrecomputedClient E2E test', () => {
       },
     });
     const httpClient = new FetchHttpClient(apiEndpoints, 1000);
-    const precomputedFlagRequestor = new PrecomputedRequestor(httpClient, storage);
+    const precomputedFlagRequestor = new PrecomputedRequestor(httpClient, storage, 'subject-key', {
+      'attribute-key': 'attribute-value',
+    });
     await precomputedFlagRequestor.fetchAndStorePrecomputedFlags();
   });
 

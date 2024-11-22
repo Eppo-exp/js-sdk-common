@@ -3,7 +3,7 @@ import { IConfigurationStore } from './configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import FetchHttpClient, { IHttpClient } from './http-client';
 import { PrecomputedFlag } from './interfaces';
-import ConfigurationRequestor from './precomputed-requestor';
+import PrecomputedFlagRequestor from './precomputed-requestor';
 
 const MOCK_PRECOMPUTED_RESPONSE = {
   flags: {
@@ -34,7 +34,7 @@ const MOCK_PRECOMPUTED_RESPONSE = {
 describe('PrecomputedRequestor', () => {
   let precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   let httpClient: IHttpClient;
-  let configurationRequestor: ConfigurationRequestor;
+  let precomputedFlagRequestor: PrecomputedFlagRequestor;
   let fetchSpy: jest.Mock;
 
   beforeEach(() => {
@@ -48,7 +48,14 @@ describe('PrecomputedRequestor', () => {
     });
     httpClient = new FetchHttpClient(apiEndpoints, 1000);
     precomputedFlagStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
-    configurationRequestor = new ConfigurationRequestor(httpClient, precomputedFlagStore);
+    precomputedFlagRequestor = new PrecomputedFlagRequestor(
+      httpClient,
+      precomputedFlagStore,
+      'subject-key',
+      {
+        'attribute-key': 'attribute-value',
+      },
+    );
 
     fetchSpy = jest.fn(() => {
       return Promise.resolve({
@@ -70,7 +77,7 @@ describe('PrecomputedRequestor', () => {
 
   describe('Precomputed flags', () => {
     it('Fetches and stores precomputed flag configuration', async () => {
-      await configurationRequestor.fetchAndStorePrecomputedFlags();
+      await precomputedFlagRequestor.fetchAndStorePrecomputedFlags();
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
 
@@ -110,7 +117,7 @@ describe('PrecomputedRequestor', () => {
         }),
       );
 
-      await configurationRequestor.fetchAndStorePrecomputedFlags();
+      await precomputedFlagRequestor.fetchAndStorePrecomputedFlags();
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       expect(precomputedFlagStore.getKeys().length).toBe(0);
