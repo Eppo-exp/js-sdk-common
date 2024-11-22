@@ -1,18 +1,14 @@
-import { randomUUID } from 'crypto';
-
 import { logger } from '../application-logger';
 
-import BatchProcessor from './batch-event-processor';
 import BatchEventProcessor from './batch-event-processor';
 import BatchRetryManager from './batch-retry-manager';
 import EventDelivery from './event-delivery';
 import EventDispatcher, { Event } from './event-dispatcher';
-import NamedEventQueue from './named-event-queue';
 import NetworkStatusListener from './network-status-listener';
 
 export type EventDispatcherConfig = {
+  // target url to deliver events to
   ingestionUrl: string;
-  batchSize: number;
   // number of milliseconds to wait between each batch delivery
   deliveryIntervalMs: number;
   // minimum amount of milliseconds to wait before retrying a failed delivery
