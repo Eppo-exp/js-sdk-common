@@ -1,5 +1,6 @@
 import { IAssignmentEvent } from './assignment-logger';
 import { AllocationEvaluationCode } from './flag-evaluation-details-builder';
+import { FormatEnum } from './interfaces';
 
 describe('IAssignmentEvent', () => {
   it('should allow adding arbitrary fields', () => {
@@ -11,6 +12,7 @@ describe('IAssignmentEvent', () => {
       subject: 'subject_123',
       timestamp: new Date().toISOString(),
       subjectAttributes: { age: 25, country: 'USA' },
+      format: FormatEnum.SERVER,
       holdoutKey: 'holdout_key_123',
       evaluationDetails: {
         environmentName: 'Test',

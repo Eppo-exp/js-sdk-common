@@ -46,6 +46,7 @@ export interface ConfigDetails {
   configFetchedAt: string;
   configPublishedAt: string;
   configEnvironment: Environment;
+  configFormat: string;
 }
 
 export interface Flag {
@@ -132,4 +133,25 @@ export interface BanditCategoricalAttributeCoefficients {
   attributeKey: string;
   valueCoefficients: Record<string, number>;
   missingValueCoefficient: number;
+}
+
+export enum FormatEnum {
+  SERVER = 'SERVER',
+  CLIENT = 'CLIENT',
+  PRECOMPUTED = 'PRECOMPUTED',
+}
+
+export interface PrecomputedFlag {
+  allocationKey: string;
+  variationKey: string;
+  variationType: VariationType;
+  variationValue: string;
+  extraLogging: Record<string, string>;
+  doLog: boolean;
+}
+
+export interface PrecomputedFlagsDetails {
+  precomputedFlagsFetchedAt: string;
+  precomputedFlagsPublishedAt: string;
+  precomputedFlagsEnvironment: Environment;
 }

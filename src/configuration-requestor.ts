@@ -1,8 +1,7 @@
 import { IConfigurationStore } from './configuration-store/configuration-store';
+import { hydrateConfigurationStore } from './configuration-store/configuration-store-utils';
 import { IHttpClient } from './http-client';
-import { BanditVariation, BanditParameters, Flag, Environment } from './interfaces';
-
-type Entry = Flag | BanditVariation[] | BanditParameters;
+import { BanditVariation, BanditParameters, Flag } from './interfaces';
 
 // Requests AND stores flag configurations
 export default class ConfigurationRequestor {
@@ -21,10 +20,11 @@ export default class ConfigurationRequestor {
       return;
     }
 
-    await this.hydrateConfigurationStore(this.flagConfigurationStore, {
+    await hydrateConfigurationStore(this.flagConfigurationStore, {
       entries: configResponse.flags,
       environment: configResponse.environment,
       createdAt: configResponse.createdAt,
+      format: configResponse.format,
     });
 
     const flagsHaveBandits = Object.keys(configResponse.bandits ?? {}).length > 0;
@@ -35,10 +35,11 @@ export default class ConfigurationRequestor {
       // Map bandit flag associations by flag key for quick lookup (instead of bandit key as provided by the UFC)
       const banditVariations = this.indexBanditVariationsByFlagKey(configResponse.bandits);
 
-      await this.hydrateConfigurationStore(this.banditVariationConfigurationStore, {
+      await hydrateConfigurationStore(this.banditVariationConfigurationStore, {
         entries: banditVariations,
         environment: configResponse.environment,
         createdAt: configResponse.createdAt,
+        format: configResponse.format,
       });
 
       // TODO: different polling intervals for bandit parameters
@@ -48,29 +49,12 @@ export default class ConfigurationRequestor {
           throw new Error('Bandit parameters fetched but no bandit configuration store provided');
         }
 
-        await this.hydrateConfigurationStore(this.banditModelConfigurationStore, {
+        await hydrateConfigurationStore(this.banditModelConfigurationStore, {
           entries: banditResponse.bandits,
           environment: configResponse.environment,
           createdAt: configResponse.createdAt,
+          format: configResponse.format,
         });
-      }
-    }
-  }
-
-  private async hydrateConfigurationStore<T extends Entry>(
-    configurationStore: IConfigurationStore<T> | null,
-    response: {
-      entries: Record<string, T>;
-      environment: Environment;
-      createdAt: string;
-    },
-  ): Promise<void> {
-    if (configurationStore) {
-      const didUpdate = await configurationStore.setEntries(response.entries);
-      if (didUpdate) {
-        configurationStore.setEnvironment(response.environment);
-        configurationStore.setConfigFetchedAt(new Date().toISOString());
-        configurationStore.setConfigPublishedAt(response.createdAt);
       }
     }
   }

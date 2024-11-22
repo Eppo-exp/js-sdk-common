@@ -1,10 +1,22 @@
 import ApiEndpoints from './api-endpoints';
-import { BanditParameters, BanditVariation, Environment, Flag } from './interfaces';
+import {
+  BanditParameters,
+  BanditVariation,
+  Environment,
+  Flag,
+  FormatEnum,
+  PrecomputedFlag,
+} from './interfaces';
 
 export interface IQueryParams {
   apiKey: string;
   sdkVersion: string;
   sdkName: string;
+}
+
+export interface IQueryParamsWithSubject extends IQueryParams {
+  subjectKey: string;
+  subjectAttributes: Record<string, any>;
 }
 
 export class HttpRequestError extends Error {
@@ -18,6 +30,7 @@ export class HttpRequestError extends Error {
 
 export interface IUniversalFlagConfigResponse {
   createdAt: string; // ISO formatted string
+  format: FormatEnum;
   environment: Environment;
   flags: Record<string, Flag>;
   bandits: Record<string, BanditVariation[]>;
@@ -27,9 +40,17 @@ export interface IBanditParametersResponse {
   bandits: Record<string, BanditParameters>;
 }
 
+export interface IPrecomputedFlagsResponse {
+  createdAt: string;
+  format: FormatEnum;
+  environment: Environment;
+  flags: Record<string, PrecomputedFlag>;
+}
+
 export interface IHttpClient {
   getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined>;
   getBanditParameters(): Promise<IBanditParametersResponse | undefined>;
+  getPrecomputedFlags(): Promise<IPrecomputedFlagsResponse | undefined>;
   rawGet<T>(url: URL): Promise<T | undefined>;
 }
 
@@ -44,6 +65,11 @@ export default class FetchHttpClient implements IHttpClient {
   async getBanditParameters(): Promise<IBanditParametersResponse | undefined> {
     const url = this.apiEndpoints.banditParametersEndpoint();
     return await this.rawGet<IBanditParametersResponse>(url);
+  }
+
+  async getPrecomputedFlags(): Promise<IPrecomputedFlagsResponse | undefined> {
+    const url = this.apiEndpoints.precomputedFlagsEndpoint();
+    return await this.rawGet<IPrecomputedFlagsResponse>(url);
   }
 
   async rawGet<T>(url: URL): Promise<T | undefined> {

@@ -1,5 +1,5 @@
 import { Evaluator, hashKey, isInShardRange, matchesRules } from './evaluator';
-import { Flag, Variation, Shard, VariationType, ConfigDetails } from './interfaces';
+import { Flag, Variation, Shard, VariationType, ConfigDetails, FormatEnum } from './interfaces';
 import { getMD5Hash } from './obfuscation';
 import { ObfuscatedOperatorType, OperatorType, Rule } from './rules';
 import { DeterministicSharder } from './sharders';
@@ -20,6 +20,7 @@ describe('Evaluator', () => {
       },
       configFetchedAt: new Date().toISOString(),
       configPublishedAt: new Date().toISOString(),
+      configFormat: FormatEnum.CLIENT,
     };
   });
 
