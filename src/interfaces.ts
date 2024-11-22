@@ -158,6 +158,6 @@ export interface PrecomputedFlagsDetails {
 }
 
 export interface PrecomputedFlagsPayload {
-  subjectKey: string;
-  subjectAttributes: Attributes;
+  subject_key: string;
+  subject_attributes: Attributes;
 }

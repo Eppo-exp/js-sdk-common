@@ -15,8 +15,8 @@ export default class PrecomputedFlagRequestor {
 
   async fetchAndStorePrecomputedFlags(): Promise<void> {
     const precomputedResponse = await this.httpClient.getPrecomputedFlags({
-      subjectKey: this.subjectKey,
-      subjectAttributes: this.subjectAttributes,
+      subject_key: this.subjectKey,
+      subject_attributes: this.subjectAttributes,
     });
 
     if (!precomputedResponse?.flags) {

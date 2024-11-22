@@ -56,6 +56,7 @@ export interface IHttpClient {
     payload: PrecomputedFlagsPayload,
   ): Promise<IPrecomputedFlagsResponse | undefined>;
   rawGet<T>(url: URL): Promise<T | undefined>;
+  rawPost<T, P>(url: URL, payload: P): Promise<T | undefined>;
 }
 
 export default class FetchHttpClient implements IHttpClient {
@@ -122,7 +123,8 @@ export default class FetchHttpClient implements IHttpClient {
       clearTimeout(timeoutId);
 
       if (!response?.ok) {
-        throw new HttpRequestError('Failed to post data', response?.status);
+        const errorBody = await response.text();
+        throw new HttpRequestError(errorBody || 'Failed to post data', response?.status);
       }
       return await response.json();
     } catch (error: any) {
