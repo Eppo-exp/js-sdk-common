@@ -97,4 +97,36 @@ export default class FetchHttpClient implements IHttpClient {
       throw new HttpRequestError('Network error', 0, error);
     }
   }
+
+  async rawPost<T, P>(url: URL, payload: P): Promise<T | undefined> {
+    try {
+      const controller = new AbortController();
+      const signal = controller.signal;
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response?.ok) {
+        throw new HttpRequestError('Failed to post data', response?.status);
+      }
+      return await response.json();
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new HttpRequestError('Request timed out', 408, error);
+      } else if (error instanceof HttpRequestError) {
+        throw error;
+      }
+
+      throw new HttpRequestError('Network error', 0, error);
+    }
+  }
 }
