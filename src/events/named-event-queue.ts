@@ -4,9 +4,14 @@ export default interface NamedEventQueue<T> {
 
   name: string;
 
+  /** Add an element to the end of the array */
   push(event: T): void;
 
   [Symbol.iterator](): IterableIterator<T>;
 
-  shift(): T | undefined;
+  /** changes the contents of an array by removing count elements from the start of the queue */
+  splice(count: number): T[];
+
+  /** Returns true if the queue is empty */
+  isEmpty(): boolean;
 }

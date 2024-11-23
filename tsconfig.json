@@ -5,7 +5,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
-    "target": "es2017",
+    "target": "es2020",
     "outDir": "dist",
     "noImplicitAny": true,
     "strict": true,

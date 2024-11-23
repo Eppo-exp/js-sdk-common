@@ -24,6 +24,7 @@ module.exports = {
     ],
     'import/named': 'off',
     'import/no-unresolved': 'off',
+    '@typescript-eslint/no-explicit-any': 'off',
     'import/order': [
       'warn',
       {
@@ -33,7 +34,7 @@ module.exports = {
             group: 'parent',
             position: 'before',
           },
-       ],
+        ],
         groups: ['builtin', 'external', 'parent', 'sibling', 'index'],
         'newlines-between': 'always',
         alphabetize: {
