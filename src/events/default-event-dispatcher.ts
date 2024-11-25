@@ -131,7 +131,7 @@ export function newDefaultEventDispatcher(
   sdkKey: string,
   batchSize: number = DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
   config: Omit<EventDispatcherConfig, 'ingestionUrl'> = DEFAULT_EVENT_DISPATCHER_CONFIG,
-): DefaultEventDispatcher {
+): EventDispatcher {
   const sdkKeyDecoder = new SdkKeyDecoder();
   const ingestionUrl = sdkKeyDecoder.decodeEventIngestionHostName(sdkKey);
   if (!ingestionUrl) {
