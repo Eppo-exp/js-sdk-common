@@ -30,6 +30,7 @@ import { HybridConfigurationStore } from './configuration-store/hybrid.store';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import * as constants from './constants';
 import BatchEventProcessor from './events/batch-event-processor';
+import { BoundedEventQueue } from './events/bounded-event-queue';
 import DefaultEventDispatcher, {
   DEFAULT_EVENT_DISPATCHER_CONFIG,
   DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
@@ -99,6 +100,7 @@ export {
   // event dispatcher types
   NamedEventQueue,
   EventDispatcher,
+  BoundedEventQueue,
   DEFAULT_EVENT_DISPATCHER_CONFIG,
   DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
   newDefaultEventDispatcher,
