@@ -3,11 +3,10 @@ import { logger } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import { BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
-import {
-  AssignmentCache,
-  LRUInMemoryAssignmentCache,
-  NonExpiringInMemoryAssignmentCache,
-} from '../cache/abstract-assignment-cache';
+import { AssignmentCache } from '../cache/abstract-assignment-cache';
+import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
+import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
+import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
 import ConfigurationRequestor from '../configuration-requestor';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import {
@@ -1011,8 +1010,12 @@ export default class EppoClient {
     this.banditAssignmentCache = new NonExpiringInMemoryAssignmentCache();
   }
 
-  useLRUInMemoryBanditAssignmentCache(maxSize: number) {
-    this.banditAssignmentCache = new LRUInMemoryAssignmentCache(maxSize);
+  /**
+   * @param {number} maxSize - Maximum cache size
+   * @param {number} timeout - TTL of cache entries
+   */
+  useExpiringInMemoryBanditAssignmentCache(maxSize: number, timeout?: number) {
+    this.banditAssignmentCache = new TLRUInMemoryAssignmentCache(maxSize, timeout);
   }
 
   // noinspection JSUnusedGlobalSymbols
