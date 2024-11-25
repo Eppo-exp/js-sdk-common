@@ -20,9 +20,7 @@ import {
 import { decodeFlag } from '../decoding';
 import { EppoValue } from '../eppo_value';
 import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
-import ArrayBackedNamedEventQueue from '../events/array-backed-named-event-queue';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
-import { EventDispatcherConfig } from '../events/default-event-dispatcher';
 import EventDispatcher from '../events/event-dispatcher';
 import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
 import {
@@ -83,9 +81,9 @@ export interface IContainerExperiment<T> {
 export default class EppoClient {
   private eventDispatcher: EventDispatcher;
   private readonly assignmentEventsQueue: BoundedEventQueue<IAssignmentEvent> =
-    newBoundedArrayEventQueue<IAssignmentEvent>('assignments');
+    new BoundedEventQueue<IAssignmentEvent>('assignments');
   private readonly banditEventsQueue: BoundedEventQueue<IBanditEvent> =
-    newBoundedArrayEventQueue<IBanditEvent>('bandit');
+    new BoundedEventQueue<IBanditEvent>('bandit');
   private readonly banditEvaluator = new BanditEvaluator();
   private banditLogger?: IBanditLogger;
   private banditAssignmentCache?: AssignmentCache;
@@ -1142,8 +1140,4 @@ export function checkValueTypeMatch(
     default:
       return false;
   }
-}
-
-function newBoundedArrayEventQueue<T>(name: string): BoundedEventQueue<T> {
-  return new BoundedEventQueue<T>(new ArrayBackedNamedEventQueue<T>(name));
 }
