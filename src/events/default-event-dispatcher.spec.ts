@@ -2,7 +2,10 @@ import { resolve } from 'eslint-import-resolver-typescript';
 
 import ArrayBackedNamedEventQueue from './array-backed-named-event-queue';
 import BatchEventProcessor from './batch-event-processor';
-import DefaultEventDispatcher, { EventDispatcherConfig } from './default-event-dispatcher';
+import DefaultEventDispatcher, {
+  EventDispatcherConfig,
+  newDefaultEventDispatcher,
+} from './default-event-dispatcher';
 import { Event } from './event-dispatcher';
 import NetworkStatusListener from './network-status-listener';
 
@@ -196,6 +199,23 @@ describe('DefaultEventDispatcher', () => {
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       expect(global.fetch).toHaveBeenCalled();
+    });
+  });
+
+  describe('newDefaultEventDispatcher', () => {
+    it('should create a new DefaultEventDispatcher with the provided configuration', () => {
+      const networkStatusListener = {
+        isOffline: () => false,
+        onNetworkStatusChange: (callback: (isOffline: boolean) => void) => null as unknown as void,
+        triggerNetworkStatusChange: () => null,
+      };
+      const eventQueue = new ArrayBackedNamedEventQueue('test-queue');
+      const dispatcher = newDefaultEventDispatcher(
+        eventQueue,
+        networkStatusListener,
+        'zCsQuoHJxVPp895.ZWg9MTIzNDU2LmUudGVzdGluZy5lcHBvLmNsb3Vk',
+      );
+      expect(dispatcher).toBeInstanceOf(DefaultEventDispatcher);
     });
   });
 });

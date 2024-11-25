@@ -22,6 +22,7 @@ import { EppoValue } from '../eppo_value';
 import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
 import ArrayBackedNamedEventQueue from '../events/array-backed-named-event-queue';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
+import { EventDispatcherConfig } from '../events/default-event-dispatcher';
 import EventDispatcher from '../events/event-dispatcher';
 import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
 import {
@@ -79,17 +80,8 @@ export interface IContainerExperiment<T> {
   treatmentVariationEntries: Array<T>;
 }
 
-const DEFAULT_EVENT_DISPATCHER_CONFIG = {
-  // TODO: Replace with actual ingestion URL
-  ingestionUrl: 'https://example.com/events',
-  batchSize: 10,
-  flushIntervalMs: 10_000,
-  retryIntervalMs: 5_000,
-  maxRetries: 3,
-};
-
 export default class EppoClient {
-  private readonly eventDispatcher: EventDispatcher;
+  private eventDispatcher: EventDispatcher;
   private readonly assignmentEventsQueue: BoundedEventQueue<IAssignmentEvent> =
     newBoundedArrayEventQueue<IAssignmentEvent>('assignments');
   private readonly banditEventsQueue: BoundedEventQueue<IBanditEvent> =
@@ -150,6 +142,12 @@ export default class EppoClient {
     banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]>,
   ) {
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
+  }
+
+  /** Sets the EventDispatcher instance to use when tracking events with {@link track}. */
+  // noinspection JSUnusedGlobalSymbols
+  setEventDispatcher(eventDispatcher: EventDispatcher) {
+    this.eventDispatcher = eventDispatcher;
   }
 
   // noinspection JSUnusedGlobalSymbols

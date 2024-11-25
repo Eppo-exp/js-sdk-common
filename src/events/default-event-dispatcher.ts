@@ -4,7 +4,9 @@ import BatchEventProcessor from './batch-event-processor';
 import BatchRetryManager from './batch-retry-manager';
 import EventDelivery from './event-delivery';
 import EventDispatcher, { Event } from './event-dispatcher';
+import NamedEventQueue from './named-event-queue';
 import NetworkStatusListener from './network-status-listener';
+import SdkKeyDecoder from './sdk-key-decoder';
 
 export type EventDispatcherConfig = {
   // target url to deliver events to
@@ -17,6 +19,16 @@ export type EventDispatcherConfig = {
   maxRetryDelayMs: number;
   // maximum number of retry attempts before giving up on a batch delivery
   maxRetries?: number;
+};
+
+// TODO: Have more realistic default batch size based on average event payload size once we have
+//  more concrete data.
+export const DEFAULT_EVENT_DISPATCHER_BATCH_SIZE = 100;
+export const DEFAULT_EVENT_DISPATCHER_CONFIG: Omit<EventDispatcherConfig, 'ingestionUrl'> = {
+  deliveryIntervalMs: 10_000,
+  retryIntervalMs: 5_000,
+  maxRetryDelayMs: 30_000,
+  maxRetries: 3,
 };
 
 /**
@@ -37,6 +49,7 @@ export default class DefaultEventDispatcher implements EventDispatcher {
     private readonly networkStatusListener: NetworkStatusListener,
     config: EventDispatcherConfig,
   ) {
+    this.ensureConfigFields(config);
     this.eventDelivery = new EventDelivery(config.ingestionUrl);
     this.retryManager = new BatchRetryManager(this.eventDelivery, {
       retryIntervalMs: config.retryIntervalMs,
@@ -94,4 +107,39 @@ export default class DefaultEventDispatcher implements EventDispatcher {
       this.dispatchTimer = setTimeout(() => this.deliverNextBatch(), this.deliveryIntervalMs);
     }
   }
+
+  private ensureConfigFields(config: EventDispatcherConfig) {
+    if (!config.ingestionUrl) {
+      throw new Error('Missing required ingestionUrl in EventDispatcherConfig');
+    }
+    if (!config.deliveryIntervalMs) {
+      throw new Error('Missing required deliveryIntervalMs in EventDispatcherConfig');
+    }
+    if (!config.retryIntervalMs) {
+      throw new Error('Missing required retryIntervalMs in EventDispatcherConfig');
+    }
+    if (!config.maxRetryDelayMs) {
+      throw new Error('Missing required maxRetryDelayMs in EventDispatcherConfig');
+    }
+  }
+}
+
+/** Creates a new {@link DefaultEventDispatcher} with the provided configuration. */
+export function newDefaultEventDispatcher(
+  eventQueue: NamedEventQueue<unknown>,
+  networkStatusListener: NetworkStatusListener,
+  sdkKey: string,
+  batchSize: number = DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
+  config: Omit<EventDispatcherConfig, 'ingestionUrl'> = DEFAULT_EVENT_DISPATCHER_CONFIG,
+): DefaultEventDispatcher {
+  const sdkKeyDecoder = new SdkKeyDecoder();
+  const ingestionUrl = sdkKeyDecoder.decodeEventIngestionHostName(sdkKey);
+  if (!ingestionUrl) {
+    throw new Error('Unable to parse Event ingestion URL from SDK key');
+  }
+  return new DefaultEventDispatcher(
+    new BatchEventProcessor(eventQueue, batchSize),
+    networkStatusListener,
+    { ...config, ingestionUrl },
+  );
 }
