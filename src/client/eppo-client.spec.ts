@@ -17,6 +17,7 @@ import { IConfigurationStore } from '../configuration-store/configuration-store'
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
+import { AttributeType } from '../types';
 
 import EppoClient, { FlagConfigurationRequestParameters, checkTypeMatch } from './eppo-client';
 import { initConfiguration } from './test-utils';
@@ -75,7 +76,7 @@ describe('EppoClient E2E test', () => {
 
     beforeAll(() => {
       storage.setEntries({ [flagKey]: mockFlag });
-      client = new EppoClient(storage);
+      client = new EppoClient({ flagConfigurationStore: storage });
 
       td.replace(EppoClient.prototype, 'getAssignmentDetail', function () {
         throw new Error('Mock test error');
@@ -136,7 +137,7 @@ describe('EppoClient E2E test', () => {
     it('Invokes logger for queued events', () => {
       const mockLogger = td.object<IAssignmentLogger>();
 
-      const client = new EppoClient(storage);
+      const client = new EppoClient({ flagConfigurationStore: storage });
       client.getStringAssignment(flagKey, 'subject-to-be-logged', {}, 'default-value');
       client.setAssignmentLogger(mockLogger);
 
@@ -149,7 +150,7 @@ describe('EppoClient E2E test', () => {
     it('Does not log same queued event twice', () => {
       const mockLogger = td.object<IAssignmentLogger>();
 
-      const client = new EppoClient(storage);
+      const client = new EppoClient({ flagConfigurationStore: storage });
 
       client.getStringAssignment(flagKey, 'subject-to-be-logged', {}, 'default-value');
       client.setAssignmentLogger(mockLogger);
@@ -160,7 +161,7 @@ describe('EppoClient E2E test', () => {
 
     it('Does not invoke logger for events that exceed queue size', () => {
       const mockLogger = td.object<IAssignmentLogger>();
-      const client = new EppoClient(storage);
+      const client = new EppoClient({ flagConfigurationStore: storage });
 
       times(MAX_EVENT_QUEUE_SIZE + 100, (i) =>
         client.getStringAssignment(flagKey, `subject-to-be-logged-${i}`, {}, 'default-value'),
@@ -198,7 +199,7 @@ describe('EppoClient E2E test', () => {
 
       it.each(Object.keys(testCases))('test variation assignment splits - %s', async (fileName) => {
         const { flag, variationType, defaultValue, subjects } = testCases[fileName];
-        const client = new EppoClient(storage);
+        const client = new EppoClient({ flagConfigurationStore: storage });
         client.setIsGracefulFailureMode(false);
 
         let assignments: {
@@ -214,7 +215,12 @@ describe('EppoClient E2E test', () => {
           [VariationType.JSON]: client.getJSONAssignment.bind(client),
         };
 
-        const assignmentFn = typeAssignmentFunctions[variationType];
+        const assignmentFn = typeAssignmentFunctions[variationType] as (
+          flagKey: string,
+          subjectKey: string,
+          subjectAttributes: Record<string, AttributeType>,
+          defaultValue: boolean | string | number | object,
+        ) => never;
         if (!assignmentFn) {
           throw new Error(`Unknown variation type: ${variationType}`);
         }
@@ -247,7 +253,7 @@ describe('EppoClient E2E test', () => {
 
       it.each(Object.keys(testCases))('test variation assignment splits - %s', async (fileName) => {
         const { flag, variationType, defaultValue, subjects } = testCases[fileName];
-        const client = new EppoClient(storage, undefined, undefined, undefined, true);
+        const client = new EppoClient({ flagConfigurationStore: storage, isObfuscated: true });
         client.setIsGracefulFailureMode(false);
 
         const typeAssignmentFunctions = {
@@ -258,7 +264,12 @@ describe('EppoClient E2E test', () => {
           [VariationType.JSON]: client.getJSONAssignment.bind(client),
         };
 
-        const assignmentFn = typeAssignmentFunctions[variationType];
+        const assignmentFn = typeAssignmentFunctions[variationType] as (
+          flagKey: string,
+          subjectKey: string,
+          subjectAttributes: Record<string, AttributeType>,
+          defaultValue: boolean | string | number | object,
+        ) => never;
         if (!assignmentFn) {
           throw new Error(`Unknown variation type: ${variationType}`);
         }
@@ -274,7 +285,9 @@ describe('EppoClient E2E test', () => {
   });
 
   it('returns null if getStringAssignment was called for the subject before any UFC was loaded', () => {
-    const localClient = new EppoClient(new MemoryOnlyConfigurationStore());
+    const localClient = new EppoClient({
+      flagConfigurationStore: new MemoryOnlyConfigurationStore(),
+    });
     expect(localClient.getStringAssignment(flagKey, 'subject-1', {}, 'hello world')).toEqual(
       'hello world',
     );
@@ -282,7 +295,7 @@ describe('EppoClient E2E test', () => {
   });
 
   it('returns default value when key does not exist', async () => {
-    const client = new EppoClient(storage);
+    const client = new EppoClient({ flagConfigurationStore: storage });
 
     const nonExistentFlag = 'non-existent-flag';
 
@@ -299,7 +312,7 @@ describe('EppoClient E2E test', () => {
     const mockLogger = td.object<IAssignmentLogger>();
 
     storage.setEntries({ [flagKey]: mockFlag });
-    const client = new EppoClient(storage);
+    const client = new EppoClient({ flagConfigurationStore: storage });
     client.setAssignmentLogger(mockLogger);
 
     const subjectAttributes = { foo: 3 };
@@ -325,7 +338,7 @@ describe('EppoClient E2E test', () => {
     td.when(mockLogger.logAssignment(td.matchers.anything())).thenThrow(new Error('logging error'));
 
     storage.setEntries({ [flagKey]: mockFlag });
-    const client = new EppoClient(storage);
+    const client = new EppoClient({ flagConfigurationStore: storage });
     client.setAssignmentLogger(mockLogger);
 
     const subjectAttributes = { foo: 3 };
@@ -341,7 +354,7 @@ describe('EppoClient E2E test', () => {
 
   it('exports flag configuration', () => {
     storage.setEntries({ [flagKey]: mockFlag });
-    const client = new EppoClient(storage);
+    const client = new EppoClient({ flagConfigurationStore: storage });
     expect(client.getFlagConfigurations()).toEqual({ [flagKey]: mockFlag });
   });
 
@@ -353,7 +366,7 @@ describe('EppoClient E2E test', () => {
       mockLogger = td.object<IAssignmentLogger>();
 
       storage.setEntries({ [flagKey]: mockFlag });
-      client = new EppoClient(storage);
+      client = new EppoClient({ flagConfigurationStore: storage });
       client.setAssignmentLogger(mockLogger);
     });
 
@@ -606,7 +619,10 @@ describe('EppoClient E2E test', () => {
     });
 
     it('Fetches initial configuration with parameters in constructor', async () => {
-      client = new EppoClient(thisFlagStorage, undefined, undefined, requestConfiguration);
+      client = new EppoClient({
+        flagConfigurationStore: thisFlagStorage,
+        configurationRequestParameters: requestConfiguration,
+      });
       client.setIsGracefulFailureMode(false);
       // no configuration loaded
       let variation = client.getNumericAssignment(flagKey, subject, {}, 123.4);
@@ -618,7 +634,7 @@ describe('EppoClient E2E test', () => {
     });
 
     it('Fetches initial configuration with parameters provided later', async () => {
-      client = new EppoClient(thisFlagStorage);
+      client = new EppoClient({ flagConfigurationStore: thisFlagStorage });
       client.setIsGracefulFailureMode(false);
       client.setConfigurationRequestParameters(requestConfiguration);
       // no configuration loaded
@@ -640,9 +656,12 @@ describe('EppoClient E2E test', () => {
           }
         }
 
-        client = new EppoClient(new MockStore(), undefined, undefined, {
-          ...requestConfiguration,
-          pollAfterSuccessfulInitialization: true,
+        client = new EppoClient({
+          flagConfigurationStore: new MockStore(),
+          configurationRequestParameters: {
+            ...requestConfiguration,
+            pollAfterSuccessfulInitialization: true,
+          },
         });
         client.setIsGracefulFailureMode(false);
         // no configuration loaded
@@ -669,7 +688,10 @@ describe('EppoClient E2E test', () => {
         }
       }
 
-      client = new EppoClient(new MockStore(), undefined, undefined, requestConfiguration);
+      client = new EppoClient({
+        flagConfigurationStore: new MockStore(),
+        configurationRequestParameters: requestConfiguration,
+      });
       client.setIsGracefulFailureMode(false);
       // no configuration loaded
       let variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
@@ -711,7 +733,10 @@ describe('EppoClient E2E test', () => {
         ...requestConfiguration,
         pollAfterSuccessfulInitialization,
       };
-      client = new EppoClient(thisFlagStorage, undefined, undefined, requestConfiguration);
+      client = new EppoClient({
+        flagConfigurationStore: thisFlagStorage,
+        configurationRequestParameters: requestConfiguration,
+      });
       client.setIsGracefulFailureMode(false);
       // no configuration loaded
       let variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
@@ -776,7 +801,10 @@ describe('EppoClient E2E test', () => {
         throwOnFailedInitialization,
         pollAfterFailedInitialization,
       };
-      client = new EppoClient(thisFlagStorage, undefined, undefined, requestConfiguration);
+      client = new EppoClient({
+        flagConfigurationStore: thisFlagStorage,
+        configurationRequestParameters: requestConfiguration,
+      });
       client.setIsGracefulFailureMode(false);
       // no configuration loaded
       expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(0.0);

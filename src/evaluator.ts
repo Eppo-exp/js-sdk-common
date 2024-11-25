@@ -27,12 +27,13 @@ export interface FlagEvaluation {
   allocationKey: string | null;
   variation: Variation | null;
   extraLogging: Record<string, string>;
+  // whether to log assignment event
   doLog: boolean;
   flagEvaluationDetails: IFlagEvaluationDetails;
 }
 
 export class Evaluator {
-  sharder: Sharder;
+  private readonly sharder: Sharder;
 
   constructor(sharder?: Sharder) {
     this.sharder = sharder ?? new MD5Sharder();
@@ -133,7 +134,7 @@ export class Evaluator {
           'No allocations matched. Falling back to "Default Allocation", serving NULL',
         ),
       );
-    } catch (err) {
+    } catch (err: any) {
       const flagEvaluationDetails = flagEvaluationDetailsBuilder.gracefulBuild(
         'ASSIGNMENT_ERROR',
         `Assignment Error: ${err.message}`,

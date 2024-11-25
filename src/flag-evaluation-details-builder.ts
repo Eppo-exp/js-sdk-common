@@ -50,7 +50,6 @@ export class FlagEvaluationDetailsBuilder {
   private matchedRule: IFlagEvaluationDetails['matchedRule'] = null;
   private matchedAllocation: IFlagEvaluationDetails['matchedAllocation'] = null;
   private readonly unmatchedAllocations: IFlagEvaluationDetails['unmatchedAllocations'] = [];
-  private readonly unevaluatedAllocations: IFlagEvaluationDetails['unevaluatedAllocations'] = [];
 
   constructor(
     private readonly environmentName: string,
