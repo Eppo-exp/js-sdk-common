@@ -84,8 +84,8 @@ const DEFAULT_EVENT_DISPATCHER_CONFIG = {
   // TODO: Replace with actual ingestion URL
   ingestionUrl: 'https://example.com/events',
   batchSize: 10,
-  flushInterval: 10_000,
-  retryInterval: 5_000,
+  flushIntervalMs: 10_000,
+  retryIntervalMs: 5_000,
   maxRetries: 3,
 };
 
@@ -1143,6 +1143,6 @@ export function checkValueTypeMatch(
   }
 }
 
-export function newBoundedArrayEventQueue<T>(name: string): BoundedEventQueue<T> {
+function newBoundedArrayEventQueue<T>(name: string): BoundedEventQueue<T> {
   return new BoundedEventQueue<T>(new ArrayBackedNamedEventQueue<T>(name));
 }

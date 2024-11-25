@@ -94,7 +94,6 @@ export {
   BanditActions,
 
   // event queue types
-  ArrayBackedNamedEventQueue,
   NamedEventQueue,
   EventDispatcher,
   BatchEventProcessor,
