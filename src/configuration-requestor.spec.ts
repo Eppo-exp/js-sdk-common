@@ -131,7 +131,7 @@ describe('ConfigurationRequestor', () => {
       global.fetch = fetchSpy;
     }
 
-    function responseMockGenerator(url: string) {
+    function defaultResponseMockGenerator(url: string) {
       const responseFile = url.includes('bandits')
         ? MOCK_BANDIT_MODELS_RESPONSE_FILE
         : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
@@ -140,7 +140,7 @@ describe('ConfigurationRequestor', () => {
 
     describe('Fetching bandits', () => {
       beforeAll(() => {
-        initiateFetchSpy(responseMockGenerator);
+        initiateFetchSpy(defaultResponseMockGenerator);
       });
 
       it('Fetches and populates bandit parameters', async () => {
@@ -230,193 +230,199 @@ describe('ConfigurationRequestor', () => {
         expect(fetchSpy).toHaveBeenCalledTimes(3); // Once just for UFC, bandits should be skipped
       });
 
-      const warmStartBanditReference = {
-        modelVersion: 'warm start',
-        flagVariations: [
-          {
-            key: 'warm_start_bandit',
-            flagKey: 'warm_start_bandit_flag',
-            variationKey: 'warm_start_bandit',
-            variationValue: 'warm_start_bandit',
+      describe('Bandits polling', () => {
+        const warmStartBanditReference = {
+          modelVersion: 'warm start',
+          flagVariations: [
+            {
+              key: 'warm_start_bandit',
+              flagKey: 'warm_start_bandit_flag',
+              variationKey: 'warm_start_bandit',
+              variationValue: 'warm_start_bandit',
+            },
+          ],
+        };
+
+        const warmStartBanditParameters = {
+          banditKey: 'warm_start_bandit',
+          modelName: 'pigeon',
+          modelVersion: 'warm start',
+          modelData: {
+            gamma: 1.0,
+            defaultActionScore: 0.0,
+            actionProbabilityFloor: 0.0,
+            coefficients: {},
           },
-        ],
-      };
-
-      const warmStartBanditParameters = {
-        banditKey: 'warm_start_bandit',
-        modelName: 'pigeon',
-        modelVersion: 'warm start',
-        modelData: {
-          gamma: 1.0,
-          defaultActionScore: 0.0,
-          actionProbabilityFloor: 0.0,
-          coefficients: {},
-        },
-      };
-
-      const coldStartBanditParameters = {
-        banditKey: 'cold_start_bandit',
-        modelName: 'falcon',
-        modelVersion: 'cold start',
-        modelData: {
-          gamma: 1.0,
-          defaultActionScore: 0.0,
-          actionProbabilityFloor: 0.0,
-          coefficients: {},
-        },
-      };
-
-      function expectBanditToBeInModelStore(
-        store: IConfigurationStore<BanditParameters>,
-        banditKey: string,
-        expectedBanditParameters: BanditParameters,
-      ) {
-        const bandit = store.get(banditKey);
-        expect(bandit).toBeTruthy();
-        expect(bandit?.banditKey).toBe(expectedBanditParameters.banditKey);
-        expect(bandit?.modelVersion).toBe(expectedBanditParameters.modelVersion);
-        expect(bandit?.modelName).toBe(expectedBanditParameters.modelName);
-        expect(bandit?.modelData.gamma).toBe(expectedBanditParameters.modelData.gamma);
-        expect(bandit?.modelData.defaultActionScore).toBe(
-          expectedBanditParameters.modelData.defaultActionScore,
-        );
-        expect(bandit?.modelData.actionProbabilityFloor).toBe(
-          expectedBanditParameters.modelData.actionProbabilityFloor,
-        );
-        expect(bandit?.modelData.coefficients).toStrictEqual(
-          expectedBanditParameters.modelData.coefficients,
-        );
-      }
-
-      function injectWarmStartBanditToResponseByUrl(
-        url: string,
-        response: IUniversalFlagConfigResponse | IBanditParametersResponse,
-      ) {
-        if (url.includes('config') && 'banditReferences' in response) {
-          response.banditReferences.warm_start_bandit = warmStartBanditReference;
-        }
-
-        if (url.includes('bandits') && 'bandits' in response) {
-          response.bandits.warm_start_bandit = warmStartBanditParameters;
-        }
-      }
-
-      it('Should fetch bandits if new bandit references model versions appeared', async () => {
-        let updateUFC = false;
-        await configurationRequestor.fetchAndStoreConfigurations();
-        await configurationRequestor.fetchAndStoreConfigurations();
-        expect(fetchSpy).toHaveBeenCalledTimes(3);
-
-        const customResponseMockGenerator = (url: string) => {
-          const responseFile = url.includes('bandits')
-            ? MOCK_BANDIT_MODELS_RESPONSE_FILE
-            : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
-
-          const response = readMockUFCResponse(responseFile);
-
-          if (updateUFC === true) {
-            injectWarmStartBanditToResponseByUrl(url, response);
-          }
-          return response;
         };
-        updateUFC = true;
-        initiateFetchSpy(customResponseMockGenerator);
 
-        await configurationRequestor.fetchAndStoreConfigurations();
-        expect(fetchSpy).toHaveBeenCalledTimes(2); // 2 because fetchSpy was re-initiated, 1UFC and 1bandits
+        const coldStartBanditParameters = {
+          banditKey: 'cold_start_bandit',
+          modelName: 'falcon',
+          modelVersion: 'cold start',
+          modelData: {
+            gamma: 1.0,
+            defaultActionScore: 0.0,
+            actionProbabilityFloor: 0.0,
+            coefficients: {},
+          },
+        };
 
-        // let's check if warm start was hydrated properly!
-        expectBanditToBeInModelStore(
-          banditModelStore,
-          'warm_start_bandit',
-          warmStartBanditParameters,
-        );
-      });
+        afterAll(() => {
+          initiateFetchSpy(defaultResponseMockGenerator);
+        });
 
-      it('Should not fetch bandits if bandit references model versions shrunk', async () => {
-        // Initial fetch
-        await configurationRequestor.fetchAndStoreConfigurations();
+        function expectBanditToBeInModelStore(
+          store: IConfigurationStore<BanditParameters>,
+          banditKey: string,
+          expectedBanditParameters: BanditParameters,
+        ) {
+          const bandit = store.get(banditKey);
+          expect(bandit).toBeTruthy();
+          expect(bandit?.banditKey).toBe(expectedBanditParameters.banditKey);
+          expect(bandit?.modelVersion).toBe(expectedBanditParameters.modelVersion);
+          expect(bandit?.modelName).toBe(expectedBanditParameters.modelName);
+          expect(bandit?.modelData.gamma).toBe(expectedBanditParameters.modelData.gamma);
+          expect(bandit?.modelData.defaultActionScore).toBe(
+            expectedBanditParameters.modelData.defaultActionScore,
+          );
+          expect(bandit?.modelData.actionProbabilityFloor).toBe(
+            expectedBanditParameters.modelData.actionProbabilityFloor,
+          );
+          expect(bandit?.modelData.coefficients).toStrictEqual(
+            expectedBanditParameters.modelData.coefficients,
+          );
+        }
 
-        // Let's mock UFC response so that cold_start is no longer retrieved
-        const customResponseMockGenerator = (url: string) => {
-          const responseFile = url.includes('bandits')
-            ? MOCK_BANDIT_MODELS_RESPONSE_FILE
-            : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
-
-          const response = readMockUFCResponse(responseFile);
-
+        function injectWarmStartBanditToResponseByUrl(
+          url: string,
+          response: IUniversalFlagConfigResponse | IBanditParametersResponse,
+        ) {
           if (url.includes('config') && 'banditReferences' in response) {
-            delete response.banditReferences.cold_start_bandit;
+            response.banditReferences.warm_start_bandit = warmStartBanditReference;
           }
-          return response;
-        };
 
-        initiateFetchSpy(customResponseMockGenerator);
-        await configurationRequestor.fetchAndStoreConfigurations();
-        expect(fetchSpy).toHaveBeenCalledTimes(1); // only once for UFC
-
-        // cold start should still be in memory
-        expectBanditToBeInModelStore(
-          banditModelStore,
-          'cold_start_bandit',
-          coldStartBanditParameters,
-        );
-      });
-
-      /**
-       * 1. initial call - 1 fetch for ufc 1 for bandits
-       * 2. 2nd call - 1 fetch for ufc only; bandits unchanged
-       * 3. 3rd call - new bandit ref injected to UFC; 2 fetches, because new bandit appeared
-       * 4. 4th call - we remove a bandit from ufc; 1 fetch because there is no need to update.
-       *    The bandit removed from UFC should still be in memory.
-       **/
-      it('should fetch bandits based on banditReference change in UFC', async () => {
-        let injectWarmStart = false;
-        let removeColdStartBandit = false;
-        await configurationRequestor.fetchAndStoreConfigurations();
-        expect(fetchSpy).toHaveBeenCalledTimes(2);
-
-        await configurationRequestor.fetchAndStoreConfigurations();
-        expect(fetchSpy).toHaveBeenCalledTimes(3);
-
-        const customResponseMockGenerator = (url: string) => {
-          const responseFile = url.includes('bandits')
-            ? MOCK_BANDIT_MODELS_RESPONSE_FILE
-            : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
-          const response = readMockUFCResponse(responseFile);
-          if (injectWarmStart === true) {
-            injectWarmStartBanditToResponseByUrl(url, response);
-          } else if (
-            removeColdStartBandit === true &&
-            'banditReferences' in response &&
-            url.includes('config')
-          ) {
-            delete response.banditReferences.cold_start_bandit;
+          if (url.includes('bandits') && 'bandits' in response) {
+            response.bandits.warm_start_bandit = warmStartBanditParameters;
           }
-          return response;
-        };
-        injectWarmStart = true;
-        initiateFetchSpy(customResponseMockGenerator);
+        }
 
-        await configurationRequestor.fetchAndStoreConfigurations();
-        expect(fetchSpy).toHaveBeenCalledTimes(2);
-        expectBanditToBeInModelStore(
-          banditModelStore,
-          'warm_start_bandit',
-          warmStartBanditParameters,
-        );
+        it('Should fetch bandits if new bandit references model versions appeared', async () => {
+          let updateUFC = false;
+          await configurationRequestor.fetchAndStoreConfigurations();
+          await configurationRequestor.fetchAndStoreConfigurations();
+          expect(fetchSpy).toHaveBeenCalledTimes(3);
 
-        injectWarmStart = false;
-        removeColdStartBandit = true;
-        initiateFetchSpy(customResponseMockGenerator);
-        await configurationRequestor.fetchAndStoreConfigurations();
-        expect(fetchSpy).toHaveBeenCalledTimes(1);
+          const customResponseMockGenerator = (url: string) => {
+            const responseFile = url.includes('bandits')
+              ? MOCK_BANDIT_MODELS_RESPONSE_FILE
+              : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
 
-        expectBanditToBeInModelStore(
-          banditModelStore,
-          'cold_start_bandit',
-          coldStartBanditParameters,
-        );
+            const response = readMockUFCResponse(responseFile);
+
+            if (updateUFC === true) {
+              injectWarmStartBanditToResponseByUrl(url, response);
+            }
+            return response;
+          };
+          updateUFC = true;
+          initiateFetchSpy(customResponseMockGenerator);
+
+          await configurationRequestor.fetchAndStoreConfigurations();
+          expect(fetchSpy).toHaveBeenCalledTimes(2); // 2 because fetchSpy was re-initiated, 1UFC and 1bandits
+
+          // let's check if warm start was hydrated properly!
+          expectBanditToBeInModelStore(
+            banditModelStore,
+            'warm_start_bandit',
+            warmStartBanditParameters,
+          );
+        });
+
+        it('Should not fetch bandits if bandit references model versions shrunk', async () => {
+          // Initial fetch
+          await configurationRequestor.fetchAndStoreConfigurations();
+
+          // Let's mock UFC response so that cold_start is no longer retrieved
+          const customResponseMockGenerator = (url: string) => {
+            const responseFile = url.includes('bandits')
+              ? MOCK_BANDIT_MODELS_RESPONSE_FILE
+              : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
+
+            const response = readMockUFCResponse(responseFile);
+
+            if (url.includes('config') && 'banditReferences' in response) {
+              delete response.banditReferences.cold_start_bandit;
+            }
+            return response;
+          };
+
+          initiateFetchSpy(customResponseMockGenerator);
+          await configurationRequestor.fetchAndStoreConfigurations();
+          expect(fetchSpy).toHaveBeenCalledTimes(1); // only once for UFC
+
+          // cold start should still be in memory
+          expectBanditToBeInModelStore(
+            banditModelStore,
+            'cold_start_bandit',
+            coldStartBanditParameters,
+          );
+        });
+
+        /**
+         * 1. initial call - 1 fetch for ufc 1 for bandits
+         * 2. 2nd call - 1 fetch for ufc only; bandits unchanged
+         * 3. 3rd call - new bandit ref injected to UFC; 2 fetches, because new bandit appeared
+         * 4. 4th call - we remove a bandit from ufc; 1 fetch because there is no need to update.
+         *    The bandit removed from UFC should still be in memory.
+         **/
+        it('should fetch bandits based on banditReference change in UFC', async () => {
+          let injectWarmStart = false;
+          let removeColdStartBandit = false;
+          await configurationRequestor.fetchAndStoreConfigurations();
+          expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+          await configurationRequestor.fetchAndStoreConfigurations();
+          expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+          const customResponseMockGenerator = (url: string) => {
+            const responseFile = url.includes('bandits')
+              ? MOCK_BANDIT_MODELS_RESPONSE_FILE
+              : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
+            const response = readMockUFCResponse(responseFile);
+            if (injectWarmStart === true) {
+              injectWarmStartBanditToResponseByUrl(url, response);
+            } else if (
+              removeColdStartBandit === true &&
+              'banditReferences' in response &&
+              url.includes('config')
+            ) {
+              delete response.banditReferences.cold_start_bandit;
+            }
+            return response;
+          };
+          injectWarmStart = true;
+          initiateFetchSpy(customResponseMockGenerator);
+
+          await configurationRequestor.fetchAndStoreConfigurations();
+          expect(fetchSpy).toHaveBeenCalledTimes(2);
+          expectBanditToBeInModelStore(
+            banditModelStore,
+            'warm_start_bandit',
+            warmStartBanditParameters,
+          );
+
+          injectWarmStart = false;
+          removeColdStartBandit = true;
+          initiateFetchSpy(customResponseMockGenerator);
+          await configurationRequestor.fetchAndStoreConfigurations();
+          expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+          expectBanditToBeInModelStore(
+            banditModelStore,
+            'cold_start_bandit',
+            coldStartBanditParameters,
+          );
+        });
       });
     });
   });
