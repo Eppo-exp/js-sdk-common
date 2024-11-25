@@ -203,16 +203,21 @@ describe('DefaultEventDispatcher', () => {
   });
 
   describe('newDefaultEventDispatcher', () => {
+    it('should throw if SDK key is invalid', () => {
+      expect(() => {
+        newDefaultEventDispatcher(
+          new ArrayBackedNamedEventQueue('test-queue'),
+          mockNetworkStatusListener,
+          'invalid-sdk-key',
+        );
+      }).toThrow('Unable to parse Event ingestion URL from SDK key');
+    });
+
     it('should create a new DefaultEventDispatcher with the provided configuration', () => {
-      const networkStatusListener = {
-        isOffline: () => false,
-        onNetworkStatusChange: (callback: (isOffline: boolean) => void) => null as unknown as void,
-        triggerNetworkStatusChange: () => null,
-      };
       const eventQueue = new ArrayBackedNamedEventQueue('test-queue');
       const dispatcher = newDefaultEventDispatcher(
         eventQueue,
-        networkStatusListener,
+        mockNetworkStatusListener,
         'zCsQuoHJxVPp895.ZWg9MTIzNDU2LmUudGVzdGluZy5lcHBvLmNsb3Vk',
       );
       expect(dispatcher).toBeInstanceOf(DefaultEventDispatcher);
