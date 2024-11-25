@@ -159,7 +159,10 @@ export class Evaluator {
     split: Split,
     subjectKey: string,
     expectedVariationType: VariationType | undefined,
-  ): { flagEvaluationCode: FlagEvaluationCode; flagEvaluationDescription: string } => {
+  ): {
+    flagEvaluationCode: FlagEvaluationCode;
+    flagEvaluationDescription: string;
+  } => {
     if (!checkValueTypeMatch(expectedVariationType, variation.value)) {
       const { key: vKey, value: vValue } = variation;
       return {

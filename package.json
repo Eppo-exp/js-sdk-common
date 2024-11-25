@@ -46,6 +46,7 @@
     "@types/lodash": "^4.17.5",
     "@types/md5": "^2.3.2",
     "@types/semver": "^7.5.6",
+    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^5.13.0",
     "@typescript-eslint/parser": "^5.13.0",
     "eslint": "^8.17.0",
@@ -71,7 +72,8 @@
     "js-base64": "^3.7.7",
     "md5": "^2.3.0",
     "pino": "^8.19.0",
-    "semver": "^7.5.4"
+    "semver": "^7.5.4",
+    "uuid": "^8.3.2"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

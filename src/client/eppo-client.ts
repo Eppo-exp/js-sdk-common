@@ -1,3 +1,5 @@
+import { v4 as randomUUID } from 'uuid';
+
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
@@ -20,7 +22,8 @@ import { EppoValue } from '../eppo_value';
 import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
 import ArrayBackedNamedEventQueue from '../events/array-backed-named-event-queue';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
-import NamedEventQueue from '../events/named-event-queue';
+import EventDispatcher from '../events/event-dispatcher';
+import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
 import {
   FlagEvaluationDetailsBuilder,
   IFlagEvaluationDetails,
@@ -76,8 +79,17 @@ export interface IContainerExperiment<T> {
   treatmentVariationEntries: Array<T>;
 }
 
+const DEFAULT_EVENT_DISPATCHER_CONFIG = {
+  // TODO: Replace with actual ingestion URL
+  ingestionUrl: 'https://example.com/events',
+  batchSize: 10,
+  flushIntervalMs: 10_000,
+  retryIntervalMs: 5_000,
+  maxRetries: 3,
+};
+
 export default class EppoClient {
-  private readonly eventQueue: NamedEventQueue<unknown>;
+  private readonly eventDispatcher: EventDispatcher;
   private readonly assignmentEventsQueue: BoundedEventQueue<IAssignmentEvent> =
     newBoundedArrayEventQueue<IAssignmentEvent>('assignments');
   private readonly banditEventsQueue: BoundedEventQueue<IBanditEvent> =
@@ -98,23 +110,23 @@ export default class EppoClient {
   private readonly evaluator = new Evaluator();
 
   constructor({
-    eventQueue = new ArrayBackedNamedEventQueue('events'),
+    eventDispatcher = new NoOpEventDispatcher(),
     isObfuscated = false,
     flagConfigurationStore,
     banditVariationConfigurationStore,
     banditModelConfigurationStore,
     configurationRequestParameters,
   }: {
-    // Queue for arbitrary, application-level events (not to be confused with Eppo specific assignment
+    // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
     // or bandit events). These events are application-specific and captures by EppoClient#track API.
-    eventQueue?: NamedEventQueue<unknown>;
+    eventDispatcher?: EventDispatcher;
     flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
     banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
     banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
     configurationRequestParameters?: FlagConfigurationRequestParameters;
     isObfuscated?: boolean;
   }) {
-    this.eventQueue = eventQueue;
+    this.eventDispatcher = eventDispatcher;
     this.flagConfigurationStore = flagConfigurationStore;
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
     this.banditModelConfigurationStore = banditModelConfigurationStore;
@@ -908,9 +920,10 @@ export default class EppoClient {
     return result;
   }
 
+  /** TODO */
   // noinspection JSUnusedGlobalSymbols
   track(event: unknown, params: Record<string, unknown>) {
-    this.eventQueue.push({ event, params });
+    this.eventDispatcher.dispatch({ id: randomUUID(), data: event, params });
   }
 
   private newFlagEvaluationDetailsBuilder(flagKey: string): FlagEvaluationDetailsBuilder {
@@ -928,7 +941,9 @@ export default class EppoClient {
     return {
       configFetchedAt: this.flagConfigurationStore.getConfigFetchedAt() ?? '',
       configPublishedAt: this.flagConfigurationStore.getConfigPublishedAt() ?? '',
-      configEnvironment: this.flagConfigurationStore.getEnvironment() ?? { name: '' },
+      configEnvironment: this.flagConfigurationStore.getEnvironment() ?? {
+        name: '',
+      },
     };
   }
 
@@ -1131,6 +1146,6 @@ export function checkValueTypeMatch(
   }
 }
 
-export function newBoundedArrayEventQueue<T>(name: string): BoundedEventQueue<T> {
+function newBoundedArrayEventQueue<T>(name: string): BoundedEventQueue<T> {
   return new BoundedEventQueue<T>(new ArrayBackedNamedEventQueue<T>(name));
 }

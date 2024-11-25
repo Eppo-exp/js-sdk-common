@@ -24,9 +24,4 @@ export class BoundedEventQueue<T> {
     this.queue.length = 0;
     return events;
   }
-
-  /** Returns the first event in the queue and removes it. */
-  shift(): T | undefined {
-    return this.queue.shift();
-  }
 }
