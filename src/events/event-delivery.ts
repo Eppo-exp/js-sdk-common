@@ -1,7 +1,7 @@
 import { logger } from '../application-logger';
 
 export default class EventDelivery {
-  constructor(private ingestionUrl: string) {}
+  constructor(private readonly ingestionUrl: string) {}
 
   async deliver(batch: unknown[]): Promise<boolean> {
     try {
