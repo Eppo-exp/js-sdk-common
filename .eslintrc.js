@@ -12,7 +12,7 @@ module.exports = {
     'plugin:promise/recommended',
     'plugin:import/recommended',
   ],
-  plugins: ['@typescript-eslint', 'prettier', 'import', 'promise'],
+  plugins: ['@typescript-eslint', 'prettier', 'import', 'promise', 'unused-imports'],
   rules: {
     'prettier/prettier': [
       'warn',
@@ -24,6 +24,7 @@ module.exports = {
     ],
     'import/named': 'off',
     'import/no-unresolved': 'off',
+    'unused-imports/no-unused-imports': 'error',
     '@typescript-eslint/no-explicit-any': 'off',
     'import/order': [
       'warn',

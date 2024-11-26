@@ -1,5 +1,3 @@
-import { resolve } from 'eslint-import-resolver-typescript';
-
 import ArrayBackedNamedEventQueue from './array-backed-named-event-queue';
 import BatchEventProcessor from './batch-event-processor';
 import DefaultEventDispatcher, {
