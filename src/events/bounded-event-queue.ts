@@ -1,7 +1,6 @@
 import { logger } from '../application-logger';
 import { MAX_EVENT_QUEUE_SIZE } from '../constants';
 
-import ArrayBackedNamedEventQueue from './array-backed-named-event-queue';
 import NamedEventQueue from './named-event-queue';
 
 /** A bounded event queue that drops events when it reaches its maximum size. */
