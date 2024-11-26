@@ -66,7 +66,12 @@ describe('EppoClient Bandits E2E test', () => {
   });
 
   beforeEach(() => {
-    client = new EppoClient(flagStore, banditVariationStore, banditModelStore, undefined, false);
+    client = new EppoClient({
+      flagConfigurationStore: flagStore,
+      banditVariationConfigurationStore: banditVariationStore,
+      banditModelConfigurationStore: banditModelStore,
+      isObfuscated: false,
+    });
     client.setIsGracefulFailureMode(false);
     client.setAssignmentLogger({ logAssignment: mockLogAssignment });
     client.setBanditLogger({ logBanditAction: mockLogBanditAction });
@@ -206,7 +211,7 @@ describe('EppoClient Bandits E2E test', () => {
 
     it('Flushed queued logging events when a logger is set', () => {
       client.useLRUInMemoryAssignmentCache(5);
-      client.useLRUInMemoryBanditAssignmentCache(5);
+      client.useExpiringInMemoryBanditAssignmentCache(5);
       client.setAssignmentLogger(null as unknown as IAssignmentLogger);
       client.setBanditLogger(null as unknown as IBanditLogger);
       const banditAssignment = client.getBanditAction(

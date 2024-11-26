@@ -33,7 +33,7 @@ describe('EppoClient get*AssignmentDetails', () => {
   });
 
   it('should set the details for a matched rule', () => {
-    const client = new EppoClient(storage);
+    const client = new EppoClient({ flagConfigurationStore: storage });
     client.setIsGracefulFailureMode(false);
     const subjectAttributes = { email: 'alice@mycompany.com', country: 'US' };
     const result = client.getIntegerAssignmentDetails(
@@ -85,7 +85,7 @@ describe('EppoClient get*AssignmentDetails', () => {
   });
 
   it('should set the details for a matched split', () => {
-    const client = new EppoClient(storage);
+    const client = new EppoClient({ flagConfigurationStore: storage });
     client.setIsGracefulFailureMode(false);
     const subjectAttributes = { email: 'alice@mycompany.com', country: 'Brazil' };
     const result = client.getIntegerAssignmentDetails(
@@ -128,7 +128,7 @@ describe('EppoClient get*AssignmentDetails', () => {
   });
 
   it('should handle matching a split allocation with a matched rule', () => {
-    const client = new EppoClient(storage);
+    const client = new EppoClient({ flagConfigurationStore: storage });
     client.setIsGracefulFailureMode(false);
     const subjectAttributes = { id: 'alice', email: 'alice@external.com', country: 'Brazil' };
     const result = client.getStringAssignmentDetails(
@@ -190,7 +190,7 @@ describe('EppoClient get*AssignmentDetails', () => {
   });
 
   it('should handle unrecognized flags', () => {
-    const client = new EppoClient(storage);
+    const client = new EppoClient({ flagConfigurationStore: storage });
     client.setIsGracefulFailureMode(false);
     const result = client.getIntegerAssignmentDetails('asdf', 'alice', {}, 0);
     expect(result).toEqual({
@@ -215,7 +215,7 @@ describe('EppoClient get*AssignmentDetails', () => {
   });
 
   it('should handle type mismatches with graceful failure mode enabled', () => {
-    const client = new EppoClient(storage);
+    const client = new EppoClient({ flagConfigurationStore: storage });
     client.setIsGracefulFailureMode(true);
     const result = client.getBooleanAssignmentDetails('integer-flag', 'alice', {}, true);
     expect(result).toEqual({
@@ -252,7 +252,7 @@ describe('EppoClient get*AssignmentDetails', () => {
   });
 
   it('should throw an error for type mismatches with graceful failure mode disabled', () => {
-    const client = new EppoClient(storage);
+    const client = new EppoClient({ flagConfigurationStore: storage });
     client.setIsGracefulFailureMode(false);
     expect(() => client.getBooleanAssignmentDetails('integer-flag', 'alice', {}, true)).toThrow();
   });
@@ -302,7 +302,7 @@ describe('EppoClient get*AssignmentDetails', () => {
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           const subject = subjects.find((subject) => subject.subjectKey === subjectKey)!;
 
-          const client = new EppoClient(storage);
+          const client = new EppoClient({ flagConfigurationStore: storage });
           client.setIsGracefulFailureMode(false);
 
           const focusOn = {

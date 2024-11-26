@@ -28,6 +28,7 @@ export interface FlagEvaluationWithoutDetails {
   allocationKey: string | null;
   variation: Variation | null;
   extraLogging: Record<string, string>;
+  // whether to log assignment event
   doLog: boolean;
 }
 
@@ -165,7 +166,10 @@ export class Evaluator {
     split: Split,
     subjectKey: string,
     expectedVariationType: VariationType | undefined,
-  ): { flagEvaluationCode: FlagEvaluationCode; flagEvaluationDescription: string } => {
+  ): {
+    flagEvaluationCode: FlagEvaluationCode;
+    flagEvaluationDescription: string;
+  } => {
     if (!checkValueTypeMatch(expectedVariationType, variation.value)) {
       const { key: vKey, value: vValue } = variation;
       return {

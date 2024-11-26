@@ -6,8 +6,6 @@ import { IBanditLogger, IBanditEvent } from './bandit-logger';
 import {
   AbstractAssignmentCache,
   AssignmentCache,
-  NonExpiringInMemoryAssignmentCache,
-  LRUInMemoryAssignmentCache,
   AsyncMap,
   AssignmentCacheKey,
   AssignmentCacheValue,
@@ -15,6 +13,8 @@ import {
   assignmentCacheKeyToString,
   assignmentCacheValueToString,
 } from './cache/abstract-assignment-cache';
+import { LRUInMemoryAssignmentCache } from './cache/lru-in-memory-assignment-cache';
+import { NonExpiringInMemoryAssignmentCache } from './cache/non-expiring-in-memory-cache-assignment';
 import EppoClient, {
   FlagConfigurationRequestParameters,
   IAssignmentDetails,
@@ -32,6 +32,12 @@ import {
 import { HybridConfigurationStore } from './configuration-store/hybrid.store';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import * as constants from './constants';
+import ArrayBackedNamedEventQueue from './events/array-backed-named-event-queue';
+import BatchEventProcessor from './events/batch-event-processor';
+import DefaultEventDispatcher from './events/default-event-dispatcher';
+import EventDispatcher from './events/event-dispatcher';
+import NamedEventQueue from './events/named-event-queue';
+import NetworkStatusListener from './events/network-status-listener';
 import HttpClient from './http-client';
 import { PrecomputedFlag, Flag, ObfuscatedFlag, VariationType } from './interfaces';
 import {
@@ -92,4 +98,11 @@ export {
   ContextAttributes,
   BanditSubjectAttributes,
   BanditActions,
+
+  // event queue types
+  NamedEventQueue,
+  EventDispatcher,
+  BatchEventProcessor,
+  NetworkStatusListener,
+  DefaultEventDispatcher,
 };

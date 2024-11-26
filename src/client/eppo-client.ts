@@ -1,25 +1,29 @@
+import { v4 as randomUUID } from 'uuid';
+
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import { BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
-import {
-  AssignmentCache,
-  LRUInMemoryAssignmentCache,
-  NonExpiringInMemoryAssignmentCache,
-} from '../cache/abstract-assignment-cache';
+import { AssignmentCache } from '../cache/abstract-assignment-cache';
+import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
+import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
+import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
 import ConfigurationRequestor from '../configuration-requestor';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
-  DEFAULT_REQUEST_TIMEOUT_MS,
-  MAX_EVENT_QUEUE_SIZE,
   DEFAULT_POLL_INTERVAL_MS,
+  DEFAULT_REQUEST_TIMEOUT_MS,
 } from '../constants';
 import { decodeFlag } from '../decoding';
 import { EppoValue } from '../eppo_value';
 import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
+import ArrayBackedNamedEventQueue from '../events/array-backed-named-event-queue';
+import { BoundedEventQueue } from '../events/bounded-event-queue';
+import EventDispatcher from '../events/event-dispatcher';
+import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
 import {
   FlagEvaluationDetailsBuilder,
   IFlagEvaluationDetails,
@@ -38,8 +42,8 @@ import {
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import {
-  AttributeType,
   Attributes,
+  AttributeType,
   BanditActions,
   BanditSubjectAttributes,
   ContextAttributes,
@@ -75,55 +79,92 @@ export interface IContainerExperiment<T> {
   treatmentVariationEntries: Array<T>;
 }
 
+const DEFAULT_EVENT_DISPATCHER_CONFIG = {
+  // TODO: Replace with actual ingestion URL
+  ingestionUrl: 'https://example.com/events',
+  batchSize: 10,
+  flushIntervalMs: 10_000,
+  retryIntervalMs: 5_000,
+  maxRetries: 3,
+};
+
 export default class EppoClient {
-  private readonly queuedAssignmentEvents: IAssignmentEvent[] = [];
-  private assignmentLogger?: IAssignmentLogger;
-  private readonly queuedBanditEvents: IBanditEvent[] = [];
+  private readonly eventDispatcher: EventDispatcher;
+  private readonly assignmentEventsQueue: BoundedEventQueue<IAssignmentEvent> =
+    newBoundedArrayEventQueue<IAssignmentEvent>('assignments');
+  private readonly banditEventsQueue: BoundedEventQueue<IBanditEvent> =
+    newBoundedArrayEventQueue<IBanditEvent>('bandit');
+  private readonly banditEvaluator = new BanditEvaluator();
   private banditLogger?: IBanditLogger;
-  private isGracefulFailureMode = true;
-  private assignmentCache?: AssignmentCache;
   private banditAssignmentCache?: AssignmentCache;
+  private configurationRequestParameters?: FlagConfigurationRequestParameters;
+  private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
+  private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
+  private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
+  private assignmentLogger?: IAssignmentLogger;
+  private assignmentCache?: AssignmentCache;
+  // whether to suppress any errors and return default values instead
+  private isGracefulFailureMode = true;
+  private isObfuscated: boolean;
   private requestPoller?: IPoller;
   private readonly evaluator = new Evaluator();
-  private readonly banditEvaluator = new BanditEvaluator();
 
-  constructor(
-    private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>,
-    private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>,
-    private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>,
-    private configurationRequestParameters?: FlagConfigurationRequestParameters,
-    private isObfuscated = false,
-  ) {}
+  constructor({
+    eventDispatcher = new NoOpEventDispatcher(),
+    isObfuscated = false,
+    flagConfigurationStore,
+    banditVariationConfigurationStore,
+    banditModelConfigurationStore,
+    configurationRequestParameters,
+  }: {
+    // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
+    // or bandit events). These events are application-specific and captures by EppoClient#track API.
+    eventDispatcher?: EventDispatcher;
+    flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
+    banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
+    banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
+    configurationRequestParameters?: FlagConfigurationRequestParameters;
+    isObfuscated?: boolean;
+  }) {
+    this.eventDispatcher = eventDispatcher;
+    this.flagConfigurationStore = flagConfigurationStore;
+    this.banditVariationConfigurationStore = banditVariationConfigurationStore;
+    this.banditModelConfigurationStore = banditModelConfigurationStore;
+    this.configurationRequestParameters = configurationRequestParameters;
+    this.isObfuscated = isObfuscated;
+  }
 
-  public setConfigurationRequestParameters(
+  setConfigurationRequestParameters(
     configurationRequestParameters: FlagConfigurationRequestParameters,
   ) {
     this.configurationRequestParameters = configurationRequestParameters;
   }
 
-  public setFlagConfigurationStore(
-    flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>,
-  ) {
+  // noinspection JSUnusedGlobalSymbols
+  setFlagConfigurationStore(flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>) {
     this.flagConfigurationStore = flagConfigurationStore;
   }
 
-  public setBanditVariationConfigurationStore(
+  // noinspection JSUnusedGlobalSymbols
+  setBanditVariationConfigurationStore(
     banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]>,
   ) {
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
   }
 
-  public setBanditModelConfigurationStore(
+  // noinspection JSUnusedGlobalSymbols
+  setBanditModelConfigurationStore(
     banditModelConfigurationStore: IConfigurationStore<BanditParameters>,
   ) {
     this.banditModelConfigurationStore = banditModelConfigurationStore;
   }
 
-  public setIsObfuscated(isObfuscated: boolean) {
+  // noinspection JSUnusedGlobalSymbols
+  setIsObfuscated(isObfuscated: boolean) {
     this.isObfuscated = isObfuscated;
   }
 
-  public async fetchFlagConfigurations() {
+  async fetchFlagConfigurations() {
     if (!this.configurationRequestParameters) {
       throw new Error(
         'Eppo SDK unable to fetch flag configurations without configuration request parameters',
@@ -183,7 +224,8 @@ export default class EppoClient {
     await this.requestPoller.start();
   }
 
-  public stopPolling() {
+  // noinspection JSUnusedGlobalSymbols
+  stopPolling() {
     if (this.requestPoller) {
       this.requestPoller.stop();
     }
@@ -200,7 +242,7 @@ export default class EppoClient {
    * @returns a variation value if the subject is part of the experiment sample, otherwise the default value
    * @public
    */
-  public getStringAssignment(
+  getStringAssignment(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Attributes,
@@ -222,7 +264,7 @@ export default class EppoClient {
    * @returns an object that includes the variation value along with additional metadata about the assignment
    * @public
    */
-  public getStringAssignmentDetails(
+  getStringAssignmentDetails(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Record<string, AttributeType>,
@@ -245,7 +287,7 @@ export default class EppoClient {
   /**
    * @deprecated use getBooleanAssignment instead.
    */
-  public getBoolAssignment(
+  getBoolAssignment(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Attributes,
@@ -263,7 +305,7 @@ export default class EppoClient {
    * @param defaultValue default value to return if the subject is not part of the experiment sample
    * @returns a boolean variation value if the subject is part of the experiment sample, otherwise the default value
    */
-  public getBooleanAssignment(
+  getBooleanAssignment(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Attributes,
@@ -285,7 +327,7 @@ export default class EppoClient {
    * @returns an object that includes the variation value along with additional metadata about the assignment
    * @public
    */
-  public getBooleanAssignmentDetails(
+  getBooleanAssignmentDetails(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Record<string, AttributeType>,
@@ -314,7 +356,7 @@ export default class EppoClient {
    * @param defaultValue default value to return if the subject is not part of the experiment sample
    * @returns an integer variation value if the subject is part of the experiment sample, otherwise the default value
    */
-  public getIntegerAssignment(
+  getIntegerAssignment(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Attributes,
@@ -336,7 +378,7 @@ export default class EppoClient {
    * @returns an object that includes the variation value along with additional metadata about the assignment
    * @public
    */
-  public getIntegerAssignmentDetails(
+  getIntegerAssignmentDetails(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Record<string, AttributeType>,
@@ -365,7 +407,7 @@ export default class EppoClient {
    * @param defaultValue default value to return if the subject is not part of the experiment sample
    * @returns a number variation value if the subject is part of the experiment sample, otherwise the default value
    */
-  public getNumericAssignment(
+  getNumericAssignment(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Attributes,
@@ -387,7 +429,7 @@ export default class EppoClient {
    * @returns an object that includes the variation value along with additional metadata about the assignment
    * @public
    */
-  public getNumericAssignmentDetails(
+  getNumericAssignmentDetails(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Record<string, AttributeType>,
@@ -416,7 +458,7 @@ export default class EppoClient {
    * @param defaultValue default value to return if the subject is not part of the experiment sample
    * @returns a JSON object variation value if the subject is part of the experiment sample, otherwise the default value
    */
-  public getJSONAssignment(
+  getJSONAssignment(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Attributes,
@@ -426,7 +468,7 @@ export default class EppoClient {
       .variation;
   }
 
-  public getJSONAssignmentDetails(
+  getJSONAssignmentDetails(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Record<string, AttributeType>,
@@ -446,7 +488,7 @@ export default class EppoClient {
     };
   }
 
-  public getBanditAction(
+  getBanditAction(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: BanditSubjectAttributes,
@@ -463,7 +505,7 @@ export default class EppoClient {
     return { variation, action };
   }
 
-  public getBanditActionDetails(
+  getBanditActionDetails(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: BanditSubjectAttributes,
@@ -474,7 +516,7 @@ export default class EppoClient {
     let action: string | null = null;
 
     // Initialize with a generic evaluation details. This will mutate as the function progresses.
-    let evaluationDetails: IFlagEvaluationDetails = this.flagEvaluationDetailsBuilder(
+    let evaluationDetails: IFlagEvaluationDetails = this.newFlagEvaluationDetailsBuilder(
       flagKey,
     ).buildForNoneResult(
       'ASSIGNMENT_ERROR',
@@ -544,7 +586,7 @@ export default class EppoClient {
    * @param subjectAttributes optional attributes associated with the subject, for example name and email.
    * @returns The container entry associated with the experiment.
    */
-  public getExperimentContainerEntry<T>(
+  getExperimentContainerEntry<T>(
     flagExperiment: IContainerExperiment<T>,
     subjectKey: string,
     subjectAttributes: Attributes,
@@ -648,13 +690,11 @@ export default class EppoClient {
   private ensureContextualSubjectAttributes(
     subjectAttributes: BanditSubjectAttributes,
   ): ContextAttributes {
-    let result: ContextAttributes;
     if (this.isInstanceOfContextualAttributes(subjectAttributes)) {
-      result = subjectAttributes as ContextAttributes;
+      return subjectAttributes as ContextAttributes;
     } else {
-      result = this.deduceAttributeContext(subjectAttributes as Attributes);
+      return this.deduceAttributeContext(subjectAttributes as Attributes);
     }
-    return result;
   }
 
   private ensureActionsWithContextualAttributes(
@@ -726,9 +766,9 @@ export default class EppoClient {
     try {
       if (this.banditLogger) {
         this.banditLogger.logBanditAction(banditEvent);
-      } else if (this.queuedBanditEvents.length < MAX_EVENT_QUEUE_SIZE) {
+      } else {
         // If no logger defined, queue up the events (up to a max) to flush if a logger is later defined
-        this.queuedBanditEvents.push(banditEvent);
+        this.banditEventsQueue.push(banditEvent);
       }
       // Record in the assignment cache, if active, to deduplicate subsequent repeat assignments
       this.banditAssignmentCache?.set(banditAssignmentCacheProperties);
@@ -775,27 +815,19 @@ export default class EppoClient {
   }
 
   private parseVariationWithDetails(
-    result: FlagEvaluation,
+    { flagEvaluationDetails, variation }: FlagEvaluation,
     defaultValue: EppoValue,
     expectedVariationType: VariationType,
   ): { eppoValue: EppoValue; flagEvaluationDetails: IFlagEvaluationDetails } {
     try {
-      if (!result.variation || result.flagEvaluationDetails.flagEvaluationCode !== 'MATCH') {
-        return {
-          eppoValue: defaultValue,
-          flagEvaluationDetails: result.flagEvaluationDetails,
-        };
+      if (!variation || flagEvaluationDetails.flagEvaluationCode !== 'MATCH') {
+        return { eppoValue: defaultValue, flagEvaluationDetails };
       }
-      return {
-        eppoValue: EppoValue.valueOf(result.variation.value, expectedVariationType),
-        flagEvaluationDetails: result.flagEvaluationDetails,
-      };
+      const eppoValue = EppoValue.valueOf(variation.value, expectedVariationType);
+      return { eppoValue, flagEvaluationDetails };
     } catch (error: any) {
       const eppoValue = this.rethrowIfNotGraceful(error, defaultValue);
-      return {
-        eppoValue,
-        flagEvaluationDetails: result.flagEvaluationDetails,
-      };
+      return { eppoValue, flagEvaluationDetails };
     }
   }
 
@@ -819,7 +851,7 @@ export default class EppoClient {
    * @param expectedVariationType The expected variation type
    * @returns A detailed return of assignment for a particular subject and flag
    */
-  public getAssignmentDetail(
+  getAssignmentDetail(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Attributes = {},
@@ -828,7 +860,7 @@ export default class EppoClient {
     validateNotBlank(subjectKey, 'Invalid argument: subjectKey cannot be blank');
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
 
-    const flagEvaluationDetailsBuilder = this.flagEvaluationDetailsBuilder(flagKey);
+    const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
     const configDetails = this.getConfigDetails();
     const flag = this.getFlag(flagKey);
 
@@ -897,7 +929,7 @@ export default class EppoClient {
 
     try {
       if (result?.doLog) {
-        this.logAssignment(result);
+        this.maybeLogAssignment(result);
       }
     } catch (error) {
       logger.error(`[Eppo SDK] Error logging assignment event: ${error}`);
@@ -906,7 +938,13 @@ export default class EppoClient {
     return result;
   }
 
-  private flagEvaluationDetailsBuilder(flagKey: string): FlagEvaluationDetailsBuilder {
+  /** TODO */
+  // noinspection JSUnusedGlobalSymbols
+  track(event: unknown, params: Record<string, unknown>) {
+    this.eventDispatcher.dispatch({ id: randomUUID(), data: event, params });
+  }
+
+  private newFlagEvaluationDetailsBuilder(flagKey: string): FlagEvaluationDetailsBuilder {
     const flag = this.getFlag(flagKey);
     const configDetails = this.getConfigDetails();
     return new FlagEvaluationDetailsBuilder(
@@ -939,7 +977,8 @@ export default class EppoClient {
     return flag ? decodeFlag(flag) : null;
   }
 
-  public getFlagKeys() {
+  // noinspection JSUnusedGlobalSymbols
+  getFlagKeys() {
     /**
      * Returns a list of all flag keys that have been initialized.
      * This can be useful to debug the initialization process.
@@ -949,7 +988,7 @@ export default class EppoClient {
     return this.flagConfigurationStore.getKeys();
   }
 
-  public isInitialized() {
+  isInitialized() {
     return (
       this.flagConfigurationStore.isInitialized() &&
       (!this.banditVariationConfigurationStore ||
@@ -958,70 +997,74 @@ export default class EppoClient {
     );
   }
 
-  /** @deprecated Renamed to setAssignmentLogger */
-  public setLogger(logger: IAssignmentLogger) {
+  /** @deprecated Use `setAssignmentLogger` */
+  setLogger(logger: IAssignmentLogger) {
     this.setAssignmentLogger(logger);
   }
 
-  public setAssignmentLogger(logger: IAssignmentLogger) {
+  setAssignmentLogger(logger: IAssignmentLogger) {
     this.assignmentLogger = logger;
     // log any assignment events that may have been queued while initializing
-    this.flushQueuedEvents(this.queuedAssignmentEvents, this.assignmentLogger?.logAssignment);
+    this.flushQueuedEvents(this.assignmentEventsQueue, this.assignmentLogger?.logAssignment);
   }
 
-  public setBanditLogger(logger: IBanditLogger) {
+  setBanditLogger(logger: IBanditLogger) {
     this.banditLogger = logger;
     // log any bandit events that may have been queued while initializing
-    this.flushQueuedEvents(this.queuedBanditEvents, this.banditLogger?.logBanditAction);
+    this.flushQueuedEvents(this.banditEventsQueue, this.banditLogger?.logBanditAction);
   }
 
   /**
    * Assignment cache methods.
    */
-  public disableAssignmentCache() {
+  disableAssignmentCache() {
     this.assignmentCache = undefined;
   }
 
-  public useNonExpiringInMemoryAssignmentCache() {
+  useNonExpiringInMemoryAssignmentCache() {
     this.assignmentCache = new NonExpiringInMemoryAssignmentCache();
   }
 
-  public useLRUInMemoryAssignmentCache(maxSize: number) {
+  useLRUInMemoryAssignmentCache(maxSize: number) {
     this.assignmentCache = new LRUInMemoryAssignmentCache(maxSize);
   }
 
-  public useCustomAssignmentCache(cache: AssignmentCache) {
+  // noinspection JSUnusedGlobalSymbols
+  useCustomAssignmentCache(cache: AssignmentCache) {
     this.assignmentCache = cache;
   }
 
-  public disableBanditAssignmentCache() {
+  disableBanditAssignmentCache() {
     this.banditAssignmentCache = undefined;
   }
 
-  public useNonExpiringInMemoryBanditAssignmentCache() {
+  useNonExpiringInMemoryBanditAssignmentCache() {
     this.banditAssignmentCache = new NonExpiringInMemoryAssignmentCache();
   }
 
-  public useLRUInMemoryBanditAssignmentCache(maxSize: number) {
-    this.banditAssignmentCache = new LRUInMemoryAssignmentCache(maxSize);
+  /**
+   * @param {number} maxSize - Maximum cache size
+   * @param {number} timeout - TTL of cache entries
+   */
+  useExpiringInMemoryBanditAssignmentCache(maxSize: number, timeout?: number) {
+    this.banditAssignmentCache = new TLRUInMemoryAssignmentCache(maxSize, timeout);
   }
 
-  public useCustomBanditAssignmentCache(cache: AssignmentCache) {
+  // noinspection JSUnusedGlobalSymbols
+  useCustomBanditAssignmentCache(cache: AssignmentCache) {
     this.banditAssignmentCache = cache;
   }
 
-  public setIsGracefulFailureMode(gracefulFailureMode: boolean) {
+  setIsGracefulFailureMode(gracefulFailureMode: boolean) {
     this.isGracefulFailureMode = gracefulFailureMode;
   }
 
-  public getFlagConfigurations(): Record<string, Flag> {
+  getFlagConfigurations(): Record<string, Flag> {
     return this.flagConfigurationStore.entries();
   }
 
-  private flushQueuedEvents<T>(eventQueue: T[], logFunction?: (event: T) => void) {
-    const eventsToFlush = [...eventQueue]; // defensive copy
-    eventQueue.length = 0; // Truncate the array
-
+  private flushQueuedEvents<T>(eventQueue: BoundedEventQueue<T>, logFunction?: (event: T) => void) {
+    const eventsToFlush = eventQueue.flush();
     if (!logFunction) {
       return;
     }
@@ -1035,7 +1078,7 @@ export default class EppoClient {
     });
   }
 
-  private logAssignment(result: FlagEvaluation) {
+  private maybeLogAssignment(result: FlagEvaluation) {
     const { flagKey, format, subjectKey, allocationKey, subjectAttributes, variation } = result;
     const event: IAssignmentEvent = {
       ...(result.extraLogging ?? {}),
@@ -1052,6 +1095,7 @@ export default class EppoClient {
     };
 
     if (variation && allocationKey) {
+      // If already logged, don't log again
       const hasLoggedAssignment = this.assignmentCache?.has({
         flagKey,
         subjectKey,
@@ -1066,10 +1110,10 @@ export default class EppoClient {
     try {
       if (this.assignmentLogger) {
         this.assignmentLogger.logAssignment(event);
-      } else if (this.queuedAssignmentEvents.length < MAX_EVENT_QUEUE_SIZE) {
+      } else {
         // assignment logger may be null while waiting for initialization, queue up events (up to a max)
         // to be flushed when set
-        this.queuedAssignmentEvents.push(event);
+        this.assignmentEventsQueue.push(event);
       }
       this.assignmentCache?.set({
         flagKey,
@@ -1118,4 +1162,8 @@ export function checkValueTypeMatch(
     default:
       return false;
   }
+}
+
+function newBoundedArrayEventQueue<T>(name: string): BoundedEventQueue<T> {
+  return new BoundedEventQueue<T>(new ArrayBackedNamedEventQueue<T>(name));
 }

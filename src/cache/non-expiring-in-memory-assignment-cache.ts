@@ -1,8 +1,8 @@
 import {
   assignmentCacheKeyToString,
   assignmentCacheValueToString,
-  NonExpiringInMemoryAssignmentCache,
 } from './abstract-assignment-cache';
+import { NonExpiringInMemoryAssignmentCache } from './non-expiring-in-memory-cache-assignment';
 
 describe('NonExpiringInMemoryAssignmentCache', () => {
   it('read and write variation entries', () => {
