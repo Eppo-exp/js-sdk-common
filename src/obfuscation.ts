@@ -1,8 +1,8 @@
 import base64 = require('js-base64');
-import * as md5 from 'md5';
+import * as SparkMD5 from 'spark-md5';
 
 export function getMD5Hash(input: string): string {
-  return md5(input);
+  return SparkMD5.hash(input);
 }
 
 export function encodeBase64(input: string) {
