@@ -1,11 +1,9 @@
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
-import {
-  AssignmentCache,
-  LRUInMemoryAssignmentCache,
-  NonExpiringInMemoryAssignmentCache,
-} from '../cache/abstract-assignment-cache';
+import { AssignmentCache } from '../cache/abstract-assignment-cache';
+import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
+import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
