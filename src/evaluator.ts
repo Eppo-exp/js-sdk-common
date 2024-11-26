@@ -20,8 +20,9 @@ import { Rule, matchesRule } from './rules';
 import { MD5Sharder, Sharder } from './sharders';
 import { Attributes } from './types';
 
-export interface FlagEvaluation {
+export interface FlagEvaluationWithoutDetails {
   flagKey: string;
+  format: string;
   subjectKey: string;
   subjectAttributes: Attributes;
   allocationKey: string | null;
@@ -29,6 +30,9 @@ export interface FlagEvaluation {
   extraLogging: Record<string, string>;
   // whether to log assignment event
   doLog: boolean;
+}
+
+export interface FlagEvaluation extends FlagEvaluationWithoutDetails {
   flagEvaluationDetails: IFlagEvaluationDetails;
 }
 
@@ -63,6 +67,7 @@ export class Evaluator {
             'FLAG_UNRECOGNIZED_OR_DISABLED',
             `Unrecognized or disabled flag: ${flag.key}`,
           ),
+          configDetails.configFormat,
         );
       }
 
@@ -109,6 +114,7 @@ export class Evaluator {
                 .build(flagEvaluationCode, flagEvaluationDescription);
               return {
                 flagKey: flag.key,
+                format: configDetails.configFormat,
                 subjectKey,
                 subjectAttributes,
                 allocationKey: allocation.key,
@@ -133,6 +139,7 @@ export class Evaluator {
           'DEFAULT_ALLOCATION_NULL',
           'No allocations matched. Falling back to "Default Allocation", serving NULL',
         ),
+        configDetails.configFormat,
       );
     } catch (err: any) {
       const flagEvaluationDetails = flagEvaluationDetailsBuilder.gracefulBuild(
@@ -207,9 +214,11 @@ export function noneResult(
   subjectKey: string,
   subjectAttributes: Attributes,
   flagEvaluationDetails: IFlagEvaluationDetails,
+  format: string,
 ): FlagEvaluation {
   return {
     flagKey,
+    format,
     subjectKey,
     subjectAttributes,
     allocationKey: null,

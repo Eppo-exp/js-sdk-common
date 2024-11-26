@@ -1,5 +1,5 @@
 import { logger, loggerPrefix } from '../application-logger';
-import { Environment } from '../interfaces';
+import { Environment, FormatEnum } from '../interfaces';
 
 import { IAsyncStore, IConfigurationStore, ISyncStore } from './configuration-store';
 
@@ -11,6 +11,7 @@ export class HybridConfigurationStore<T> implements IConfigurationStore<T> {
   private environment: Environment | null = null;
   private configFetchedAt: string | null = null;
   private configPublishedAt: string | null = null;
+  private format: FormatEnum | null = null;
 
   /**
    * Initialize the configuration store by loading the entries from the persistent store into the serving store.
@@ -92,5 +93,13 @@ export class HybridConfigurationStore<T> implements IConfigurationStore<T> {
 
   public setConfigPublishedAt(configPublishedAt: string): void {
     this.configPublishedAt = configPublishedAt;
+  }
+
+  public getFormat(): FormatEnum | null {
+    return this.format;
+  }
+
+  public setFormat(format: FormatEnum): void {
+    this.format = format;
   }
 }

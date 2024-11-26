@@ -20,6 +20,9 @@ import EppoClient, {
   IAssignmentDetails,
   IContainerExperiment,
 } from './client/eppo-client';
+import EppoPrecomputedClient, {
+  PrecomputedFlagsRequestParameters,
+} from './client/eppo-precomputed-client';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -40,7 +43,7 @@ import EventDispatcher from './events/event-dispatcher';
 import NamedEventQueue from './events/named-event-queue';
 import NetworkStatusListener from './events/network-status-listener';
 import HttpClient from './http-client';
-import { Flag, ObfuscatedFlag, VariationType } from './interfaces';
+import { PrecomputedFlag, Flag, ObfuscatedFlag, VariationType } from './interfaces';
 import {
   AttributeType,
   Attributes,
@@ -60,12 +63,14 @@ export {
   IBanditLogger,
   IBanditEvent,
   IContainerExperiment,
+  PrecomputedFlagsRequestParameters,
   EppoClient,
   constants,
   ApiEndpoints,
   FlagConfigRequestor,
   HttpClient,
   validation,
+  EppoPrecomputedClient,
 
   // Configuration store
   IConfigurationStore,
@@ -90,6 +95,7 @@ export {
   FlagConfigurationRequestParameters,
   Flag,
   ObfuscatedFlag,
+  PrecomputedFlag,
   VariationType,
   AttributeType,
   Attributes,

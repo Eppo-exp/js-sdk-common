@@ -1,4 +1,4 @@
-import { Environment } from '../interfaces';
+import { Environment, FormatEnum } from '../interfaces';
 
 import { IConfigurationStore, ISyncStore } from './configuration-store';
 
@@ -34,7 +34,7 @@ export class MemoryOnlyConfigurationStore<T> implements IConfigurationStore<T> {
   private configFetchedAt: string | null = null;
   private configPublishedAt: string | null = null;
   private environment: Environment | null = null;
-
+  private format: FormatEnum | null = null;
   init(): Promise<void> {
     this.initialized = true;
     return Promise.resolve();
@@ -88,5 +88,13 @@ export class MemoryOnlyConfigurationStore<T> implements IConfigurationStore<T> {
 
   public setConfigPublishedAt(configPublishedAt: string): void {
     this.configPublishedAt = configPublishedAt;
+  }
+
+  public getFormat(): FormatEnum | null {
+    return this.format;
+  }
+
+  public setFormat(format: FormatEnum): void {
+    this.format = format;
   }
 }
