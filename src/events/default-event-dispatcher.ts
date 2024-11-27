@@ -6,6 +6,7 @@ import EventDelivery from './event-delivery';
 import EventDispatcher, { Event } from './event-dispatcher';
 import NamedEventQueue from './named-event-queue';
 import NetworkStatusListener from './network-status-listener';
+import NoOpEventDispatcher from './no-op-event-dispatcher';
 import SdkKeyDecoder from './sdk-key-decoder';
 
 export type EventDispatcherConfig = {
@@ -135,7 +136,10 @@ export function newDefaultEventDispatcher(
   const sdkKeyDecoder = new SdkKeyDecoder();
   const ingestionUrl = sdkKeyDecoder.decodeEventIngestionHostName(sdkKey);
   if (!ingestionUrl) {
-    throw new Error('Unable to parse Event ingestion URL from SDK key');
+    logger.debug(
+      'Unable to parse Event ingestion URL from SDK key, falling back to no-op event dispatcher',
+    );
+    return new NoOpEventDispatcher();
   }
   return new DefaultEventDispatcher(
     new BatchEventProcessor(eventQueue, batchSize),
