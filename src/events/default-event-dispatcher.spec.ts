@@ -6,6 +6,7 @@ import DefaultEventDispatcher, {
 } from './default-event-dispatcher';
 import { Event } from './event-dispatcher';
 import NetworkStatusListener from './network-status-listener';
+import NoOpEventDispatcher from './no-op-event-dispatcher';
 
 global.fetch = jest.fn();
 
@@ -201,14 +202,13 @@ describe('DefaultEventDispatcher', () => {
   });
 
   describe('newDefaultEventDispatcher', () => {
-    it('should throw if SDK key is invalid', () => {
-      expect(() => {
-        newDefaultEventDispatcher(
-          new ArrayBackedNamedEventQueue('test-queue'),
-          mockNetworkStatusListener,
-          'invalid-sdk-key',
-        );
-      }).toThrow('Unable to parse Event ingestion URL from SDK key');
+    it('should fallback to no-op dispatcher if SDK key is invalid', () => {
+      const eventDispatcher = newDefaultEventDispatcher(
+        new ArrayBackedNamedEventQueue('test-queue'),
+        mockNetworkStatusListener,
+        'invalid-sdk-key',
+      );
+      expect(eventDispatcher).toBeInstanceOf(NoOpEventDispatcher);
     });
 
     it('should create a new DefaultEventDispatcher with the provided configuration', () => {
