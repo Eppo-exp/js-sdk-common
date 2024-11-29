@@ -20,6 +20,9 @@ import EppoClient, {
   IAssignmentDetails,
   IContainerExperiment,
 } from './client/eppo-client';
+import EppoPrecomputedClient, {
+  PrecomputedFlagsRequestParameters,
+} from './client/eppo-precomputed-client';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -29,8 +32,18 @@ import {
 import { HybridConfigurationStore } from './configuration-store/hybrid.store';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import * as constants from './constants';
+import BatchEventProcessor from './events/batch-event-processor';
+import { BoundedEventQueue } from './events/bounded-event-queue';
+import DefaultEventDispatcher, {
+  DEFAULT_EVENT_DISPATCHER_CONFIG,
+  DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
+  newDefaultEventDispatcher,
+} from './events/default-event-dispatcher';
+import EventDispatcher from './events/event-dispatcher';
+import NamedEventQueue from './events/named-event-queue';
+import NetworkStatusListener from './events/network-status-listener';
 import HttpClient from './http-client';
-import { Flag, ObfuscatedFlag, VariationType } from './interfaces';
+import { PrecomputedFlag, Flag, ObfuscatedFlag, VariationType } from './interfaces';
 import {
   AttributeType,
   Attributes,
@@ -50,12 +63,14 @@ export {
   IBanditLogger,
   IBanditEvent,
   IContainerExperiment,
+  PrecomputedFlagsRequestParameters,
   EppoClient,
   constants,
   ApiEndpoints,
   FlagConfigRequestor,
   HttpClient,
   validation,
+  EppoPrecomputedClient,
 
   // Configuration store
   IConfigurationStore,
@@ -80,10 +95,22 @@ export {
   FlagConfigurationRequestParameters,
   Flag,
   ObfuscatedFlag,
+  PrecomputedFlag,
   VariationType,
   AttributeType,
   Attributes,
   ContextAttributes,
   BanditSubjectAttributes,
   BanditActions,
+
+  // event dispatcher types
+  NamedEventQueue,
+  EventDispatcher,
+  BoundedEventQueue,
+  DEFAULT_EVENT_DISPATCHER_CONFIG,
+  DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
+  newDefaultEventDispatcher,
+  BatchEventProcessor,
+  NetworkStatusListener,
+  DefaultEventDispatcher,
 };

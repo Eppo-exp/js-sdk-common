@@ -1,3 +1,5 @@
+import { v4 as randomUUID } from 'uuid';
+
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
@@ -18,9 +20,9 @@ import {
 import { decodeFlag } from '../decoding';
 import { EppoValue } from '../eppo_value';
 import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
-import ArrayBackedNamedEventQueue from '../events/array-backed-named-event-queue';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
-import NamedEventQueue from '../events/named-event-queue';
+import EventDispatcher from '../events/event-dispatcher';
+import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
 import {
   FlagEvaluationDetailsBuilder,
   IFlagEvaluationDetails,
@@ -77,11 +79,11 @@ export interface IContainerExperiment<T> {
 }
 
 export default class EppoClient {
-  private readonly eventQueue: NamedEventQueue<unknown>;
+  private eventDispatcher: EventDispatcher;
   private readonly assignmentEventsQueue: BoundedEventQueue<IAssignmentEvent> =
-    newBoundedArrayEventQueue<IAssignmentEvent>('assignments');
+    new BoundedEventQueue<IAssignmentEvent>('assignments');
   private readonly banditEventsQueue: BoundedEventQueue<IBanditEvent> =
-    newBoundedArrayEventQueue<IBanditEvent>('bandit');
+    new BoundedEventQueue<IBanditEvent>('bandit');
   private readonly banditEvaluator = new BanditEvaluator();
   private banditLogger?: IBanditLogger;
   private banditAssignmentCache?: AssignmentCache;
@@ -98,23 +100,23 @@ export default class EppoClient {
   private readonly evaluator = new Evaluator();
 
   constructor({
-    eventQueue = new ArrayBackedNamedEventQueue('events'),
+    eventDispatcher = new NoOpEventDispatcher(),
     isObfuscated = false,
     flagConfigurationStore,
     banditVariationConfigurationStore,
     banditModelConfigurationStore,
     configurationRequestParameters,
   }: {
-    // Queue for arbitrary, application-level events (not to be confused with Eppo specific assignment
+    // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
     // or bandit events). These events are application-specific and captures by EppoClient#track API.
-    eventQueue?: NamedEventQueue<unknown>;
+    eventDispatcher?: EventDispatcher;
     flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
     banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
     banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
     configurationRequestParameters?: FlagConfigurationRequestParameters;
     isObfuscated?: boolean;
   }) {
-    this.eventQueue = eventQueue;
+    this.eventDispatcher = eventDispatcher;
     this.flagConfigurationStore = flagConfigurationStore;
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
     this.banditModelConfigurationStore = banditModelConfigurationStore;
@@ -138,6 +140,12 @@ export default class EppoClient {
     banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]>,
   ) {
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
+  }
+
+  /** Sets the EventDispatcher instance to use when tracking events with {@link track}. */
+  // noinspection JSUnusedGlobalSymbols
+  setEventDispatcher(eventDispatcher: EventDispatcher) {
+    this.eventDispatcher = eventDispatcher;
   }
 
   // noinspection JSUnusedGlobalSymbols
@@ -859,7 +867,13 @@ export default class EppoClient {
         'FLAG_UNRECOGNIZED_OR_DISABLED',
         `Unrecognized or disabled flag: ${flagKey}`,
       );
-      return noneResult(flagKey, subjectKey, subjectAttributes, flagEvaluationDetails);
+      return noneResult(
+        flagKey,
+        subjectKey,
+        subjectAttributes,
+        flagEvaluationDetails,
+        configDetails.configFormat,
+      );
     }
 
     if (!checkTypeMatch(expectedVariationType, flag.variationType)) {
@@ -869,7 +883,13 @@ export default class EppoClient {
           'TYPE_MISMATCH',
           errorMessage,
         );
-        return noneResult(flagKey, subjectKey, subjectAttributes, flagEvaluationDetails);
+        return noneResult(
+          flagKey,
+          subjectKey,
+          subjectAttributes,
+          flagEvaluationDetails,
+          configDetails.configFormat,
+        );
       }
       throw new TypeError(errorMessage);
     }
@@ -881,7 +901,13 @@ export default class EppoClient {
         'FLAG_UNRECOGNIZED_OR_DISABLED',
         `Unrecognized or disabled flag: ${flagKey}`,
       );
-      return noneResult(flagKey, subjectKey, subjectAttributes, flagEvaluationDetails);
+      return noneResult(
+        flagKey,
+        subjectKey,
+        subjectAttributes,
+        flagEvaluationDetails,
+        configDetails.configFormat,
+      );
     }
 
     const result = this.evaluator.evaluateFlag(
@@ -908,9 +934,10 @@ export default class EppoClient {
     return result;
   }
 
+  /** TODO */
   // noinspection JSUnusedGlobalSymbols
   track(event: unknown, params: Record<string, unknown>) {
-    this.eventQueue.push({ event, params });
+    this.eventDispatcher.dispatch({ id: randomUUID(), data: event, params });
   }
 
   private newFlagEvaluationDetailsBuilder(flagKey: string): FlagEvaluationDetailsBuilder {
@@ -929,6 +956,7 @@ export default class EppoClient {
       configFetchedAt: this.flagConfigurationStore.getConfigFetchedAt() ?? '',
       configPublishedAt: this.flagConfigurationStore.getConfigPublishedAt() ?? '',
       configEnvironment: this.flagConfigurationStore.getEnvironment() ?? { name: '' },
+      configFormat: this.flagConfigurationStore.getFormat() ?? '',
     };
   }
 
@@ -1047,12 +1075,13 @@ export default class EppoClient {
   }
 
   private maybeLogAssignment(result: FlagEvaluation) {
-    const { flagKey, subjectKey, allocationKey, subjectAttributes, variation } = result;
+    const { flagKey, format, subjectKey, allocationKey, subjectAttributes, variation } = result;
     const event: IAssignmentEvent = {
       ...(result.extraLogging ?? {}),
       allocation: allocationKey ?? null,
       experiment: allocationKey ? `${flagKey}-${allocationKey}` : null,
       featureFlag: flagKey,
+      format,
       variation: variation?.key ?? null,
       subject: subjectKey,
       timestamp: new Date().toISOString(),
@@ -1129,8 +1158,4 @@ export function checkValueTypeMatch(
     default:
       return false;
   }
-}
-
-export function newBoundedArrayEventQueue<T>(name: string): BoundedEventQueue<T> {
-  return new BoundedEventQueue<T>(new ArrayBackedNamedEventQueue<T>(name));
 }

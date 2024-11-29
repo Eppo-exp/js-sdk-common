@@ -36,6 +36,8 @@ export interface IConfigurationStore<T> {
   setConfigFetchedAt(configFetchedAt: string): void;
   getConfigPublishedAt(): string | null;
   setConfigPublishedAt(configPublishedAt: string): void;
+  getFormat(): string | null;
+  setFormat(format: string): void;
 }
 
 export interface ISyncStore<T> {

@@ -1,10 +1,24 @@
 import ApiEndpoints from './api-endpoints';
-import { BanditParameters, BanditVariation, Environment, Flag } from './interfaces';
+import {
+  BanditParameters,
+  BanditVariation,
+  Environment,
+  Flag,
+  FormatEnum,
+  PrecomputedFlag,
+  PrecomputedFlagsPayload,
+} from './interfaces';
+import { Attributes } from './types';
 
 export interface IQueryParams {
   apiKey: string;
   sdkVersion: string;
   sdkName: string;
+}
+
+export interface IQueryParamsWithSubject extends IQueryParams {
+  subjectKey: string;
+  subjectAttributes: Attributes;
 }
 
 export class HttpRequestError extends Error {
@@ -18,6 +32,7 @@ export class HttpRequestError extends Error {
 
 export interface IUniversalFlagConfigResponse {
   createdAt: string; // ISO formatted string
+  format: FormatEnum;
   environment: Environment;
   flags: Record<string, Flag>;
   bandits: Record<string, BanditVariation[]>;
@@ -27,10 +42,21 @@ export interface IBanditParametersResponse {
   bandits: Record<string, BanditParameters>;
 }
 
+export interface IPrecomputedFlagsResponse {
+  createdAt: string;
+  format: FormatEnum;
+  environment: Environment;
+  flags: Record<string, PrecomputedFlag>;
+}
+
 export interface IHttpClient {
   getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined>;
   getBanditParameters(): Promise<IBanditParametersResponse | undefined>;
+  getPrecomputedFlags(
+    payload: PrecomputedFlagsPayload,
+  ): Promise<IPrecomputedFlagsResponse | undefined>;
   rawGet<T>(url: URL): Promise<T | undefined>;
+  rawPost<T, P>(url: URL, payload: P): Promise<T | undefined>;
 }
 
 export default class FetchHttpClient implements IHttpClient {
@@ -46,6 +72,13 @@ export default class FetchHttpClient implements IHttpClient {
     return await this.rawGet<IBanditParametersResponse>(url);
   }
 
+  async getPrecomputedFlags(
+    payload: PrecomputedFlagsPayload,
+  ): Promise<IPrecomputedFlagsResponse | undefined> {
+    const url = this.apiEndpoints.precomputedFlagsEndpoint();
+    return await this.rawPost<IPrecomputedFlagsResponse, PrecomputedFlagsPayload>(url, payload);
+  }
+
   async rawGet<T>(url: URL): Promise<T | undefined> {
     try {
       // Canonical implementation of abortable fetch for interrupting when request takes longer than desired.
@@ -59,6 +92,39 @@ export default class FetchHttpClient implements IHttpClient {
 
       if (!response?.ok) {
         throw new HttpRequestError('Failed to fetch data', response?.status);
+      }
+      return await response.json();
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new HttpRequestError('Request timed out', 408, error);
+      } else if (error instanceof HttpRequestError) {
+        throw error;
+      }
+
+      throw new HttpRequestError('Network error', 0, error);
+    }
+  }
+
+  async rawPost<T, P>(url: URL, payload: P): Promise<T | undefined> {
+    try {
+      const controller = new AbortController();
+      const signal = controller.signal;
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response?.ok) {
+        const errorBody = await response.text();
+        throw new HttpRequestError(errorBody || 'Failed to post data', response?.status);
       }
       return await response.json();
     } catch (error: any) {
