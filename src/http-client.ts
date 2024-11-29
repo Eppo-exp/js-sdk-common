@@ -3,7 +3,6 @@ import { IPrecomputedConfigurationResponse } from './configuration';
 import {
   BanditParameters,
   BanditReference,
-  BanditVariation,
   Environment,
   Flag,
   FormatEnum,
