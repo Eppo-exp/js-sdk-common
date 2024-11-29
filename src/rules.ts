@@ -154,8 +154,6 @@ function evaluateRuleConditions(
 function evaluateCondition(subjectAttributes: Record<string, any>, condition: Condition): boolean {
   const value = subjectAttributes[condition.attribute];
 
-  const conditionValueType = targetingRuleConditionValuesTypesFromValues(condition.value);
-
   if (condition.operator === OperatorType.IS_NULL) {
     if (condition.value) {
       return value === null || value === undefined;
@@ -166,25 +164,32 @@ function evaluateCondition(subjectAttributes: Record<string, any>, condition: Co
   if (value != null) {
     switch (condition.operator) {
       case OperatorType.GTE:
-        if (conditionValueType === OperatorValueType.SEM_VER) {
-          return compareSemVer(value, condition.value, semverGte);
-        }
-        return compareNumber(value, condition.value, (a, b) => a >= b);
       case OperatorType.GT:
-        if (conditionValueType === OperatorValueType.SEM_VER) {
-          return compareSemVer(value, condition.value, semverGt);
-        }
-        return compareNumber(value, condition.value, (a, b) => a > b);
       case OperatorType.LTE:
+      case OperatorType.LT: {
+        const conditionValueType = targetingRuleConditionValuesTypesFromValues(condition.value);
         if (conditionValueType === OperatorValueType.SEM_VER) {
-          return compareSemVer(value, condition.value, semverLte);
+          const comparator =
+            condition.operator === OperatorType.GTE
+              ? semverGte
+              : condition.operator === OperatorType.GT
+              ? semverGt
+              : condition.operator === OperatorType.LTE
+              ? semverLte
+              : semverLt;
+          return compareSemVer(value, condition.value, comparator);
         }
-        return compareNumber(value, condition.value, (a, b) => a <= b);
-      case OperatorType.LT:
-        if (conditionValueType === OperatorValueType.SEM_VER) {
-          return compareSemVer(value, condition.value, semverLt);
-        }
-        return compareNumber(value, condition.value, (a, b) => a < b);
+
+        const comparator = (a: number, b: number) =>
+          condition.operator === OperatorType.GTE
+            ? a >= b
+            : condition.operator === OperatorType.GT
+            ? a > b
+            : condition.operator === OperatorType.LTE
+            ? a <= b
+            : a < b;
+        return compareNumber(value, condition.value, comparator);
+      }
       case OperatorType.MATCHES:
         return new RegExp(condition.value as string).test(value as string);
       case OperatorType.NOT_MATCHES:
@@ -203,7 +208,6 @@ function evaluateObfuscatedCondition(
   condition: Condition,
 ): boolean {
   const value = hashedSubjectAttributes[condition.attribute];
-  const conditionValueType = targetingRuleConditionValuesTypesFromValues(value);
 
   if (condition.operator === ObfuscatedOperatorType.IS_NULL) {
     if (condition.value === getMD5Hash('true')) {
@@ -215,41 +219,33 @@ function evaluateObfuscatedCondition(
   if (value != null) {
     switch (condition.operator) {
       case ObfuscatedOperatorType.GTE:
-        if (conditionValueType === OperatorValueType.SEM_VER) {
-          return compareSemVer(value, decodeBase64(condition.value as string), semverGte);
-        }
-        return compareNumber(
-          value,
-          Number(decodeBase64(condition.value as string)),
-          (a, b) => a >= b,
-        );
       case ObfuscatedOperatorType.GT:
-        if (conditionValueType === OperatorValueType.SEM_VER) {
-          return compareSemVer(value, decodeBase64(condition.value as string), semverGt);
-        }
-        return compareNumber(
-          value,
-          Number(decodeBase64(condition.value as string)),
-          (a, b) => a > b,
-        );
       case ObfuscatedOperatorType.LTE:
+      case ObfuscatedOperatorType.LT: {
+        const conditionValue = decodeBase64(condition.value);
+        const conditionValueType = targetingRuleConditionValuesTypesFromValues(conditionValue);
         if (conditionValueType === OperatorValueType.SEM_VER) {
-          return compareSemVer(value, decodeBase64(condition.value as string), semverLte);
+          const comparator =
+            condition.operator === ObfuscatedOperatorType.GTE
+              ? semverGte
+              : condition.operator === ObfuscatedOperatorType.GT
+              ? semverGt
+              : condition.operator === ObfuscatedOperatorType.LTE
+              ? semverLte
+              : semverLt;
+          return compareSemVer(value, conditionValue, comparator);
         }
-        return compareNumber(
-          value,
-          Number(decodeBase64(condition.value as string)),
-          (a, b) => a <= b,
-        );
-      case ObfuscatedOperatorType.LT:
-        if (conditionValueType === OperatorValueType.SEM_VER) {
-          return compareSemVer(value, decodeBase64(condition.value as string), semverLt);
-        }
-        return compareNumber(
-          value,
-          Number(decodeBase64(condition.value as string)),
-          (a, b) => a < b,
-        );
+
+        const comparator = (a: number, b: number) =>
+          condition.operator === ObfuscatedOperatorType.GTE
+            ? a >= b
+            : condition.operator === ObfuscatedOperatorType.GT
+            ? a > b
+            : condition.operator === ObfuscatedOperatorType.LTE
+            ? a <= b
+            : a < b;
+        return compareNumber(value, Number(conditionValue), comparator);
+      }
       case ObfuscatedOperatorType.MATCHES:
         return new RegExp(decodeBase64(condition.value as string)).test(value as string);
       case ObfuscatedOperatorType.NOT_MATCHES:
