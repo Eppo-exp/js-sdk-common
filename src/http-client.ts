@@ -2,7 +2,6 @@ import ApiEndpoints from './api-endpoints';
 import {
   BanditParameters,
   BanditReference,
-  BanditVariation,
   Environment,
   Flag,
   FormatEnum,
