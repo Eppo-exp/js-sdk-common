@@ -12,6 +12,20 @@ Refer to our [SDK documentation](https://docs.geteppo.com/sdks/client-sdks/javas
 
 To set up the package for local development, run `make prepare` after cloning the repository
 
+## Troubleshooting
+
+* Jest encountered an unexpected token
+```
+Details:
+
+/.../node_modules/@eppo/js-client-sdk-common/node_modules/uuid/dist/esm-browser/index.js:1
+({"Object.<anonymous>":function(module,exports,require,__dirname,__filename,jest){export { default as v1 } from './v1.js';
+                                                                                  ^^^^^^
+SyntaxError: Unexpected token 'export'
+```
+Add the following line to your `jest.config.js` file:
+`transformIgnorePatterns: ['<rootDir>/node_modules/(?!(@eppo|uuid)/)'],`
+
 ### Installing local package
 
 It may be useful to install the local version of this package as you develop the client SDK or Node SDK.
