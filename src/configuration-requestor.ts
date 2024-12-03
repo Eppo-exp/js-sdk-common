@@ -1,14 +1,7 @@
 import { IConfigurationStore } from './configuration-store/configuration-store';
 import { hydrateConfigurationStore } from './configuration-store/configuration-store-utils';
 import { IHttpClient } from './http-client';
-import {
-  BanditVariation,
-  BanditParameters,
-  Flag,
-  BanditReference,
-} from './interfaces';
-
-type Entry = Flag | BanditVariation[] | BanditParameters;
+import { BanditVariation, BanditParameters, Flag, BanditReference } from './interfaces';
 
 // Requests AND stores flag configurations
 export default class ConfigurationRequestor {
@@ -63,7 +56,8 @@ export default class ConfigurationRequestor {
             entries: banditResponse.bandits,
             environment: configResponse.environment,
             createdAt: configResponse.createdAt,
-            format: configResponse.format,});
+            format: configResponse.format,
+          });
 
           this.banditModelVersions = this.getLoadedBanditModelVersionsFromStore(
             this.banditModelConfigurationStore,
@@ -73,6 +67,15 @@ export default class ConfigurationRequestor {
     }
   }
 
+  // This is hopefully temporary workaround until we address
+  // non-unique model version of bandits for cold start
+  private getUniqueColdStartModelVersionForBandit(
+    banditKey: string,
+    banditModelVersion: string,
+  ): string {
+    return `${banditModelVersion}-${banditKey}`;
+  }
+
   private getLoadedBanditModelVersionsFromStore(
     banditModelConfigurationStore: IConfigurationStore<BanditParameters> | null,
   ): string[] {
@@ -80,7 +83,11 @@ export default class ConfigurationRequestor {
       return [];
     }
     return Object.values(banditModelConfigurationStore.entries()).map(
-      (banditParam: BanditParameters) => banditParam.modelVersion,
+      (banditParam: BanditParameters) =>
+        this.getUniqueColdStartModelVersionForBandit(
+          banditParam.banditKey,
+          banditParam.modelVersion,
+        ),
     );
   }
 
@@ -88,8 +95,9 @@ export default class ConfigurationRequestor {
     currentBanditModelVersions: string[],
     banditReferences: Record<string, BanditReference>,
   ): boolean {
-    const referencedModelVersions = Object.values(banditReferences).map(
-      (banditReference: BanditReference) => banditReference.modelVersion,
+    const referencedModelVersions = Object.entries(banditReferences).map(
+      ([banditKey, banditReference]) =>
+        this.getUniqueColdStartModelVersionForBandit(banditKey, banditReference.modelVersion),
     );
 
     return !referencedModelVersions.every((modelVersion) =>
