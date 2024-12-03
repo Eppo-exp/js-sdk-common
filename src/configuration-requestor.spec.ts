@@ -267,7 +267,7 @@ describe('ConfigurationRequestor', () => {
           },
         };
 
-        afterAll(() => {
+        afterEach(() => {
           initiateFetchSpy(defaultResponseMockGenerator);
         });
 
@@ -422,6 +422,50 @@ describe('ConfigurationRequestor', () => {
             'cold_start_bandit',
             coldStartBanditParameters,
           );
+        });
+
+        it('should handle more than 1 cold start', async () => {
+          await configurationRequestor.fetchAndStoreConfigurations();
+          expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+          // setting up scenario where user added new bandit
+          const customResponseMockGenerator = (url: string) => {
+            const responseFile = url.includes('bandits')
+              ? MOCK_BANDIT_MODELS_RESPONSE_FILE
+              : MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE;
+            const response = readMockUFCResponse(responseFile);
+
+            if ('banditReferences' in response && url.includes('config')) {
+              response.banditReferences.brand_new_bandit = {
+                flagVariations: [
+                  {
+                    key: 'cold_start_bandit',
+                    flagKey: 'cold_start_bandit_flag',
+                    variationKey: 'cold_start_bandit',
+                    variationValue: 'cold_start_bandit',
+                  },
+                ],
+                modelVersion: 'cold start',
+              };
+            } else if (url.includes('bandits') && 'bandits' in response) {
+              response.bandits.brand_new_bandit = {
+                banditKey: 'brand_new_bandit',
+                modelName: 'very new',
+                modelVersion: 'cold start',
+                modelData: {
+                  gamma: 1.0,
+                  defaultActionScore: 0.0,
+                  actionProbabilityFloor: 0.0,
+                  coefficients: {},
+                },
+              };
+            }
+            return response;
+          };
+          initiateFetchSpy(customResponseMockGenerator);
+
+          await configurationRequestor.fetchAndStoreConfigurations();
+          expect(fetchSpy).toHaveBeenCalledTimes(2);
         });
       });
     });
