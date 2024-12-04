@@ -1,3 +1,5 @@
+import { Base64 } from 'js-base64';
+
 export default class SdkKeyDecoder {
   /**
    * Decodes and returns the event ingestion hostname from the provided Eppo SDK key string.
@@ -7,7 +9,7 @@ export default class SdkKeyDecoder {
     const encodedPayload = sdkKey.split('.')[1];
     if (!encodedPayload) return null;
 
-    const decodedPayload = Buffer.from(encodedPayload, 'base64url').toString('utf-8');
+    const decodedPayload = Base64.decode(encodedPayload);
     const params = new URLSearchParams(decodedPayload);
     return params.get('eh');
   }
