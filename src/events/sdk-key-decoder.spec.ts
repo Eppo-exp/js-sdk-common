@@ -18,7 +18,6 @@ describe('SdkKeyDecoder', () => {
   });
 
   it("should return null if the SDK key doesn't contain the event ingestion hostname", () => {
-    const decoder = new SdkKeyDecoder();
     expect(decoder.decodeEventIngestionHostName('zCsQuoHJxVPp895')).toBeNull();
     expect(decoder.decodeEventIngestionHostName('zCsQuoHJxVPp895.xxxxxx')).toBeNull();
   });
