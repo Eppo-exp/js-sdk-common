@@ -84,4 +84,12 @@ module.exports = {
     ],
     'unused-imports/no-unused-imports': 'error',
   },
+  overrides: [
+    {
+      files: ['*.spec.ts'],
+      rules: {
+        'no-restricted-globals': 'off',
+      },
+    },
+  ],
 };
