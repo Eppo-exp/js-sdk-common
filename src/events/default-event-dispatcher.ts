@@ -1,9 +1,11 @@
+import { Event } from '@eppo/protobuf-schemas';
+
 import { logger } from '../application-logger';
 
 import BatchEventProcessor from './batch-event-processor';
 import BatchRetryManager from './batch-retry-manager';
 import EventDelivery from './event-delivery';
-import EventDispatcher, { Event } from './event-dispatcher';
+import EventDispatcher from './event-dispatcher';
 import NamedEventQueue from './named-event-queue';
 import NetworkStatusListener from './network-status-listener';
 import NoOpEventDispatcher from './no-op-event-dispatcher';

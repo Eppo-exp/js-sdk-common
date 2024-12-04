@@ -5,11 +5,15 @@
     "declarationMap": true,
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
-    "target": "es2020",
+    "target": "es2022",
     "outDir": "dist",
     "noImplicitAny": true,
     "strict": true,
-    "strictPropertyInitialization": true
+    "strictPropertyInitialization": true,
+    "baseUrl": ".",
+    "paths": {
+      "src/*": ["./src/*"],
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": [

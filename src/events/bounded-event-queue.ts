@@ -11,7 +11,9 @@ export class BoundedEventQueue<T> implements NamedEventQueue<T> {
     private readonly maxSize = MAX_EVENT_QUEUE_SIZE,
   ) {}
 
-  length = this.queue.length;
+  get length() {
+    return this.queue.length;
+  }
 
   splice(count: number): T[] {
     return this.queue.splice(count);

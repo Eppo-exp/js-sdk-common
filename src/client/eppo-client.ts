@@ -1,3 +1,4 @@
+import { Event } from '@eppo/protobuf-schemas';
 import { v4 as randomUUID } from 'uuid';
 
 import ApiEndpoints from '../api-endpoints';
@@ -937,7 +938,12 @@ export default class EppoClient {
   /** TODO */
   // noinspection JSUnusedGlobalSymbols
   track(event: unknown, params: Record<string, unknown>) {
-    this.eventDispatcher.dispatch({ id: randomUUID(), data: event, params });
+    this.eventDispatcher.dispatch(
+      Event.create({
+        id: randomUUID(),
+        data: new TextEncoder().encode(JSON.stringify({ event, params })),
+      }),
+    );
   }
 
   private newFlagEvaluationDetailsBuilder(flagKey: string): FlagEvaluationDetailsBuilder {

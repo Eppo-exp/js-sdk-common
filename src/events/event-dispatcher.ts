@@ -1,8 +1,4 @@
-export type Event = {
-  id: string;
-  data: unknown;
-  params?: Record<string, unknown>;
-};
+import { Event } from '@eppo/protobuf-schemas';
 
 export default interface EventDispatcher {
   /** Dispatches (enqueues) an event for eventual delivery. */
