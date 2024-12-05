@@ -28,17 +28,19 @@ import {
   IFlagEvaluationDetails,
 } from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
-import FetchHttpClient, { IPrecomputedFlagsResponse } from '../http-client';
+import FetchHttpClient from '../http-client';
 import {
   BanditParameters,
   BanditVariation,
   ConfigDetails,
-  Flag, FormatEnum,
-  ObfuscatedFlag, PrecomputedFlag,
+  Flag,
+  FormatEnum,
+  ObfuscatedFlag,
+  PrecomputedFlag,
   Variation,
   VariationType,
 } from '../interfaces';
-import { getMD5Hash } from '../obfuscation';
+import { getMD5Hash, obfuscatePrecomputedFlags } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import {
   Attributes,
@@ -835,10 +837,10 @@ export default class EppoClient {
     throw err;
   }
 
-  getAllAssignments(
+  private getAllAssignments(
     subjectKey: string,
     subjectAttributes: Attributes = {},
-  ): IPrecomputedFlagsResponse {
+  ): Record<string, PrecomputedFlag> {
     const configDetails = this.getConfigDetails();
     const flagKeys = this.getFlagKeys();
     const flags: Record<string, PrecomputedFlag> = {};
@@ -877,12 +879,28 @@ export default class EppoClient {
       };
     });
 
-    return {
+    return flags;
+  }
+
+  exportPrecomputedAssignments(
+    subjectKey: string,
+    subjectAttributes: Attributes = {},
+    obfuscated = false,
+  ): string {
+    const configDetails = this.getConfigDetails();
+    let flags = this.getAllAssignments(subjectKey, subjectAttributes);
+
+    if (obfuscated) {
+      flags = obfuscatePrecomputedFlags(flags);
+    }
+
+    const response = {
       createdAt: new Date().toISOString(),
       environment: configDetails.configEnvironment,
       flags,
-      format: FormatEnum.PRECOMPUTED,
+      format: obfuscated ? FormatEnum.CLIENT : FormatEnum.PRECOMPUTED,
     };
+    return JSON.stringify(response, null, 2);
   }
 
   /**

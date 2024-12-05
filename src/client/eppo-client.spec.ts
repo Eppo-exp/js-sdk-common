@@ -16,6 +16,7 @@ import { IAssignmentLogger } from '../assignment-logger';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
+import { IPrecomputedFlagsResponse } from '../http-client';
 import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
 import { AttributeType } from '../types';
 
@@ -78,7 +79,7 @@ describe('EppoClient E2E test', () => {
       storage.setEntries({ [flagKey]: mockFlag });
       client = new EppoClient({ flagConfigurationStore: storage });
 
-      td.replace(EppoClient.prototype, 'getAssignmentDetail', function() {
+      td.replace(EppoClient.prototype, 'getAssignmentDetail', function () {
         throw new Error('Mock test error');
       });
     });
@@ -203,7 +204,9 @@ describe('EppoClient E2E test', () => {
 
     it('skips disabled flags', () => {
       const client = new EppoClient({ flagConfigurationStore: storage });
-      const flagResults = client.getAllAssignments('subject', {});
+      const flagResults: IPrecomputedFlagsResponse = JSON.parse(
+        client.exportPrecomputedAssignments('subject', {}),
+      );
 
       const precomputedFlags = flagResults.flags;
       expect(Object.keys(precomputedFlags)).toContain('anotherFlag');
@@ -213,13 +216,28 @@ describe('EppoClient E2E test', () => {
 
     it('evaluates and returns assignments', () => {
       const client = new EppoClient({ flagConfigurationStore: storage });
-      const flagResults = client.getAllAssignments('subject', {});
+      const flagResults: IPrecomputedFlagsResponse = JSON.parse(
+        client.exportPrecomputedAssignments('subject', {}),
+      );
 
       const precomputedFlags = flagResults.flags;
       const firstFlag = precomputedFlags[flagKey];
       const secondFlag = precomputedFlags['anotherFlag'];
       expect(firstFlag.variationValue).toEqual('variation-a');
       expect(secondFlag.variationValue).toEqual('variation-b');
+    });
+
+    it('obfuscates assignments', () => {
+      const client = new EppoClient({ flagConfigurationStore: storage });
+      const flagResults: IPrecomputedFlagsResponse = JSON.parse(
+        client.exportPrecomputedAssignments('subject', {}, true),
+      );
+
+      const precomputedFlags = flagResults.flags;
+      const firstFlag = precomputedFlags['76a475dca4e7f11d2b02f3d257225cef']; // flagKey, md5 hashed
+      const secondFlag = precomputedFlags['6783d6010b0c8a6cd388a96caafe9568']; // 'anotherFlag', md5 hashed
+      expect(firstFlag.variationValue).toEqual('dmFyaWF0aW9uLWE='); // 'variation-a' base64 encoded
+      expect(secondFlag.variationValue).toEqual('dmFyaWF0aW9uLWI='); // 'variation-b' base64 encoded
     });
   });
 
