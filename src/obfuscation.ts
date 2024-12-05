@@ -23,7 +23,9 @@ export function obfuscatePrecomputedFlags(
     const assignment = precomputedFlags[flagKey];
 
     response[getMD5Hash(flagKey)] = {
-      ...assignment,
+      variationType: assignment.variationType,
+      extraLogging: assignment.extraLogging,
+      doLog: assignment.doLog,
       allocationKey: getMD5Hash(assignment.allocationKey),
       variationKey: getMD5Hash(assignment.variationKey),
       variationValue: encodeBase64(assignment.variationValue),
