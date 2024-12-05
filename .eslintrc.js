@@ -14,18 +14,9 @@ module.exports = {
   ],
   plugins: ['@typescript-eslint', 'prettier', 'import', 'promise', 'unused-imports'],
   rules: {
-    'prettier/prettier': [
-      'warn',
-      {
-        singleQuote: true,
-        trailingComma: 'all',
-        printWidth: 100,
-      },
-    ],
+    '@typescript-eslint/no-explicit-any': 'off',
     'import/named': 'off',
     'import/no-unresolved': 'off',
-    'unused-imports/no-unused-imports': 'error',
-    '@typescript-eslint/no-explicit-any': 'off',
     'import/order': [
       'warn',
       {
@@ -44,5 +35,61 @@ module.exports = {
         },
       },
     ],
+    'no-restricted-globals': [
+      'error',
+      {
+        name: '__dirname',
+        message: 'Not available in JavaScript',
+      },
+      {
+        name: '__filename',
+        message: 'Not available in JavaScript',
+      },
+      {
+        name: 'atob',
+        message:
+          "'atob' unavailable in React Native 0.72. Use 'decodeBase64' helper in src/obfuscation.ts instead",
+      },
+      {
+        name: 'btoa',
+        message:
+          "'btoa' unavailable in React Native 0.72. Use 'encodeBase64' helper in src/obfuscation.ts instead",
+      },
+      {
+        name: 'Buffer',
+        message:
+          "'Buffer' unavailable in JavaScript. Use 'Uint8Array' instead. For Base64, use helpers in src/obfuscation.ts",
+      },
+      {
+        name: 'clearImmediate',
+        message: "'clearImmediate' unavailable in JavaScript.",
+      },
+      {
+        name: 'process',
+        message:
+          "'process' unavailable in JavaScript. If this is already defined in webpack.config.js, you can safely disable the error for this line.",
+      },
+      {
+        name: 'setImmediate',
+        message: "'setImmediate' unavailable in JavaScript. Use 'setTimeout(fn, 0)' instead",
+      },
+    ],
+    'prettier/prettier': [
+      'warn',
+      {
+        singleQuote: true,
+        trailingComma: 'all',
+        printWidth: 100,
+      },
+    ],
+    'unused-imports/no-unused-imports': 'error',
   },
+  overrides: [
+    {
+      files: ['*.spec.ts'],
+      rules: {
+        'no-restricted-globals': 'off',
+      },
+    },
+  ],
 };
