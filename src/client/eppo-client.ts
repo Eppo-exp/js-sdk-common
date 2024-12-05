@@ -23,12 +23,9 @@ import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
 import EventDispatcher from '../events/event-dispatcher';
 import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
-import {
-  FlagEvaluationDetailsBuilder,
-  IFlagEvaluationDetails,
-} from '../flag-evaluation-details-builder';
+import { FlagEvaluationDetailsBuilder, IFlagEvaluationDetails } from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
-import FetchHttpClient from '../http-client';
+import FetchHttpClient, { IPrecomputedFlagsResponse } from '../http-client';
 import {
   BanditParameters,
   BanditVariation,
@@ -882,11 +879,18 @@ export default class EppoClient {
     return flags;
   }
 
-  exportPrecomputedAssignments(
+  /**
+   * Computes and returns assignments for a subject from all loaded flags.
+   *
+   * @param subjectKey an identifier of the experiment subject, for example a user ID.
+   * @param subjectAttributes optional attributes associated with the subject, for example name and email.   * The
+   * @param obfuscated optional whether to obfuscate the results.
+   */
+  getPrecomputedAssignments(
     subjectKey: string,
     subjectAttributes: Attributes = {},
     obfuscated = false,
-  ): string {
+  ): IPrecomputedFlagsResponse {
     const configDetails = this.getConfigDetails();
     let flags = this.getAllAssignments(subjectKey, subjectAttributes);
 
@@ -894,13 +898,12 @@ export default class EppoClient {
       flags = obfuscatePrecomputedFlags(flags);
     }
 
-    const response = {
+    return {
       createdAt: new Date().toISOString(),
       environment: configDetails.configEnvironment,
       flags,
-      format: obfuscated ? FormatEnum.CLIENT : FormatEnum.PRECOMPUTED,
+      format: obfuscated ? FormatEnum.PRECOMPUTED_CLIENT : FormatEnum.PRECOMPUTED,
     };
-    return JSON.stringify(response, null, 2);
   }
 
   /**

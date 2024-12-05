@@ -204,8 +204,9 @@ describe('EppoClient E2E test', () => {
 
     it('skips disabled flags', () => {
       const client = new EppoClient({ flagConfigurationStore: storage });
-      const flagResults: IPrecomputedFlagsResponse = JSON.parse(
-        client.exportPrecomputedAssignments('subject', {}),
+      const flagResults: IPrecomputedFlagsResponse = client.getPrecomputedAssignments(
+        'subject',
+        {},
       );
 
       const precomputedFlags = flagResults.flags;
@@ -216,8 +217,9 @@ describe('EppoClient E2E test', () => {
 
     it('evaluates and returns assignments', () => {
       const client = new EppoClient({ flagConfigurationStore: storage });
-      const flagResults: IPrecomputedFlagsResponse = JSON.parse(
-        client.exportPrecomputedAssignments('subject', {}),
+      const flagResults: IPrecomputedFlagsResponse = client.getPrecomputedAssignments(
+        'subject',
+        {},
       );
 
       const precomputedFlags = flagResults.flags;
@@ -229,13 +231,18 @@ describe('EppoClient E2E test', () => {
 
     it('obfuscates assignments', () => {
       const client = new EppoClient({ flagConfigurationStore: storage });
-      const flagResults: IPrecomputedFlagsResponse = JSON.parse(
-        client.exportPrecomputedAssignments('subject', {}, true),
+      const flagResults: IPrecomputedFlagsResponse = client.getPrecomputedAssignments(
+        'subject',
+        {},
+        true,
       );
 
       const precomputedFlags = flagResults.flags;
-      const firstFlag = precomputedFlags['76a475dca4e7f11d2b02f3d257225cef']; // flagKey, md5 hashed
-      const secondFlag = precomputedFlags['6783d6010b0c8a6cd388a96caafe9568']; // 'anotherFlag', md5 hashed
+      expect(Object.keys(precomputedFlags)).toContain('76a475dca4e7f11d2b02f3d257225cef'); // flagKey, md5 hashed
+      expect(Object.keys(precomputedFlags)).toContain('6783d6010b0c8a6cd388a96caafe9568'); // 'anotherFlag', md5 hashed
+
+      const firstFlag = precomputedFlags['76a475dca4e7f11d2b02f3d257225cef'];
+      const secondFlag = precomputedFlags['6783d6010b0c8a6cd388a96caafe9568'];
       expect(firstFlag.variationValue).toEqual('dmFyaWF0aW9uLWE='); // 'variation-a' base64 encoded
       expect(secondFlag.variationValue).toEqual('dmFyaWF0aW9uLWI='); // 'variation-b' base64 encoded
     });

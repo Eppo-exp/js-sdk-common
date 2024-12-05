@@ -140,6 +140,7 @@ export enum FormatEnum {
   SERVER = 'SERVER',
   CLIENT = 'CLIENT',
   PRECOMPUTED = 'PRECOMPUTED',
+  PRECOMPUTED_CLIENT = 'PRECOMPUTED_CLIENT',
 }
 
 export interface PrecomputedFlag {
