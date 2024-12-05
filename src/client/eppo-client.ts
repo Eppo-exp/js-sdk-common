@@ -28,13 +28,13 @@ import {
   IFlagEvaluationDetails,
 } from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
-import FetchHttpClient from '../http-client';
+import FetchHttpClient, { IPrecomputedFlagsResponse } from '../http-client';
 import {
   BanditParameters,
   BanditVariation,
   ConfigDetails,
-  Flag,
-  ObfuscatedFlag,
+  Flag, FormatEnum,
+  ObfuscatedFlag, PrecomputedFlag,
   Variation,
   VariationType,
 } from '../interfaces';
@@ -833,6 +833,56 @@ export default class EppoClient {
       return defaultValue ?? EppoValue.Null();
     }
     throw err;
+  }
+
+  getAllAssignments(
+    subjectKey: string,
+    subjectAttributes: Attributes = {},
+  ): IPrecomputedFlagsResponse {
+    const configDetails = this.getConfigDetails();
+    const flagKeys = this.getFlagKeys();
+    const flags: Record<string, PrecomputedFlag> = {};
+
+    // Evaluate all the enabled flags for the user
+    flagKeys.forEach((flagKey) => {
+      const flag = this.getFlag(flagKey);
+      if (flag === null || !flag.enabled) {
+        logger.info(`[Eppo SDK] No assigned variation. Flag is disabled: ${flagKey}`);
+        return;
+      }
+
+      // Evaluate the flag for this subject.
+      const evaluation = this.evaluator.evaluateFlag(
+        flag,
+        configDetails,
+        subjectKey,
+        subjectAttributes,
+        this.isObfuscated,
+      );
+
+      // allocationKey is set along with variation when there is a result. this if check appeases typescript below
+      if (!evaluation.variation || !evaluation.allocationKey) {
+        logger.info(`[Eppo SDK] No assigned variation: ${flagKey}`);
+        return;
+      }
+
+      // Transform into a PrecomputedFlag
+      flags[flagKey] = {
+        allocationKey: evaluation.allocationKey,
+        doLog: evaluation.doLog,
+        extraLogging: evaluation.extraLogging,
+        variationKey: evaluation.variation.key,
+        variationType: flag.variationType,
+        variationValue: evaluation.variation.value.toString(),
+      };
+    });
+
+    return {
+      createdAt: '',
+      environment: configDetails.configEnvironment,
+      flags,
+      format: FormatEnum.PRECOMPUTED,
+    };
   }
 
   /**

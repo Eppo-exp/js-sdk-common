@@ -78,7 +78,7 @@ describe('EppoClient E2E test', () => {
       storage.setEntries({ [flagKey]: mockFlag });
       client = new EppoClient({ flagConfigurationStore: storage });
 
-      td.replace(EppoClient.prototype, 'getAssignmentDetail', function () {
+      td.replace(EppoClient.prototype, 'getAssignmentDetail', function() {
         throw new Error('Mock test error');
       });
     });
@@ -174,6 +174,53 @@ describe('EppoClient E2E test', () => {
   describe('check type match', () => {
     it('returns false when types do not match', () => {
       expect(checkTypeMatch(VariationType.JSON, VariationType.STRING)).toBe(false);
+    });
+  });
+
+  describe('precomputed flags', () => {
+    beforeAll(() => {
+      storage.setEntries({
+        [flagKey]: mockFlag,
+        disabledFlag: { ...mockFlag, enabled: false },
+        anotherFlag: {
+          ...mockFlag,
+          allocations: [
+            {
+              key: 'allocation-b',
+              rules: [],
+              splits: [
+                {
+                  shards: [],
+                  variationKey: 'b',
+                },
+              ],
+              doLog: true,
+            },
+          ],
+        },
+      });
+    });
+
+    it('skips disabled flags', () => {
+      const client = new EppoClient({ flagConfigurationStore: storage });
+      const flagResults = client.getAllAssignments('subject', {});
+
+      const precomputedFlags = flagResults.flags;
+      expect(Object.keys(precomputedFlags)).toContain('anotherFlag');
+      expect(Object.keys(precomputedFlags)).toContain(flagKey);
+      expect(Object.keys(precomputedFlags)).not.toContain('disabledFlag');
+    });
+
+    it('evaluates and returns assignments', () => {
+      const client = new EppoClient({ flagConfigurationStore: storage });
+      const flagResults = client.getAllAssignments('subject', {});
+
+      const precomputedFlags = flagResults.flags;
+      const firstFlag = precomputedFlags[flagKey];
+      const secondFlag = precomputedFlags['anotherFlag'];
+      expect(firstFlag.variationValue).toEqual('variation-a');
+      expect(secondFlag.variationValue).toEqual('variation-b');
+
     });
   });
 
