@@ -878,7 +878,7 @@ export default class EppoClient {
     });
 
     return {
-      createdAt: '',
+      createdAt: new Date().toISOString(),
       environment: configDetails.configEnvironment,
       flags,
       format: FormatEnum.PRECOMPUTED,

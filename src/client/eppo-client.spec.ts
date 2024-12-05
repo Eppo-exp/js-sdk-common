@@ -220,7 +220,6 @@ describe('EppoClient E2E test', () => {
       const secondFlag = precomputedFlags['anotherFlag'];
       expect(firstFlag.variationValue).toEqual('variation-a');
       expect(secondFlag.variationValue).toEqual('variation-b');
-
     });
   });
 
