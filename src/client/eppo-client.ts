@@ -23,13 +23,17 @@ import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
 import EventDispatcher from '../events/event-dispatcher';
 import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
-import { FlagEvaluationDetailsBuilder, IFlagEvaluationDetails } from '../flag-evaluation-details-builder';
+import {
+  FlagEvaluationDetailsBuilder,
+  IFlagEvaluationDetails,
+} from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
-import FetchHttpClient, { IPrecomputedFlagsResponse } from '../http-client';
+import FetchHttpClient from '../http-client';
 import {
   BanditParameters,
   BanditVariation,
   ConfigDetails,
+  ConfigurationWireFormat,
   Flag,
   FormatEnum,
   ObfuscatedFlag,
@@ -859,7 +863,7 @@ export default class EppoClient {
         this.isObfuscated,
       );
 
-      // allocationKey is set along with variation when there is a result. this if check appeases typescript below
+      // allocationKey is set along with variation when there is a result. this check appeases typescript below
       if (!evaluation.variation || !evaluation.allocationKey) {
         logger.info(`[Eppo SDK] No assigned variation: ${flagKey}`);
         return;
@@ -890,7 +894,7 @@ export default class EppoClient {
     subjectKey: string,
     subjectAttributes: Attributes = {},
     obfuscated = false,
-  ): IPrecomputedFlagsResponse {
+  ): ConfigurationWireFormat {
     const configDetails = this.getConfigDetails();
     let flags = this.getAllAssignments(subjectKey, subjectAttributes);
 
@@ -899,10 +903,15 @@ export default class EppoClient {
     }
 
     return {
-      createdAt: new Date().toISOString(),
-      environment: configDetails.configEnvironment,
-      flags,
-      format: obfuscated ? FormatEnum.PRECOMPUTED_CLIENT : FormatEnum.PRECOMPUTED,
+      precomputed: {
+        obfuscated,
+        subjectKey,
+        subjectAttributes,
+        createdAt: new Date().toISOString(),
+        environment: configDetails.configEnvironment,
+        flags,
+        format: FormatEnum.PRECOMPUTED,
+      },
     };
   }
 
