@@ -425,4 +425,94 @@ describe('BanditEvaluator', () => {
       expect(resultB.optimalityGap).toBeCloseTo(0.3);
     });
   });
+
+  describe('evaluateBestBandit', () => {
+    it('evaluates the bandit with action contexts', () => {
+      const subjectAttributes: ContextAttributes = {
+        numericAttributes: { age: 25 },
+        categoricalAttributes: { location: 'US' },
+      };
+      const subjectAttributesB: ContextAttributes = {
+        numericAttributes: { age: 25 },
+        categoricalAttributes: {},
+      };
+      const actions: Record<string, ContextAttributes> = {
+        action1: { numericAttributes: { price: 10 }, categoricalAttributes: { category: 'A' } },
+        action2: { numericAttributes: { price: 20 }, categoricalAttributes: { category: 'B' } },
+      };
+      const banditModel: BanditModelData = {
+        gamma: 0.1,
+        defaultActionScore: 0.0,
+        actionProbabilityFloor: 0.1,
+        coefficients: {
+          action1: {
+            actionKey: 'action1',
+            intercept: 0.5,
+            subjectNumericCoefficients: [
+              { attributeKey: 'age', coefficient: 0.1, missingValueCoefficient: 0.0 },
+            ],
+            subjectCategoricalCoefficients: [
+              {
+                attributeKey: 'location',
+                missingValueCoefficient: 0.0,
+                valueCoefficients: { US: 0.2 },
+              },
+            ],
+            actionNumericCoefficients: [
+              { attributeKey: 'price', coefficient: 0.05, missingValueCoefficient: 0.0 },
+            ],
+            actionCategoricalCoefficients: [
+              {
+                attributeKey: 'category',
+                missingValueCoefficient: 0.0,
+                valueCoefficients: { A: 0.3 },
+              },
+            ],
+          },
+          action2: {
+            actionKey: 'action2',
+            intercept: 0.3,
+            subjectNumericCoefficients: [
+              { attributeKey: 'age', coefficient: 0.1, missingValueCoefficient: 0.0 },
+            ],
+            subjectCategoricalCoefficients: [
+              {
+                attributeKey: 'location',
+                missingValueCoefficient: -3.0,
+                valueCoefficients: { US: 0.2 },
+              },
+            ],
+            actionNumericCoefficients: [
+              { attributeKey: 'price', coefficient: 0.05, missingValueCoefficient: 0.0 },
+            ],
+            actionCategoricalCoefficients: [
+              {
+                attributeKey: 'category',
+                missingValueCoefficient: 0.0,
+                valueCoefficients: { B: 0.3 },
+              },
+            ],
+          },
+        },
+      };
+
+      // Subject A gets assigned action 2
+      const resultA = banditEvaluator.evaluateBestBanditAction(
+        subjectAttributes,
+        actions,
+        banditModel,
+      );
+
+      expect(resultA).toEqual('action2');
+
+      // Subject B gets assigned action 1 because of the missing location penalty
+      const resultB = banditEvaluator.evaluateBestBanditAction(
+        subjectAttributesB,
+        actions,
+        banditModel,
+      );
+
+      expect(resultB).toEqual('action1');
+    });
+  });
 });

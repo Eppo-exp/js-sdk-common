@@ -501,6 +501,47 @@ export default class EppoClient {
     return { variation, action };
   }
 
+  /**
+   * Evaluates the supplied actions using the first bandit associated with `flagKey` and returns the best ranked action.
+   *
+   * This method should be considered **preview** and is subject to change as requirements mature.
+   *
+   * NOTE: This method does not do any logging or assignment computation and so calling this method will have
+   * NO IMPACT on bandit and experiment training.
+   *
+   * Only use this method under certain circumstances (i.e. where the impact of the choice of bandit cannot be measured,
+   * but you want to put the "best foot forward", for example, when being web-crawled).
+   *
+   */
+  getBestAction(
+    flagKey: string,
+    subjectAttributes: BanditSubjectAttributes,
+    actions: BanditActions,
+    defaultAction: string,
+  ): string {
+    let result: string | null = null;
+
+    const flagBanditVariations = this.banditVariationConfigurationStore?.get(flagKey);
+    const banditKey = flagBanditVariations?.at(0)?.key;
+
+    if (banditKey) {
+      const banditParameters = this.banditModelConfigurationStore?.get(banditKey);
+      if (banditParameters) {
+        const contextualSubjectAttributes =
+          this.ensureContextualSubjectAttributes(subjectAttributes);
+        const actionsWithContextualAttributes = this.ensureActionsWithContextualAttributes(actions);
+
+        result = this.banditEvaluator.evaluateBestBanditAction(
+          contextualSubjectAttributes,
+          actionsWithContextualAttributes,
+          banditParameters.modelData,
+        );
+      }
+    }
+
+    return result ?? defaultAction;
+  }
+
   getBanditActionDetails(
     flagKey: string,
     subjectKey: string,

@@ -23,6 +23,21 @@ export class BanditEvaluator {
   private readonly assignmentShards = BANDIT_ASSIGNMENT_SHARDS; // We just hard code this for now
   private readonly sharder: Sharder = new MD5Sharder();
 
+  public evaluateBestBanditAction(
+    subjectAttributes: ContextAttributes,
+    actions: Record<string, ContextAttributes>,
+    banditModel: BanditModelData,
+  ): string | null {
+    const actionScores: Record<string, number> = this.scoreActions(
+      subjectAttributes,
+      actions,
+      banditModel,
+    );
+
+    const { topAction } = this.getTopScore(actionScores);
+    return topAction;
+  }
+
   public evaluateBandit(
     flagKey: string,
     subjectKey: string,
@@ -140,20 +155,7 @@ export class BanditEvaluator {
       return actionWeights;
     }
 
-    // First find the action with the highest score
-    let currTopScore: number | null = null;
-    let currTopAction: string | null = null;
-    actionScoreEntries.forEach(([actionKey, actionScore]) => {
-      if (
-        currTopScore === null ||
-        currTopAction === null ||
-        actionScore > currTopScore ||
-        (actionScore === currTopScore && actionKey < currTopAction)
-      ) {
-        currTopScore = actionScore;
-        currTopAction = actionKey;
-      }
-    });
+    const { topScore: currTopScore, topAction: currTopAction } = this.getTopScore(actionScores);
 
     if (currTopScore === null || currTopAction === null) {
       // Appease typescript with this check and extra variables
@@ -227,5 +229,28 @@ export class BanditEvaluator {
       );
     }
     return assignedAction;
+  }
+
+  private getTopScore(actionScores: Record<string, number>): {
+    topScore: number | null;
+    topAction: string | null;
+  } {
+    const actionScoreEntries = Object.entries(actionScores);
+    // Find the action with the highest score, tie-breaking by name, selecting the alpha-numerically smaller key.
+    let topScore: number | null = null;
+    let topAction: string | null = null;
+    actionScoreEntries.forEach(([actionKey, actionScore]) => {
+      if (
+        topScore === null ||
+        topAction === null ||
+        actionScore > topScore ||
+        (actionScore === topScore && actionKey < topAction)
+      ) {
+        topScore = actionScore;
+        topAction = actionKey;
+      }
+    });
+
+    return { topScore, topAction };
   }
 }
