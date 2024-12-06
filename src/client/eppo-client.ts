@@ -504,8 +504,13 @@ export default class EppoClient {
   /**
    * Evaluates the supplied actions and returns the best ranked action.
    *
-   * Variation assignment is skipped all together and the first bandit referenced by `flagKey` is used.
-   * No logging is done from this method.
+   * This method should be considered **preview** and is subject to change as requirements mature.
+   *
+   * CAUTION: This method does not do any logging or assignment computation and so calling this method will have
+   * NO IMPACT on bandit and experiment training.
+   *
+   * Only use this method under certain circumstances (i.e. where the impact of the choice of bandit cannot be measured,
+   * but you want to put the "best foot forward", for example, when being web-crawled).
    *
    * @param flagKey
    * @param subjectKey
