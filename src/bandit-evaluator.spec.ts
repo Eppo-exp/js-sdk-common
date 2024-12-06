@@ -498,38 +498,22 @@ describe('BanditEvaluator', () => {
       };
 
       // Subject A gets assigned action 2
-      const resultA = banditEvaluator.evaluateBestBandit(
-        flagKey,
-        'subjectA',
+      const resultA = banditEvaluator.evaluateBestBanditAction(
         subjectAttributes,
         actions,
         banditModel,
       );
 
-      expect(resultA.subjectAttributes).toStrictEqual(subjectAttributes);
-      expect(resultA.actionKey).toBe('action2');
-      expect(resultA.actionAttributes).toStrictEqual(actions.action2);
-      expect(resultA.actionScore).toBe(4.3);
-      expect(resultA.actionWeight).toBeCloseTo(0.5074);
-      expect(resultA.gamma).toBe(banditModel.gamma);
-      expect(resultA.optimalityGap).toBe(0);
+      expect(resultA).toEqual('action2');
 
       // Subject B gets assigned action 1 because of the missing location penalty
-      const resultB = banditEvaluator.evaluateBestBandit(
-        flagKey,
-        'subjectB',
+      const resultB = banditEvaluator.evaluateBestBanditAction(
         subjectAttributesB,
         actions,
         banditModel,
       );
 
-      expect(resultB.subjectAttributes).toStrictEqual(subjectAttributesB);
-      expect(resultB.actionKey).toBe('action1');
-      expect(resultB.actionAttributes).toStrictEqual(actions.action1);
-      expect(resultB.actionScore).toBe(3.8);
-      expect(resultB.actionWeight).toBeCloseTo(0.5594);
-      expect(resultB.gamma).toBe(banditModel.gamma);
-      expect(resultB.optimalityGap).toBe(0);
+      expect(resultB).toEqual('action1');
     });
   });
 });

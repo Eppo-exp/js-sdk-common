@@ -23,43 +23,28 @@ export class BanditEvaluator {
   private readonly assignmentShards = BANDIT_ASSIGNMENT_SHARDS; // We just hard code this for now
   private readonly sharder: Sharder = new MD5Sharder();
 
-  public evaluateBestBandit(
-    flagKey: string,
-    subjectKey: string,
+  public evaluateBestBanditAction(
     subjectAttributes: ContextAttributes,
     actions: Record<string, ContextAttributes>,
     banditModel: BanditModelData,
-  ): BanditEvaluation {
+  ): string {
     const actionScores: Record<string, number> = this.scoreActions(
       subjectAttributes,
       actions,
       banditModel,
     );
 
-    const actionWeights: Record<string, number> = this.weighActions(
-      actionScores,
-      banditModel.gamma,
-      banditModel.actionProbabilityFloor,
-    );
-
-    const selectedActionKey = Object.keys(actionScores).reduce((prev, cur) => {
-      if (!prev || actionScores[cur] > actionScores[prev]) {
+    return Object.keys(actionScores).reduce((prev, cur) => {
+      if (!prev) {
+        return cur;
+      } else if (actionScores[cur] > actionScores[prev]) {
+        return cur;
+      } else if (actionScores[cur] === actionScores[prev] && cur < prev) {
+        // Tie-break by action name
         return cur;
       }
       return prev;
     });
-
-    return {
-      flagKey,
-      subjectKey,
-      subjectAttributes,
-      actionKey: selectedActionKey,
-      actionAttributes: actions[selectedActionKey],
-      actionScore: actionScores[selectedActionKey],
-      actionWeight: actionWeights[selectedActionKey],
-      gamma: banditModel.gamma,
-      optimalityGap: 0,
-    };
   }
 
   public evaluateBandit(
