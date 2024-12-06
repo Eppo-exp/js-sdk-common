@@ -33,12 +33,15 @@ import {
   BanditParameters,
   BanditVariation,
   ConfigDetails,
+  ConfigurationWireFormat,
   Flag,
+  FormatEnum,
   ObfuscatedFlag,
+  PrecomputedFlag,
   Variation,
   VariationType,
 } from '../interfaces';
-import { getMD5Hash } from '../obfuscation';
+import { getMD5Hash, obfuscatePrecomputedFlags } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import {
   Attributes,
@@ -874,6 +877,83 @@ export default class EppoClient {
       return defaultValue ?? EppoValue.Null();
     }
     throw err;
+  }
+
+  private getAllAssignments(
+    subjectKey: string,
+    subjectAttributes: Attributes = {},
+  ): Record<string, PrecomputedFlag> {
+    const configDetails = this.getConfigDetails();
+    const flagKeys = this.getFlagKeys();
+    const flags: Record<string, PrecomputedFlag> = {};
+
+    // Evaluate all the enabled flags for the user
+    flagKeys.forEach((flagKey) => {
+      const flag = this.getFlag(flagKey);
+      if (flag === null || !flag.enabled) {
+        logger.info(`[Eppo SDK] No assigned variation. Flag is disabled: ${flagKey}`);
+        return;
+      }
+
+      // Evaluate the flag for this subject.
+      const evaluation = this.evaluator.evaluateFlag(
+        flag,
+        configDetails,
+        subjectKey,
+        subjectAttributes,
+        this.isObfuscated,
+      );
+
+      // allocationKey is set along with variation when there is a result. this check appeases typescript below
+      if (!evaluation.variation || !evaluation.allocationKey) {
+        logger.info(`[Eppo SDK] No assigned variation: ${flagKey}`);
+        return;
+      }
+
+      // Transform into a PrecomputedFlag
+      flags[flagKey] = {
+        allocationKey: evaluation.allocationKey,
+        doLog: evaluation.doLog,
+        extraLogging: evaluation.extraLogging,
+        variationKey: evaluation.variation.key,
+        variationType: flag.variationType,
+        variationValue: evaluation.variation.value.toString(),
+      };
+    });
+
+    return flags;
+  }
+
+  /**
+   * Computes and returns assignments for a subject from all loaded flags.
+   *
+   * @param subjectKey an identifier of the experiment subject, for example a user ID.
+   * @param subjectAttributes optional attributes associated with the subject, for example name and email.   * The
+   * @param obfuscated optional whether to obfuscate the results.
+   */
+  getPrecomputedAssignments(
+    subjectKey: string,
+    subjectAttributes: Attributes = {},
+    obfuscated = false,
+  ): ConfigurationWireFormat {
+    const configDetails = this.getConfigDetails();
+    let flags = this.getAllAssignments(subjectKey, subjectAttributes);
+
+    if (obfuscated) {
+      flags = obfuscatePrecomputedFlags(flags);
+    }
+
+    return {
+      precomputed: {
+        obfuscated,
+        subjectKey,
+        subjectAttributes,
+        createdAt: new Date().toISOString(),
+        environment: configDetails.configEnvironment,
+        flags,
+        format: FormatEnum.PRECOMPUTED,
+      },
+    };
   }
 
   /**

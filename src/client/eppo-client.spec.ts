@@ -177,6 +177,69 @@ describe('EppoClient E2E test', () => {
     });
   });
 
+  describe('precomputed flags', () => {
+    beforeAll(() => {
+      storage.setEntries({
+        [flagKey]: mockFlag,
+        disabledFlag: { ...mockFlag, enabled: false },
+        anotherFlag: {
+          ...mockFlag,
+          allocations: [
+            {
+              key: 'allocation-b',
+              rules: [],
+              splits: [
+                {
+                  shards: [],
+                  variationKey: 'b',
+                },
+              ],
+              doLog: true,
+            },
+          ],
+        },
+      });
+    });
+
+    it('skips disabled flags', () => {
+      const client = new EppoClient({ flagConfigurationStore: storage });
+      const { precomputed } = client.getPrecomputedAssignments('subject', {});
+
+      expect(precomputed).toBeTruthy();
+      const precomputedFlags = precomputed?.flags ?? {};
+      expect(Object.keys(precomputedFlags)).toContain('anotherFlag');
+      expect(Object.keys(precomputedFlags)).toContain(flagKey);
+      expect(Object.keys(precomputedFlags)).not.toContain('disabledFlag');
+    });
+
+    it('evaluates and returns assignments', () => {
+      const client = new EppoClient({ flagConfigurationStore: storage });
+      const { precomputed } = client.getPrecomputedAssignments('subject', {});
+
+      expect(precomputed).toBeTruthy();
+      const precomputedFlags = precomputed?.flags ?? {};
+      const firstFlag = precomputedFlags[flagKey];
+      const secondFlag = precomputedFlags['anotherFlag'];
+      expect(firstFlag.variationValue).toEqual('variation-a');
+      expect(secondFlag.variationValue).toEqual('variation-b');
+    });
+
+    it('obfuscates assignments', () => {
+      const client = new EppoClient({ flagConfigurationStore: storage });
+      const { precomputed } = client.getPrecomputedAssignments('subject', {}, true);
+
+      expect(precomputed).toBeTruthy();
+      const precomputedFlags = precomputed?.flags ?? {};
+      expect(Object.keys(precomputedFlags)).toContain('76a475dca4e7f11d2b02f3d257225cef'); // flagKey, md5 hashed
+      expect(Object.keys(precomputedFlags)).toContain('6783d6010b0c8a6cd388a96caafe9568'); // 'anotherFlag', md5 hashed
+
+      const firstFlag = precomputedFlags['76a475dca4e7f11d2b02f3d257225cef'];
+      const secondFlag = precomputedFlags['6783d6010b0c8a6cd388a96caafe9568'];
+      expect(firstFlag.variationValue).toEqual('dmFyaWF0aW9uLWE='); // 'variation-a' base64 encoded
+      expect(secondFlag.variationValue).toEqual('dmFyaWF0aW9uLWI='); // 'variation-b' base64 encoded
+    });
+  });
+
   describe('UFC Shared Test Cases', () => {
     const testCases = testCasesByFileName<IAssignmentTestCase>(ASSIGNMENT_TEST_DATA_DIR);
 

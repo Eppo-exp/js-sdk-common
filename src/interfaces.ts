@@ -1,5 +1,6 @@
+import { IPrecomputedFlagsResponse } from './http-client';
 import { Rule } from './rules';
-import { Attributes } from './types';
+import { Attributes, ContextAttributes } from './types';
 
 export enum VariationType {
   STRING = 'STRING',
@@ -149,6 +150,16 @@ export interface PrecomputedFlag {
   variationValue: string;
   extraLogging: Record<string, string>;
   doLog: boolean;
+}
+
+export interface PrecomputedResponse extends IPrecomputedFlagsResponse {
+  obfuscated: boolean;
+  subjectKey: string;
+  subjectAttributes: Attributes | ContextAttributes;
+}
+
+export interface ConfigurationWireFormat {
+  precomputed?: PrecomputedResponse;
 }
 
 export interface PrecomputedFlagsDetails {
