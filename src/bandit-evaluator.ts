@@ -27,24 +27,15 @@ export class BanditEvaluator {
     subjectAttributes: ContextAttributes,
     actions: Record<string, ContextAttributes>,
     banditModel: BanditModelData,
-  ): string {
+  ): string | null {
     const actionScores: Record<string, number> = this.scoreActions(
       subjectAttributes,
       actions,
       banditModel,
     );
 
-    return Object.keys(actionScores).reduce((prev, cur) => {
-      if (!prev) {
-        return cur;
-      } else if (actionScores[cur] > actionScores[prev]) {
-        return cur;
-      } else if (actionScores[cur] === actionScores[prev] && cur < prev) {
-        // Tie-break by action name
-        return cur;
-      }
-      return prev;
-    });
+    const { topAction } = this.getTopScore(actionScores);
+    return topAction;
   }
 
   public evaluateBandit(
@@ -164,20 +155,7 @@ export class BanditEvaluator {
       return actionWeights;
     }
 
-    // First find the action with the highest score
-    let currTopScore: number | null = null;
-    let currTopAction: string | null = null;
-    actionScoreEntries.forEach(([actionKey, actionScore]) => {
-      if (
-        currTopScore === null ||
-        currTopAction === null ||
-        actionScore > currTopScore ||
-        (actionScore === currTopScore && actionKey < currTopAction)
-      ) {
-        currTopScore = actionScore;
-        currTopAction = actionKey;
-      }
-    });
+    const { topScore: currTopScore, topAction: currTopAction } = this.getTopScore(actionScores);
 
     if (currTopScore === null || currTopAction === null) {
       // Appease typescript with this check and extra variables
@@ -251,5 +229,28 @@ export class BanditEvaluator {
       );
     }
     return assignedAction;
+  }
+
+  private getTopScore(actionScores: Record<string, number>): {
+    topScore: number | null;
+    topAction: string | null;
+  } {
+    const actionScoreEntries = Object.entries(actionScores);
+    // First find the action with the highest score
+    let topScore: number | null = null;
+    let topAction: string | null = null;
+    actionScoreEntries.forEach(([actionKey, actionScore]) => {
+      if (
+        topScore === null ||
+        topAction === null ||
+        actionScore > topScore ||
+        (actionScore === topScore && actionKey < topAction)
+      ) {
+        topScore = actionScore;
+        topAction = actionKey;
+      }
+    });
+
+    return { topScore, topAction };
   }
 }

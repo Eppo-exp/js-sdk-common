@@ -523,7 +523,7 @@ export default class EppoClient {
     actions: BanditActions,
     defaultAction: string,
   ): string {
-    let selectedAction = defaultAction;
+    let result: string | null = null;
 
     const flagBanditVariations = this.banditVariationConfigurationStore?.get(flagKey);
     const banditKey = flagBanditVariations?.at(0)?.key;
@@ -535,7 +535,7 @@ export default class EppoClient {
           this.ensureContextualSubjectAttributes(subjectAttributes);
         const actionsWithContextualAttributes = this.ensureActionsWithContextualAttributes(actions);
 
-        selectedAction = this.banditEvaluator.evaluateBestBanditAction(
+        result = this.banditEvaluator.evaluateBestBanditAction(
           contextualSubjectAttributes,
           actionsWithContextualAttributes,
           banditParameters.modelData,
@@ -543,7 +543,7 @@ export default class EppoClient {
       }
     }
 
-    return selectedAction;
+    return result ?? defaultAction;
   }
 
   getBanditActionDetails(
