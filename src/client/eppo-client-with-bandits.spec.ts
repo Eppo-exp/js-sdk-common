@@ -477,7 +477,7 @@ describe('EppoClient Bandits E2E test', () => {
           area_code: '303', // categorical area code
         };
 
-        const banditAssignment = client.getBestBanditAction(
+        const banditAssignment = client.getBestAction(
           flagKey,
           subjectAttributesWithAreaCode,
           actions,

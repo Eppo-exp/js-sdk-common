@@ -236,7 +236,7 @@ export class BanditEvaluator {
     topAction: string | null;
   } {
     const actionScoreEntries = Object.entries(actionScores);
-    // First find the action with the highest score
+    // Find the action with the highest score, tie-breaking by name, selecting the alpha-numerically smaller key.
     let topScore: number | null = null;
     let topAction: string | null = null;
     actionScoreEntries.forEach(([actionKey, actionScore]) => {

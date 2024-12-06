@@ -428,7 +428,6 @@ describe('BanditEvaluator', () => {
 
   describe('evaluateBestBandit', () => {
     it('evaluates the bandit with action contexts', () => {
-      const flagKey = 'test_flag';
       const subjectAttributes: ContextAttributes = {
         numericAttributes: { age: 25 },
         categoricalAttributes: { location: 'US' },

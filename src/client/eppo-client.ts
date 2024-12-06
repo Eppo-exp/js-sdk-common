@@ -502,22 +502,18 @@ export default class EppoClient {
   }
 
   /**
-   * Evaluates the supplied actions and returns the best ranked action.
+   * Evaluates the supplied actions using the first bandit associated with `flagKey` and returns the best ranked action.
    *
    * This method should be considered **preview** and is subject to change as requirements mature.
    *
-   * CAUTION: This method does not do any logging or assignment computation and so calling this method will have
+   * NOTE: This method does not do any logging or assignment computation and so calling this method will have
    * NO IMPACT on bandit and experiment training.
    *
    * Only use this method under certain circumstances (i.e. where the impact of the choice of bandit cannot be measured,
    * but you want to put the "best foot forward", for example, when being web-crawled).
    *
-   * @param flagKey
-   * @param subjectAttributes
-   * @param actions
-   * @param defaultAction
    */
-  getBestBanditAction(
+  getBestAction(
     flagKey: string,
     subjectAttributes: BanditSubjectAttributes,
     actions: BanditActions,
