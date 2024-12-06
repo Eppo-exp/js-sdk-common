@@ -477,15 +477,13 @@ describe('EppoClient Bandits E2E test', () => {
           area_code: '303', // categorical area code
         };
 
-        const banditAssignment = client.getBanditAction(
+        const banditAssignment = client.getBestBanditAction(
           flagKey,
-          'henry',
           subjectAttributesWithAreaCode,
           actions,
           'default',
         );
-        expect(banditAssignment.action).toBe('adidas');
-        expect(banditAssignment.variation).toBe('banner_bandit');
+        expect(banditAssignment).toBe('adidas');
       });
     });
 

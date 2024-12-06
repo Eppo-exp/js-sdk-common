@@ -513,14 +513,12 @@ export default class EppoClient {
    * but you want to put the "best foot forward", for example, when being web-crawled).
    *
    * @param flagKey
-   * @param subjectKey
    * @param subjectAttributes
    * @param actions
    * @param defaultAction
    */
   getBestBanditAction(
     flagKey: string,
-    subjectKey: string,
     subjectAttributes: BanditSubjectAttributes,
     actions: BanditActions,
     defaultAction: string,
