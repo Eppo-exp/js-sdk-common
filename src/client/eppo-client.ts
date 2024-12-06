@@ -23,7 +23,10 @@ import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
 import EventDispatcher from '../events/event-dispatcher';
 import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
-import { FlagEvaluationDetailsBuilder, IFlagEvaluationDetails } from '../flag-evaluation-details-builder';
+import {
+  FlagEvaluationDetailsBuilder,
+  IFlagEvaluationDetails,
+} from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
 import FetchHttpClient from '../http-client';
 import {
@@ -498,12 +501,31 @@ export default class EppoClient {
     return { variation, action };
   }
 
+  getBestBanditAction(
+    flagKey: string,
+    subjectKey: string,
+    subjectAttributes: BanditSubjectAttributes,
+    actions: BanditActions,
+    defaultValue: string,
+  ): Omit<IAssignmentDetails<string>, 'evaluationDetails'> {
+    const { variation, action } = this.getBanditActionDetails(
+      flagKey,
+      subjectKey,
+      subjectAttributes,
+      actions,
+      defaultValue,
+      true, // selectBestAction
+    );
+    return { variation, action };
+  }
+
   getBanditActionDetails(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: BanditSubjectAttributes,
     actions: BanditActions,
     defaultValue: string,
+    selectBestAction = false,
   ): IAssignmentDetails<string> {
     let variation = defaultValue;
     let action: string | null = null;
@@ -547,6 +569,7 @@ export default class EppoClient {
           actions,
           banditKey,
           evaluationDetails,
+          selectBestAction,
         );
         action = banditEvent?.action ?? null;
         if (banditEvent !== null) {
@@ -627,6 +650,7 @@ export default class EppoClient {
     actions: BanditActions,
     banditKey: string,
     evaluationDetails: IFlagEvaluationDetails,
+    selectBestAction = false,
   ): IBanditEvent | null {
     // If no actions, there is nothing to do
     if (!Object.keys(actions).length) {
@@ -642,13 +666,21 @@ export default class EppoClient {
     const banditModelData = banditParameters.modelData;
     const contextualSubjectAttributes = this.ensureContextualSubjectAttributes(subjectAttributes);
     const actionsWithContextualAttributes = this.ensureActionsWithContextualAttributes(actions);
-    const banditEvaluation = this.banditEvaluator.evaluateBandit(
-      flagKey,
-      subjectKey,
-      contextualSubjectAttributes,
-      actionsWithContextualAttributes,
-      banditModelData,
-    );
+    const banditEvaluation = selectBestAction
+      ? this.banditEvaluator.evaluateBestBandit(
+          flagKey,
+          subjectKey,
+          contextualSubjectAttributes,
+          actionsWithContextualAttributes,
+          banditModelData,
+        )
+      : this.banditEvaluator.evaluateBandit(
+          flagKey,
+          subjectKey,
+          contextualSubjectAttributes,
+          actionsWithContextualAttributes,
+          banditModelData,
+        );
     const action = banditEvaluation.actionKey;
 
     return {

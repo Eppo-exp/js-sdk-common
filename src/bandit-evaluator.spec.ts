@@ -498,7 +498,13 @@ describe('BanditEvaluator', () => {
       };
 
       // Subject A gets assigned action 2
-      const resultA = banditEvaluator.evaluateBestBandit(flagKey, 'subjectA', subjectAttributes, actions, banditModel);
+      const resultA = banditEvaluator.evaluateBestBandit(
+        flagKey,
+        'subjectA',
+        subjectAttributes,
+        actions,
+        banditModel,
+      );
 
       expect(resultA.subjectAttributes).toStrictEqual(subjectAttributes);
       expect(resultA.actionKey).toBe('action2');
@@ -509,7 +515,13 @@ describe('BanditEvaluator', () => {
       expect(resultA.optimalityGap).toBe(0);
 
       // Subject B gets assigned action 1 because of the missing location penalty
-      const resultB = banditEvaluator.evaluateBestBandit(flagKey, 'subjectB', subjectAttributesB, actions, banditModel);
+      const resultB = banditEvaluator.evaluateBestBandit(
+        flagKey,
+        'subjectB',
+        subjectAttributesB,
+        actions,
+        banditModel,
+      );
 
       expect(resultB.subjectAttributes).toStrictEqual(subjectAttributesB);
       expect(resultB.actionKey).toBe('action1');

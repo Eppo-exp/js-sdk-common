@@ -452,6 +452,43 @@ describe('EppoClient Bandits E2E test', () => {
       });
     });
 
+    describe('Best bandit action', () => {
+      it('Selects the highest scoring action', async () => {
+        const actions: Record<string, ContextAttributes> = {
+          nike: {
+            numericAttributes: { brand_affinity: 1.0 },
+            categoricalAttributes: {},
+          },
+          adidas: {
+            numericAttributes: { brand_affinity: 1.0 },
+            categoricalAttributes: {},
+          },
+          reebok: {
+            numericAttributes: { brand_affinity: 2.0 },
+            categoricalAttributes: {},
+          },
+        };
+
+        const subjectAttributesWithAreaCode: Attributes = {
+          age: 25,
+          mistake: 'oops',
+          country: 'USA',
+          gender_identity: 'female',
+          area_code: '303', // categorical area code
+        };
+
+        const banditAssignment = client.getBanditAction(
+          flagKey,
+          'henry',
+          subjectAttributesWithAreaCode,
+          actions,
+          'default',
+        );
+        expect(banditAssignment.action).toBe('adidas');
+        expect(banditAssignment.variation).toBe('banner_bandit');
+      });
+    });
+
     describe('Assignment logging deduplication', () => {
       let mockEvaluateFlag: jest.SpyInstance;
       let mockEvaluateBandit: jest.SpyInstance;
