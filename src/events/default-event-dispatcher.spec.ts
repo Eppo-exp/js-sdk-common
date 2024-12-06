@@ -49,9 +49,24 @@ describe('DefaultEventDispatcher', () => {
       const { dispatcher, batchProcessor } = createDispatcher();
 
       // Add three events to the queue
-      dispatcher.dispatch({ id: 'foo-1', data: 'event1', params: {} });
-      dispatcher.dispatch({ id: 'foo-2', data: 'event2', params: {} });
-      dispatcher.dispatch({ id: 'foo-3', data: 'event3', params: {} });
+      dispatcher.dispatch({
+        uuid: 'foo-1',
+        payload: 'event1',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
+      dispatcher.dispatch({
+        uuid: 'foo-2',
+        payload: 'event2',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
+      dispatcher.dispatch({
+        uuid: 'foo-3',
+        payload: 'event3',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
 
       const batch1 = batchProcessor.nextBatch();
       expect(batch1).toHaveLength(2);
@@ -66,9 +81,24 @@ describe('DefaultEventDispatcher', () => {
   describe('deliverNextBatch', () => {
     it('delivers the next batch of events using fetch', async () => {
       const { dispatcher } = createDispatcher();
-      dispatcher.dispatch({ id: 'foo-1', data: 'event1', params: {} });
-      dispatcher.dispatch({ id: 'foo-2', data: 'event2', params: {} });
-      dispatcher.dispatch({ id: 'foo-3', data: 'event3', params: {} });
+      dispatcher.dispatch({
+        uuid: 'foo-1',
+        payload: 'event1',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
+      dispatcher.dispatch({
+        uuid: 'foo-2',
+        payload: 'event2',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
+      dispatcher.dispatch({
+        uuid: 'foo-3',
+        payload: 'event3',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
 
       const fetch = global.fetch as jest.Mock;
       fetch.mockResolvedValue({ ok: true });
@@ -86,8 +116,8 @@ describe('DefaultEventDispatcher', () => {
       let fetchOptions = fetch.mock.calls[0][1];
       let payload = JSON.parse(fetchOptions.body);
       expect(payload).toEqual([
-        expect.objectContaining({ data: 'event1' }),
-        expect.objectContaining({ data: 'event2' }),
+        expect.objectContaining({ payload: 'event1' }),
+        expect.objectContaining({ payload: 'event2' }),
       ]);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -102,7 +132,7 @@ describe('DefaultEventDispatcher', () => {
 
       fetchOptions = fetch.mock.calls[1][1];
       payload = JSON.parse(fetchOptions.body);
-      expect(payload).toEqual([expect.objectContaining({ data: 'event3' })]);
+      expect(payload).toEqual([expect.objectContaining({ payload: 'event3' })]);
     });
 
     it('does not schedule delivery if the queue is empty', async () => {
@@ -117,7 +147,12 @@ describe('DefaultEventDispatcher', () => {
   describe('retry logic', () => {
     it('retries failed deliveries after the retry interval', async () => {
       const { dispatcher } = createDispatcher();
-      dispatcher.dispatch({ id: 'foo', data: 'event1' });
+      dispatcher.dispatch({
+        uuid: 'foo',
+        payload: 'event1',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
 
       // Simulate fetch failure on the first attempt
       (global.fetch as jest.Mock)
@@ -151,8 +186,18 @@ describe('DefaultEventDispatcher', () => {
         triggerNetworkStatusChange: () => cb(isOffline),
       };
       const { dispatcher } = createDispatcher({ networkStatusListener });
-      dispatcher.dispatch({ id: '1', data: 'event1', params: {} });
-      dispatcher.dispatch({ id: '2', data: 'event2', params: {} });
+      dispatcher.dispatch({
+        uuid: '1',
+        payload: 'event1',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
+      dispatcher.dispatch({
+        uuid: '2',
+        payload: 'event2',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
 
       isOffline = true;
       // simulate the network going offline
@@ -175,8 +220,18 @@ describe('DefaultEventDispatcher', () => {
         triggerNetworkStatusChange: () => cb(isOffline),
       };
       const { dispatcher } = createDispatcher({ networkStatusListener });
-      dispatcher.dispatch({ id: '1', data: 'event1', params: {} });
-      dispatcher.dispatch({ id: '2', data: 'event2', params: {} });
+      dispatcher.dispatch({
+        uuid: '1',
+        payload: 'event1',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
+      dispatcher.dispatch({
+        uuid: '2',
+        payload: 'event2',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
 
       const fetch = global.fetch as jest.Mock;
       fetch.mockResolvedValue({ ok: true });
