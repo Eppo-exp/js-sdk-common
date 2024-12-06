@@ -23,10 +23,7 @@ import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
 import EventDispatcher from '../events/event-dispatcher';
 import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
-import {
-  FlagEvaluationDetailsBuilder,
-  IFlagEvaluationDetails,
-} from '../flag-evaluation-details-builder';
+import { FlagEvaluationDetailsBuilder, IFlagEvaluationDetails } from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
 import FetchHttpClient from '../http-client';
 import {
@@ -543,7 +540,7 @@ export default class EppoClient {
 
       if (banditKey) {
         evaluationDetails.banditKey = banditKey;
-        action = this.evaluateBanditAction(
+        const banditEvent = this.evaluateBanditAction(
           flagKey,
           subjectKey,
           subjectAttributes,
@@ -551,6 +548,15 @@ export default class EppoClient {
           banditKey,
           evaluationDetails,
         );
+        action = banditEvent?.action ?? null;
+        if (banditEvent !== null) {
+          try {
+            this.logBanditAction(banditEvent);
+          } catch (err: any) {
+            logger.error('Error logging bandit event');
+          }
+        }
+
         evaluationDetails.banditAction = action;
       }
     } catch (err: any) {
@@ -621,7 +627,7 @@ export default class EppoClient {
     actions: BanditActions,
     banditKey: string,
     evaluationDetails: IFlagEvaluationDetails,
-  ): string | null {
+  ): IBanditEvent | null {
     // If no actions, there is nothing to do
     if (!Object.keys(actions).length) {
       return null;
@@ -645,7 +651,7 @@ export default class EppoClient {
     );
     const action = banditEvaluation.actionKey;
 
-    const banditEvent: IBanditEvent = {
+    return {
       timestamp: new Date().toISOString(),
       featureFlag: flagKey,
       bandit: banditKey,
@@ -661,9 +667,6 @@ export default class EppoClient {
       metaData: this.buildLoggerMetadata(),
       evaluationDetails,
     };
-    this.logBanditAction(banditEvent);
-
-    return action;
   }
 
   private ensureNonContextualSubjectAttributes(
