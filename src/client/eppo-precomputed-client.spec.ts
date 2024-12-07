@@ -706,21 +706,28 @@ describe('EppoPrecomputedClient E2E test', () => {
     expect(loggedEvent.format).toEqual(FormatEnum.PRECOMPUTED);
   });
 
-  describe('EppoPrecomputedClient subject data and store initializatio', () => {
+  describe('EppoPrecomputedClient subject data and store initialization', () => {
     let client: EppoPrecomputedClient;
     let store: IConfigurationStore<PrecomputedFlag>;
+    let mockLogger: IAssignmentLogger;
 
     beforeEach(() => {
       store = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+      mockLogger = td.object<IAssignmentLogger>();
       client = new EppoPrecomputedClient(store);
+      client.setAssignmentLogger(mockLogger);
     });
 
-    it('returns default value when store is not initialized', () => {
+    it('returns default value and does not log when store is not initialized', () => {
       client.setSubjectDataAndPrecomputedFlagStore('test-subject', {}, store);
       expect(client.getStringAssignment('test-flag', 'default')).toBe('default');
+      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(0);
     });
 
-    it('returns assignment after store is initialized with flags', async () => {
+    it('returns assignment and logs subject data after store is initialized with flags', async () => {
+      const subjectKey = 'test-subject';
+      const subjectAttributes = { attr1: 'value1' };
+
       await store.setEntries({
         'test-flag': {
           variationType: VariationType.STRING,
@@ -731,12 +738,18 @@ describe('EppoPrecomputedClient E2E test', () => {
           extraLogging: {},
         },
       });
-      client.setSubjectDataAndPrecomputedFlagStore('test-subject', {}, store);
+      client.setSubjectDataAndPrecomputedFlagStore(subjectKey, subjectAttributes, store);
       expect(client.getStringAssignment('test-flag', 'default')).toBe('test-value');
+
+      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
+      const loggedEvent = td.explain(mockLogger.logAssignment).calls[0].args[0];
+      expect(loggedEvent.subject).toEqual(subjectKey);
+      expect(loggedEvent.subjectAttributes).toEqual(subjectAttributes);
     });
 
-    it('returns default value when subject data is not set', () => {
+    it('returns default value and does not log when subject data is not set', () => {
       expect(client.getStringAssignment('test-flag', 'default')).toBe('default');
+      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(0);
     });
   });
 });
