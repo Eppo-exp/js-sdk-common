@@ -48,12 +48,20 @@ export default class EppoPrecomputedClient {
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
   private requestPoller?: IPoller;
+  private subjectKey?: string;
+  private subjectAttributes?: Attributes;
 
   constructor(
     private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
     private precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters,
     private isObfuscated = false,
-  ) {}
+  ) {
+    // Initialize subject data from parameters if provided
+    if (precomputedFlagsRequestParameters?.precompute) {
+      this.subjectKey = precomputedFlagsRequestParameters.precompute.subjectKey;
+      this.subjectAttributes = precomputedFlagsRequestParameters.precompute.subjectAttributes;
+    }
+  }
 
   public setPrecomputedFlagsRequestParameters(
     precomputedFlagsRequestParameters: PrecomputedFlagsRequestParameters,
@@ -67,6 +75,11 @@ export default class EppoPrecomputedClient {
 
   public setIsObfuscated(isObfuscated: boolean) {
     this.isObfuscated = isObfuscated;
+  }
+
+  public setSubjectData(subjectKey: string, subjectAttributes: Attributes = {}) {
+    this.subjectKey = subjectKey;
+    this.subjectAttributes = subjectAttributes;
   }
 
   public async fetchPrecomputedFlags() {
@@ -160,8 +173,8 @@ export default class EppoPrecomputedClient {
     const result: FlagEvaluationWithoutDetails = {
       flagKey,
       format: this.precomputedFlagStore.getFormat() ?? '',
-      subjectKey: this.precomputedFlagsRequestParameters?.precompute.subjectKey ?? '',
-      subjectAttributes: this.precomputedFlagsRequestParameters?.precompute.subjectAttributes ?? {},
+      subjectKey: this.subjectKey ?? '',
+      subjectAttributes: this.subjectAttributes ?? {},
       variation: {
         key: preComputedFlag.variationKey,
         value: preComputedFlag.variationValue,
