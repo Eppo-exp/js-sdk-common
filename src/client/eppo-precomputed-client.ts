@@ -77,11 +77,6 @@ export default class EppoPrecomputedClient {
     this.isObfuscated = isObfuscated;
   }
 
-  public setSubjectData(subjectKey: string, subjectAttributes: Attributes = {}) {
-    this.subjectKey = subjectKey;
-    this.subjectAttributes = subjectAttributes;
-  }
-
   public async fetchPrecomputedFlags() {
     if (!this.precomputedFlagsRequestParameters) {
       throw new Error('Eppo SDK unable to fetch precomputed flags without the request parameters');
@@ -145,6 +140,19 @@ export default class EppoPrecomputedClient {
     if (this.requestPoller) {
       this.requestPoller.stop();
     }
+  }
+
+  public setSubjectDataAndPrecomputedFlagStore(
+    subjectKey: string,
+    subjectAttributes: Attributes,
+    precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
+  ) {
+    // Save the new subject data and precomputed flag store together because they are related
+    // Stop any polling process if it exists from previous subject data to protect consistency
+    this.requestPoller?.stop();
+    this.setPrecomputedFlagStore(precomputedFlagStore);
+    this.subjectKey = subjectKey;
+    this.subjectAttributes = subjectAttributes;
   }
 
   private getPrecomputedAssignment<T>(

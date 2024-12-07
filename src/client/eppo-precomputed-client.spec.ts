@@ -705,4 +705,38 @@ describe('EppoPrecomputedClient E2E test', () => {
 
     expect(loggedEvent.format).toEqual(FormatEnum.PRECOMPUTED);
   });
+
+  describe('EppoPrecomputedClient subject data and store initializatio', () => {
+    let client: EppoPrecomputedClient;
+    let store: IConfigurationStore<PrecomputedFlag>;
+
+    beforeEach(() => {
+      store = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+      client = new EppoPrecomputedClient(store);
+    });
+
+    it('returns default value when store is not initialized', () => {
+      client.setSubjectDataAndPrecomputedFlagStore('test-subject', {}, store);
+      expect(client.getStringAssignment('test-flag', 'default')).toBe('default');
+    });
+
+    it('returns assignment after store is initialized with flags', async () => {
+      await store.setEntries({
+        'test-flag': {
+          variationType: VariationType.STRING,
+          variationKey: 'control',
+          variationValue: 'test-value',
+          allocationKey: 'allocation-1',
+          doLog: true,
+          extraLogging: {},
+        },
+      });
+      client.setSubjectDataAndPrecomputedFlagStore('test-subject', {}, store);
+      expect(client.getStringAssignment('test-flag', 'default')).toBe('test-value');
+    });
+
+    it('returns default value when subject data is not set', () => {
+      expect(client.getStringAssignment('test-flag', 'default')).toBe('default');
+    });
+  });
 });
