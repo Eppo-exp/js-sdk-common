@@ -142,7 +142,7 @@ export default class EppoPrecomputedClient {
     }
   }
 
-  public setSubjectDataAndPrecomputedFlagStore(
+  public setSubjectAndPrecomputedFlagStore(
     subjectKey: string,
     subjectAttributes: Attributes,
     precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,

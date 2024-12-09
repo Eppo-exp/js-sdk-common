@@ -719,7 +719,7 @@ describe('EppoPrecomputedClient E2E test', () => {
     });
 
     it('returns default value and does not log when store is not initialized', () => {
-      client.setSubjectDataAndPrecomputedFlagStore('test-subject', {}, store);
+      client.setSubjectAndPrecomputedFlagStore('test-subject', {}, store);
       expect(client.getStringAssignment('test-flag', 'default')).toBe('default');
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(0);
     });
@@ -738,7 +738,7 @@ describe('EppoPrecomputedClient E2E test', () => {
           extraLogging: {},
         },
       });
-      client.setSubjectDataAndPrecomputedFlagStore(subjectKey, subjectAttributes, store);
+      client.setSubjectAndPrecomputedFlagStore(subjectKey, subjectAttributes, store);
       expect(client.getStringAssignment('test-flag', 'default')).toBe('test-value');
 
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
