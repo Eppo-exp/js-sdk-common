@@ -890,8 +890,8 @@ export default class EppoClient {
     // Evaluate all the enabled flags for the user
     flagKeys.forEach((flagKey) => {
       const flag = this.getFlag(flagKey);
-      if (flag === null || !flag.enabled) {
-        logger.info(`[Eppo SDK] No assigned variation. Flag is disabled: ${flagKey}`);
+      if (!flag) {
+        logger.debug(`[Eppo SDK] No assigned variation. Flag does not exist.`);
         return;
       }
 
@@ -906,7 +906,7 @@ export default class EppoClient {
 
       // allocationKey is set along with variation when there is a result. this check appeases typescript below
       if (!evaluation.variation || !evaluation.allocationKey) {
-        logger.info(`[Eppo SDK] No assigned variation: ${flagKey}`);
+        logger.debug(`[Eppo SDK] No assigned variation: ${flagKey}`);
         return;
       }
 
@@ -935,7 +935,7 @@ export default class EppoClient {
     subjectKey: string,
     subjectAttributes: Attributes = {},
     obfuscated = false,
-  ): ConfigurationWireFormat {
+  ): string {
     const configDetails = this.getConfigDetails();
     let flags = this.getAllAssignments(subjectKey, subjectAttributes);
 
@@ -943,7 +943,7 @@ export default class EppoClient {
       flags = obfuscatePrecomputedFlags(flags);
     }
 
-    return {
+    const configurationBundle: ConfigurationWireFormat = {
       precomputed: {
         obfuscated,
         subjectKey,
@@ -954,6 +954,8 @@ export default class EppoClient {
         format: FormatEnum.PRECOMPUTED,
       },
     };
+
+    return JSON.stringify(configurationBundle, null, 2);
   }
 
   /**
