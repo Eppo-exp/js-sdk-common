@@ -48,16 +48,20 @@ export default class EppoPrecomputedClient {
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
   private requestPoller?: IPoller;
+  private precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters;
+  private subjectKey?: string;
+  private subjectAttributes?: Attributes;
 
   constructor(
     private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
-    private precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters,
     private isObfuscated = false,
   ) {}
 
-  public setPrecomputedFlagsRequestParameters(
+  public setSubjectAndPrecomputedFlagsRequestParameters(
     precomputedFlagsRequestParameters: PrecomputedFlagsRequestParameters,
   ) {
+    this.subjectKey = precomputedFlagsRequestParameters.precompute.subjectKey;
+    this.subjectAttributes = precomputedFlagsRequestParameters.precompute.subjectAttributes;
     this.precomputedFlagsRequestParameters = precomputedFlagsRequestParameters;
   }
 
@@ -134,6 +138,19 @@ export default class EppoPrecomputedClient {
     }
   }
 
+  public setSubjectAndPrecomputedFlagStore(
+    subjectKey: string,
+    subjectAttributes: Attributes,
+    precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
+  ) {
+    // Save the new subject data and precomputed flag store together because they are related
+    // Stop any polling process if it exists from previous subject data to protect consistency
+    this.requestPoller?.stop();
+    this.setPrecomputedFlagStore(precomputedFlagStore);
+    this.subjectKey = subjectKey;
+    this.subjectAttributes = subjectAttributes;
+  }
+
   private getPrecomputedAssignment<T>(
     flagKey: string,
     defaultValue: T,
@@ -160,8 +177,8 @@ export default class EppoPrecomputedClient {
     const result: FlagEvaluationWithoutDetails = {
       flagKey,
       format: this.precomputedFlagStore.getFormat() ?? '',
-      subjectKey: this.precomputedFlagsRequestParameters?.precompute.subjectKey ?? '',
-      subjectAttributes: this.precomputedFlagsRequestParameters?.precompute.subjectAttributes ?? {},
+      subjectKey: this.subjectKey ?? '',
+      subjectAttributes: this.subjectAttributes ?? {},
       variation: {
         key: preComputedFlag.variationKey,
         value: preComputedFlag.variationValue,
