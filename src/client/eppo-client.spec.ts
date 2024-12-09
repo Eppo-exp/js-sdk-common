@@ -241,6 +241,8 @@ describe('EppoClient E2E test', () => {
       const { precomputed } = JSON.parse(client.getPrecomputedAssignments('subject', {}, true));
 
       expect(precomputed).toBeTruthy();
+      expect(precomputed.salt).toEqual('BzURTg==');
+
       const precomputedFlags = precomputed?.flags ?? {};
       expect(Object.keys(precomputedFlags)).toContain('ddc24ede545855b9bbae82cfec6a83a1'); // flagKey, md5 hashed
       expect(Object.keys(precomputedFlags)).toContain('2b439e5a0104d62400dc44c34230f6f2'); // 'anotherFlag', md5 hashed

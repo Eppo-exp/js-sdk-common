@@ -12,15 +12,15 @@ export interface IPrecomputedConfiguration {
 
   readonly obfuscated: boolean;
 
-  /// `format` is always `AssignmentFormat::Precomputed`.
+  // `format` is always `PRECOMPUTED`
   readonly format: FormatEnum;
 
-  /// Salt used for hashing md5-encoded strings.
-  readonly salt: string; // base64 encoded
+  // Salt used for hashing md5-encoded strings.
+  readonly salt: string;
 
   // Environment might be missing if configuration was absent during evaluation.
   readonly environment?: Environment;
-  readonly flags: Record<string, PrecomputedFlag>; // md5 hashed flag key
+  readonly flags: Record<string, PrecomputedFlag>;
 }
 
 export class PrecomputedConfiguration implements IPrecomputedConfiguration {
@@ -60,16 +60,6 @@ export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfigura
     this.createdAt = new Date().toISOString();
   }
 }
-
-// export class ObfuscatedPrecomputedResponse implements PrecomputedResponse {
-//   createdAt: string;
-//   environment: Environment;
-//   flags: Record<string, PrecomputedFlag>;
-//   format: FormatEnum;
-//   obfuscated: boolean;
-//   subjectKey: string;
-//
-// }
 
 // "Wire" in the name means "in-transit"/"file" format.
 // In-memory representation may differ significantly and is up to SDKs.
