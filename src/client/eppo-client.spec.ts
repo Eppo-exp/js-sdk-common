@@ -17,6 +17,7 @@ import { IConfigurationStore } from '../configuration-store/configuration-store'
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
+import { setSaltOverrideForTests } from '../obfuscation';
 import { AttributeType } from '../types';
 
 import EppoClient, { FlagConfigurationRequestParameters, checkTypeMatch } from './eppo-client';
@@ -201,6 +202,10 @@ describe('EppoClient E2E test', () => {
       });
     });
 
+    afterEach(() => {
+      setSaltOverrideForTests(null);
+    });
+
     it('skips disabled flags', () => {
       const client = new EppoClient({ flagConfigurationStore: storage });
       const { precomputed } = JSON.parse(client.getPrecomputedAssignments('subject', {}));
@@ -225,16 +230,23 @@ describe('EppoClient E2E test', () => {
     });
 
     it('obfuscates assignments', () => {
+      // Use a known salt to produce deterministic hashes
+      setSaltOverrideForTests({
+        base64String: 'BzURTg==',
+        saltString: '0735114e',
+        bytes: new Uint8Array([7, 53, 17, 78]),
+      });
+
       const client = new EppoClient({ flagConfigurationStore: storage });
       const { precomputed } = JSON.parse(client.getPrecomputedAssignments('subject', {}, true));
 
       expect(precomputed).toBeTruthy();
       const precomputedFlags = precomputed?.flags ?? {};
-      expect(Object.keys(precomputedFlags)).toContain('76a475dca4e7f11d2b02f3d257225cef'); // flagKey, md5 hashed
-      expect(Object.keys(precomputedFlags)).toContain('6783d6010b0c8a6cd388a96caafe9568'); // 'anotherFlag', md5 hashed
+      expect(Object.keys(precomputedFlags)).toContain('ddc24ede545855b9bbae82cfec6a83a1'); // flagKey, md5 hashed
+      expect(Object.keys(precomputedFlags)).toContain('2b439e5a0104d62400dc44c34230f6f2'); // 'anotherFlag', md5 hashed
 
-      const firstFlag = precomputedFlags['76a475dca4e7f11d2b02f3d257225cef'];
-      const secondFlag = precomputedFlags['6783d6010b0c8a6cd388a96caafe9568'];
+      const firstFlag = precomputedFlags['ddc24ede545855b9bbae82cfec6a83a1'];
+      const secondFlag = precomputedFlags['2b439e5a0104d62400dc44c34230f6f2'];
       expect(firstFlag.variationValue).toEqual('dmFyaWF0aW9uLWE='); // 'variation-a' base64 encoded
       expect(secondFlag.variationValue).toEqual('dmFyaWF0aW9uLWI='); // 'variation-b' base64 encoded
     });

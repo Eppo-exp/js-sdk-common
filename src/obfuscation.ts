@@ -7,6 +7,10 @@ export function getMD5Hash(input: string): string {
   return SparkMD5.hash(input);
 }
 
+function saltedHasher(salt: string) {
+  return (input: string) => SparkMD5.hash(salt + input);
+}
+
 export function encodeBase64(input: string) {
   return base64.btoaPolyfill(input);
 }
@@ -16,20 +20,56 @@ export function decodeBase64(input: string) {
 }
 
 export function obfuscatePrecomputedFlags(
+  salt: string,
   precomputedFlags: Record<string, PrecomputedFlag>,
 ): Record<string, PrecomputedFlag> {
   const response: Record<string, PrecomputedFlag> = {};
+  const hash = saltedHasher(salt);
+
   Object.keys(precomputedFlags).map((flagKey) => {
     const assignment = precomputedFlags[flagKey];
 
-    response[getMD5Hash(flagKey)] = {
+    // Encode extraLogging keys and values.
+    const encodedExtraLogging = Object.fromEntries(
+      Object.entries(assignment.extraLogging).map((kvArr) => kvArr.map(encodeBase64)),
+    );
+
+    response[hash(flagKey)] = {
       variationType: assignment.variationType,
-      extraLogging: assignment.extraLogging,
+      extraLogging: encodedExtraLogging,
       doLog: assignment.doLog,
-      allocationKey: getMD5Hash(assignment.allocationKey),
-      variationKey: getMD5Hash(assignment.variationKey),
+      allocationKey: encodeBase64(assignment.allocationKey),
+      variationKey: encodeBase64(assignment.variationKey),
       variationValue: encodeBase64(assignment.variationValue),
     };
   });
   return response;
+}
+
+export interface Salt {
+  saltString: string;
+  base64String: string;
+  bytes: Uint8Array;
+}
+
+let _saltOverride: Salt | null = null;
+export function setSaltOverrideForTests(salt: Salt | null) {
+  _saltOverride = salt;
+}
+
+export function generateSalt(length = 16): Salt {
+  if (_saltOverride) return _saltOverride;
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+
+  const saltString = Array.from(array)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+  const base64String = encodeBase64(String.fromCharCode(...array));
+
+  return {
+    saltString,
+    base64String,
+    bytes: array,
+  };
 }
