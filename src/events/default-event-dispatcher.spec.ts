@@ -19,6 +19,7 @@ const createDispatcher = (
   configOverrides: Partial<
     EventDispatcherConfig & { networkStatusListener: NetworkStatusListener }
   > = {},
+  eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue'),
 ) => {
   const batchSize = 2;
   const defaultConfig: EventDispatcherConfig = {
@@ -29,7 +30,6 @@ const createDispatcher = (
     maxRetries: 3,
   };
   const config = { ...defaultConfig, ...configOverrides };
-  const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
   const batchProcessor = new BatchEventProcessor(eventQueue, batchSize);
   const dispatcher = new DefaultEventDispatcher(
     batchProcessor,
@@ -40,9 +40,7 @@ const createDispatcher = (
 };
 
 describe('DefaultEventDispatcher', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
+  beforeEach(() => jest.clearAllMocks());
 
   describe('BatchEventProcessor', () => {
     it('processes events in batches of the configured size', () => {
@@ -144,36 +142,6 @@ describe('DefaultEventDispatcher', () => {
     });
   });
 
-  describe('retry logic', () => {
-    it('retries failed deliveries after the retry interval', async () => {
-      const { dispatcher } = createDispatcher();
-      dispatcher.dispatch({
-        uuid: 'foo',
-        payload: 'event1',
-        timestamp: new Date().getTime(),
-        type: 'foo',
-      });
-
-      // Simulate fetch failure on the first attempt
-      (global.fetch as jest.Mock)
-        .mockResolvedValueOnce({ ok: false }) // First attempt fails
-        .mockResolvedValueOnce({ ok: true }); // Second attempt succeeds
-
-      // Fast-forward to trigger the first attempt
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-
-      // Fast-forward to trigger the retry
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      // no retries yet since retry interval is 300ms
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(global.fetch).toHaveBeenCalledTimes(2);
-    });
-  });
-
   describe('offline handling', () => {
     it('skips delivery when offline', async () => {
       let isOffline = false;
@@ -256,6 +224,68 @@ describe('DefaultEventDispatcher', () => {
     });
   });
 
+  describe('retry logic', () => {
+    it('retries failed deliveries after the retry interval', async () => {
+      const { dispatcher } = createDispatcher();
+      dispatcher.dispatch({
+        uuid: 'foo',
+        payload: 'event1',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
+
+      // Simulate fetch failure on the first attempt
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: false }) // First attempt fails
+        .mockResolvedValueOnce({ ok: true }); // Second attempt succeeds
+
+      // Fast-forward to trigger the first attempt
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      // Fast-forward to trigger the retry
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      // no retries yet since retry interval is 300ms
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-enqueues failed retries', async () => {
+      const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
+      const { dispatcher } = createDispatcher({ maxRetries: 1 }, eventQueue);
+      dispatcher.dispatch({
+        uuid: 'foo',
+        payload: 'event1',
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      });
+
+      // Simulate fetch failure on two attempt
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: false }) // First attempt fails
+        .mockResolvedValueOnce({ ok: false }); // Second attempt fails
+
+      // Fast-forward to trigger the first attempt
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      // Fast-forward to trigger the retry
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      // no retries yet since retry interval is 300ms
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+
+      // ensure that failed retry has been re-enqueued
+      expect(eventQueue.length).toBe(1);
+    });
+  });
+
   describe('newDefaultEventDispatcher', () => {
     it('should fallback to no-op dispatcher if SDK key is invalid', () => {
       const eventDispatcher = newDefaultEventDispatcher(
@@ -267,7 +297,7 @@ describe('DefaultEventDispatcher', () => {
     });
 
     it('should create a new DefaultEventDispatcher with the provided configuration', () => {
-      const eventQueue = new ArrayBackedNamedEventQueue('test-queue');
+      const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
       const dispatcher = newDefaultEventDispatcher(
         eventQueue,
         mockNetworkStatusListener,

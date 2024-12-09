@@ -1,10 +1,13 @@
 import { logger } from '../application-logger';
 
+import { Event } from './event-dispatcher';
+
 export default class EventDelivery {
   constructor(private readonly ingestionUrl: string) {}
 
-  async deliver(batch: unknown[]): Promise<boolean> {
+  async deliver(batch: Event[]): Promise<boolean> {
     try {
+      logger.info(`[EventDispatcher] Delivering batch of ${batch.length} events...`);
       const response = await fetch(this.ingestionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
