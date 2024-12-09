@@ -11,7 +11,9 @@ export class BoundedEventQueue<T> implements NamedEventQueue<T> {
     private readonly maxSize = MAX_EVENT_QUEUE_SIZE,
   ) {}
 
-  length = this.queue.length;
+  get length() {
+    return this.queue.length;
+  }
 
   splice(count: number): T[] {
     return this.queue.splice(count);
@@ -25,11 +27,14 @@ export class BoundedEventQueue<T> implements NamedEventQueue<T> {
     return this.queue[Symbol.iterator]();
   }
 
-  push(event: T) {
-    if (this.queue.length < this.maxSize) {
-      this.queue.push(event);
+  push(...events: T[]) {
+    const { name, maxSize, queue } = this;
+    if (queue.length + events.length <= maxSize) {
+      queue.push(...events);
     } else {
-      logger.warn(`Dropping event for queue ${this.name} since the queue is full`);
+      logger.warn(
+        `Dropping ${events.length} events for queue ${name} since maxSize of ${maxSize} reached.`,
+      );
     }
   }
 

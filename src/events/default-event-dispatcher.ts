@@ -91,7 +91,11 @@ export default class DefaultEventDispatcher implements EventDispatcher {
     const success = await this.eventDelivery.deliver(batch);
     if (!success) {
       logger.warn('[EventDispatcher] Failed to deliver batch, retrying...');
-      await this.retryManager.retry(batch);
+      const retrySucceeded = await this.retryManager.retry(batch);
+      if (!retrySucceeded) {
+        // re-enqueue events that failed to retry
+        this.batchProcessor.push(...batch);
+      }
     }
     logger.debug(`[EventDispatcher] Delivered batch of ${batch.length} events.`);
     this.dispatchTimer = null;
@@ -127,7 +131,7 @@ export default class DefaultEventDispatcher implements EventDispatcher {
 
 /** Creates a new {@link DefaultEventDispatcher} with the provided configuration. */
 export function newDefaultEventDispatcher(
-  eventQueue: NamedEventQueue<unknown>,
+  eventQueue: NamedEventQueue<Event>,
   networkStatusListener: NetworkStatusListener,
   sdkKey: string,
   batchSize: number = DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
