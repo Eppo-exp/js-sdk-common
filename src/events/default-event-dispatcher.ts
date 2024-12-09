@@ -87,7 +87,6 @@ export default class DefaultEventDispatcher implements EventDispatcher {
       return;
     }
 
-    logger.info(`[EventDispatcher] Delivering batch of ${batch.length} events...`);
     const success = await this.eventDelivery.deliver(batch);
     if (!success) {
       logger.warn('[EventDispatcher] Failed to deliver batch, retrying...');

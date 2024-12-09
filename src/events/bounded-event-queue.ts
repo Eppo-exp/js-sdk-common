@@ -29,9 +29,10 @@ export class BoundedEventQueue<T> implements NamedEventQueue<T> {
 
   push(...events: T[]) {
     const { name, maxSize, queue } = this;
-    if (queue.length + events.length <= maxSize) {
-      queue.push(...events);
-    } else {
+    while (queue.length < maxSize && events.length > 0) {
+      queue.push(...events.splice(0, 1));
+    }
+    if (events.length > 0) {
       logger.warn(
         `Dropping ${events.length} events for queue ${name} since maxSize of ${maxSize} reached.`,
       );

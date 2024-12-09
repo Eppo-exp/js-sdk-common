@@ -35,6 +35,20 @@ describe('BoundedEventQueue', () => {
     spyLoggerWarn.mockRestore();
   });
 
+  it('push should partially drop events if maxSize is exceeded halfway', () => {
+    const queue = new BoundedEventQueue<string>('testQueue', [], 4);
+    const spyLoggerWarn = jest.spyOn(logger, 'warn').mockImplementation();
+
+    queue.push('event1', 'event2', 'event3', 'event4', 'event5');
+    expect(queue.length).toBe(4);
+
+    expect(spyLoggerWarn).toHaveBeenCalledWith(
+      'Dropping 1 events for queue testQueue since maxSize of 4 reached.',
+    );
+
+    spyLoggerWarn.mockRestore();
+  });
+
   it('splice should remove the specified number of events', () => {
     const queue = new BoundedEventQueue<string>('testQueue', [], maxSize);
     queue.push('event1', 'event2', 'event3');
