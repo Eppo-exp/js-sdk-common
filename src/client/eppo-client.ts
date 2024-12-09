@@ -1062,10 +1062,17 @@ export default class EppoClient {
     return result;
   }
 
-  /** TODO */
-  // noinspection JSUnusedGlobalSymbols
-  track(event: unknown, params: Record<string, unknown>) {
-    this.eventDispatcher.dispatch({ id: randomUUID(), data: event, params });
+  /**
+   * Enqueues an arbitrary event. Events must have a type and a payload.
+   * TODO: enforce max message size
+   */
+  track(type: string, payload: Record<string, unknown>) {
+    this.eventDispatcher.dispatch({
+      uuid: randomUUID(),
+      type,
+      timestamp: new Date().getTime(),
+      payload,
+    });
   }
 
   private newFlagEvaluationDetailsBuilder(flagKey: string): FlagEvaluationDetailsBuilder {

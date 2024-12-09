@@ -4,8 +4,8 @@ export default interface NamedEventQueue<T> {
 
   name: string;
 
-  /** Add an element to the end of the array */
-  push(event: T): void;
+  /** Add element(s) to the end of the array */
+  push(...events: T[]): void;
 
   [Symbol.iterator](): IterableIterator<T>;
 

@@ -1,7 +1,8 @@
 export type Event = {
-  id: string;
-  data: unknown;
-  params?: Record<string, unknown>;
+  uuid: string;
+  timestamp: number;
+  type: string;
+  payload: Record<string, unknown>;
 };
 
 export default interface EventDispatcher {
