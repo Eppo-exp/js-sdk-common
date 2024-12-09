@@ -9,6 +9,13 @@ import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
+import {
+  ConfigurationWire,
+  ConfigurationWireV1,
+  IPrecomputedConfiguration,
+  ObfuscatedPrecomputedConfiguration,
+  PrecomputedConfiguration,
+} from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import {
@@ -33,15 +40,13 @@ import {
   BanditParameters,
   BanditVariation,
   ConfigDetails,
-  ConfigurationWireFormat,
   Flag,
-  FormatEnum,
   ObfuscatedFlag,
   PrecomputedFlag,
   Variation,
   VariationType,
 } from '../interfaces';
-import { getMD5Hash, obfuscatePrecomputedFlags } from '../obfuscation';
+import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import {
   Attributes,
@@ -928,7 +933,7 @@ export default class EppoClient {
    * Computes and returns assignments for a subject from all loaded flags.
    *
    * @param subjectKey an identifier of the experiment subject, for example a user ID.
-   * @param subjectAttributes optional attributes associated with the subject, for example name and email.   * The
+   * @param subjectAttributes optional attributes associated with the subject, for example name and email.
    * @param obfuscated optional whether to obfuscate the results.
    */
   getPrecomputedAssignments(
@@ -937,23 +942,23 @@ export default class EppoClient {
     obfuscated = false,
   ): string {
     const configDetails = this.getConfigDetails();
-    let flags = this.getAllAssignments(subjectKey, subjectAttributes);
+    const flags = this.getAllAssignments(subjectKey, subjectAttributes);
 
-    if (obfuscated) {
-      flags = obfuscatePrecomputedFlags(flags);
-    }
+    const precomputedConfig: IPrecomputedConfiguration = obfuscated
+      ? new ObfuscatedPrecomputedConfiguration(
+          subjectKey,
+          flags,
+          subjectAttributes,
+          configDetails.configEnvironment,
+        )
+      : new PrecomputedConfiguration(
+          subjectKey,
+          flags,
+          subjectAttributes,
+          configDetails.configEnvironment,
+        );
 
-    const configurationBundle: ConfigurationWireFormat = {
-      precomputed: {
-        obfuscated,
-        subjectKey,
-        subjectAttributes,
-        createdAt: new Date().toISOString(),
-        environment: configDetails.configEnvironment,
-        flags,
-        format: FormatEnum.PRECOMPUTED,
-      },
-    };
+    const configurationBundle: ConfigurationWire = new ConfigurationWireV1(precomputedConfig);
 
     return JSON.stringify(configurationBundle, null, 2);
   }

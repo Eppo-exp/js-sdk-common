@@ -25,7 +25,7 @@ export default class PrecomputedFlagRequestor {
 
     await hydrateConfigurationStore(this.precomputedFlagStore, {
       entries: precomputedResponse.flags,
-      environment: precomputedResponse.environment,
+      environment: precomputedResponse.environment ?? { name: '' }, // NOTE: not sure wha the right default to have is here...
       createdAt: precomputedResponse.createdAt,
       format: precomputedResponse.format,
     });

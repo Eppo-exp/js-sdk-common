@@ -203,7 +203,7 @@ describe('EppoClient E2E test', () => {
 
     it('skips disabled flags', () => {
       const client = new EppoClient({ flagConfigurationStore: storage });
-      const { precomputed } = client.getPrecomputedAssignments('subject', {});
+      const { precomputed } = JSON.parse(client.getPrecomputedAssignments('subject', {}));
 
       expect(precomputed).toBeTruthy();
       const precomputedFlags = precomputed?.flags ?? {};
@@ -214,7 +214,7 @@ describe('EppoClient E2E test', () => {
 
     it('evaluates and returns assignments', () => {
       const client = new EppoClient({ flagConfigurationStore: storage });
-      const { precomputed } = client.getPrecomputedAssignments('subject', {});
+      const { precomputed } = JSON.parse(client.getPrecomputedAssignments('subject', {}));
 
       expect(precomputed).toBeTruthy();
       const precomputedFlags = precomputed?.flags ?? {};
@@ -226,7 +226,7 @@ describe('EppoClient E2E test', () => {
 
     it('obfuscates assignments', () => {
       const client = new EppoClient({ flagConfigurationStore: storage });
-      const { precomputed } = client.getPrecomputedAssignments('subject', {}, true);
+      const { precomputed } = JSON.parse(client.getPrecomputedAssignments('subject', {}, true));
 
       expect(precomputed).toBeTruthy();
       const precomputedFlags = precomputed?.flags ?? {};
