@@ -48,24 +48,20 @@ export default class EppoPrecomputedClient {
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
   private requestPoller?: IPoller;
+  private precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters;
   private subjectKey?: string;
   private subjectAttributes?: Attributes;
 
   constructor(
     private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
-    private precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters,
     private isObfuscated = false,
-  ) {
-    // Initialize subject data from parameters if provided
-    if (precomputedFlagsRequestParameters?.precompute) {
-      this.subjectKey = precomputedFlagsRequestParameters.precompute.subjectKey;
-      this.subjectAttributes = precomputedFlagsRequestParameters.precompute.subjectAttributes;
-    }
-  }
+  ) {}
 
-  public setPrecomputedFlagsRequestParameters(
+  public setSubjectAndPrecomputedFlagsRequestParameters(
     precomputedFlagsRequestParameters: PrecomputedFlagsRequestParameters,
   ) {
+    this.subjectKey = precomputedFlagsRequestParameters.precompute.subjectKey;
+    this.subjectAttributes = precomputedFlagsRequestParameters.precompute.subjectAttributes;
     this.precomputedFlagsRequestParameters = precomputedFlagsRequestParameters;
   }
 
