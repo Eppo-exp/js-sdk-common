@@ -979,12 +979,12 @@ export default class EppoClient {
    * Enqueues an arbitrary event. Events must have a type and a payload.
    * TODO: enforce max message size
    */
-  track(type: string, event: unknown) {
+  track(type: string, payload: Record<string, unknown>) {
     this.eventDispatcher.dispatch({
       uuid: randomUUID(),
       type,
       timestamp: new Date().getTime(),
-      payload: event,
+      payload,
     });
   }
 

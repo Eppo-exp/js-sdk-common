@@ -11,9 +11,9 @@ describe('BatchEventProcessor', () => {
       expect(processor.nextBatch()).toHaveLength(0);
       const timestamp = new Date().getTime();
       const type = 'test';
-      const event1 = { uuid: 'foo-1', payload: 'event1', timestamp, type };
-      const event2 = { uuid: 'foo-2', payload: 'event2', timestamp, type };
-      const event3 = { uuid: 'foo-3', payload: 'event3', timestamp, type };
+      const event1 = { uuid: 'foo-1', payload: { id: 'event1' }, timestamp, type };
+      const event2 = { uuid: 'foo-2', payload: { id: 'event2' }, timestamp, type };
+      const event3 = { uuid: 'foo-3', payload: { id: 'event3' }, timestamp, type };
       processor.push(event1);
       processor.push(event2);
       processor.push(event3);
