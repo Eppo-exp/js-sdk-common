@@ -19,8 +19,8 @@ export default class ArrayBackedNamedEventQueue<T> implements NamedEventQueue<T>
     this.events.length = value;
   }
 
-  push(event: T): void {
-    this.events.push(event);
+  push(...events: T[]): void {
+    this.events.push(...events);
   }
 
   [Symbol.iterator](): IterableIterator<T> {

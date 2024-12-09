@@ -1,6 +1,7 @@
 import { logger } from '../application-logger';
 
 import EventDelivery from './event-delivery';
+import { Event } from './event-dispatcher';
 
 /**
  * Attempts to retry delivering a batch of events to the ingestionUrl up to `maxRetries` times
@@ -21,7 +22,8 @@ export default class BatchRetryManager {
     },
   ) {}
 
-  async retry(batch: unknown[], attempt = 0): Promise<void> {
+  /** Re-attempts delivery of the provided batch, returns whether the retry succeeded. */
+  async retry(batch: Event[], attempt = 0): Promise<boolean> {
     const { retryIntervalMs, maxRetryDelayMs, maxRetries } = this.config;
     const delay = Math.min(retryIntervalMs * Math.pow(2, attempt), maxRetryDelayMs);
     logger.info(`[BatchRetryManager] Retrying batch delivery in ${delay}ms...`);
@@ -30,15 +32,16 @@ export default class BatchRetryManager {
     const success = await this.delivery.deliver(batch);
     if (success) {
       logger.info(`[BatchRetryManager] Batch delivery successfully after ${attempt} retries.`);
-      return;
+      return true;
     }
-    if (attempt < maxRetries) {
+    // attempts are zero-indexed while maxRetries is not
+    if (attempt < maxRetries - 1) {
       return this.retry(batch, attempt + 1);
     } else {
-      // TODO: Persist batch to avoid data loss
       logger.warn(
         `[BatchRetryManager] Failed to deliver batch after ${maxRetries} retries, bailing`,
       );
+      return false;
     }
   }
 }
