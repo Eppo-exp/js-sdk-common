@@ -90,7 +90,9 @@ export class LRUCache implements Map<string, string> {
       // Therefore, the first key represents the oldest entry, which is the least recently used item in our cache.
       // We use Map.prototype.keys().next().value to obtain this oldest key and then delete it from the cache.
       const oldestKey = this.cache.keys().next().value;
-      this.delete(oldestKey);
+      if (oldestKey) {
+        this.delete(oldestKey);
+      }
     }
 
     this.cache.set(key, value);

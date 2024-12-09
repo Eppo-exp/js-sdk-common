@@ -1,17 +1,18 @@
+import { Event } from './event-dispatcher';
 import NamedEventQueue from './named-event-queue';
 
 export default class BatchEventProcessor {
   constructor(
-    private readonly eventQueue: NamedEventQueue<unknown>,
+    private readonly eventQueue: NamedEventQueue<Event>,
     private readonly batchSize: number,
   ) {}
 
-  nextBatch(): unknown[] {
+  nextBatch(): Event[] {
     return this.eventQueue.splice(this.batchSize);
   }
 
-  push(event: unknown): void {
-    this.eventQueue.push(event);
+  push(...events: Event[]): void {
+    this.eventQueue.push(...events);
   }
 
   isEmpty(): boolean {
