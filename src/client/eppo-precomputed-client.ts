@@ -57,12 +57,18 @@ export default class EppoPrecomputedClient {
     private isObfuscated = false,
   ) {}
 
+  public setPrecomputedFlagsRequestParameters(
+    precomputedFlagsRequestParameters: PrecomputedFlagsRequestParameters,
+  ) {
+    this.precomputedFlagsRequestParameters = precomputedFlagsRequestParameters;
+  }
+
   public setSubjectAndPrecomputedFlagsRequestParameters(
     precomputedFlagsRequestParameters: PrecomputedFlagsRequestParameters,
   ) {
+    this.setPrecomputedFlagsRequestParameters(precomputedFlagsRequestParameters);
     this.subjectKey = precomputedFlagsRequestParameters.precompute.subjectKey;
     this.subjectAttributes = precomputedFlagsRequestParameters.precompute.subjectAttributes;
-    this.precomputedFlagsRequestParameters = precomputedFlagsRequestParameters;
   }
 
   public setPrecomputedFlagStore(precomputedFlagStore: IConfigurationStore<PrecomputedFlag>) {
