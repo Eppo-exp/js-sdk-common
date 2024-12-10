@@ -941,7 +941,7 @@ export default class EppoClient {
     subjectKey: string,
     subjectAttributes: Attributes = {},
     obfuscated = false,
-  ): string {
+  ): ConfigurationWire {
     const configDetails = this.getConfigDetails();
     const flags = this.getAllAssignments(subjectKey, subjectAttributes);
 
@@ -959,9 +959,7 @@ export default class EppoClient {
           configDetails.configEnvironment,
         );
 
-    const configurationBundle: ConfigurationWire = new ConfigurationWireV1(precomputedConfig);
-
-    return JSON.stringify(configurationBundle, null, 2);
+    return new ConfigurationWireV1(precomputedConfig);
   }
 
   /**

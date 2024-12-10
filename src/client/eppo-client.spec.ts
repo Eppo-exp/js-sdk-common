@@ -203,14 +203,21 @@ describe('EppoClient E2E test', () => {
       });
     });
 
+    let client: EppoClient;
+    beforeEach(() => {
+      client = new EppoClient({ flagConfigurationStore: storage });
+    });
+
     afterEach(() => {
       setSaltOverrideForTests(null);
     });
 
     it('skips disabled flags', () => {
-      const client = new EppoClient({ flagConfigurationStore: storage });
       const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
-      const { precomputed } = JSON.parse(encodedPrecomputedWire);
+      const { precomputed } = encodedPrecomputedWire;
+      if (!precomputed) {
+        fail('Precomputed data not in Configuration response');
+      }
       const precomputedResponse = JSON.parse(precomputed.response);
 
       expect(precomputedResponse).toBeTruthy();
@@ -221,9 +228,11 @@ describe('EppoClient E2E test', () => {
     });
 
     it('evaluates and returns assignments', () => {
-      const client = new EppoClient({ flagConfigurationStore: storage });
       const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
-      const { precomputed } = JSON.parse(encodedPrecomputedWire);
+      const { precomputed } = encodedPrecomputedWire;
+      if (!precomputed) {
+        fail('Precomputed data not in Configuration response');
+      }
       const precomputedResponse = JSON.parse(precomputed.response);
 
       expect(precomputedResponse).toBeTruthy();
@@ -242,9 +251,11 @@ describe('EppoClient E2E test', () => {
         bytes: new Uint8Array([7, 53, 17, 78]),
       });
 
-      const client = new EppoClient({ flagConfigurationStore: storage });
       const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {}, true);
-      const { precomputed } = JSON.parse(encodedPrecomputedWire);
+      const { precomputed } = encodedPrecomputedWire;
+      if (!precomputed) {
+        fail('Precomputed data not in Configuration response');
+      }
       const precomputedResponse = JSON.parse(precomputed.response);
 
       expect(precomputedResponse).toBeTruthy();
