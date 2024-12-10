@@ -16,11 +16,12 @@ export default class SdkKeyDecoder {
     const hostname = params.get('eh');
     if (!hostname) return null;
 
-    if (!hostname.startsWith('http://') && !hostname.startsWith('https://')) {
+    const hostAndPath = hostname.endsWith('/') ? `${hostname}${PATH}` : `${hostname}/${PATH}`;
+    if (!hostAndPath.startsWith('http://') && !hostAndPath.startsWith('https://')) {
       // prefix hostname with https scheme if none present
-      return hostname.endsWith('/') ? `https://${hostname}${PATH}` : `https://${hostname}/${PATH}`;
+      return `https://${hostAndPath}`;
     } else {
-      return hostname.endsWith('/') ? `${hostname}${PATH}` : `${hostname}/${PATH}`;
+      return hostAndPath;
     }
   }
 }
