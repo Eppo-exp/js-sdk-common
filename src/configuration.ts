@@ -2,62 +2,70 @@ import { Environment, FormatEnum, PrecomputedFlag } from './interfaces';
 import { generateSalt, obfuscatePrecomputedFlags, Salt } from './obfuscation';
 import { Attributes, ContextAttributes } from './types';
 
-export interface IPrecomputedConfiguration {
-  readonly createdAt: string;
-
-  readonly subjectKey: string;
-
-  // Optional in case server does not want to expose attributes to a client.
-  readonly subjectAttributes?: Attributes | ContextAttributes;
-
-  readonly obfuscated: boolean;
-
+export interface PrecomputedConfigurationResponse {
   // `format` is always `PRECOMPUTED`
   readonly format: FormatEnum;
-
+  readonly obfuscated: boolean;
   // Salt used for hashing md5-encoded strings.
   readonly salt: string;
-
+  readonly createdAt: string;
   // Environment might be missing if configuration was absent during evaluation.
   readonly environment?: Environment;
   readonly flags: Record<string, PrecomputedFlag>;
 }
 
+export interface IPrecomputedConfiguration {
+  // JSON encoded `PrecomputedConfigurationResponse`
+  readonly response: string;
+  readonly subjectKey: string;
+  // Optional in case server does not want to expose attributes to a client.
+  readonly subjectAttributes?: Attributes | ContextAttributes;
+}
+
 export class PrecomputedConfiguration implements IPrecomputedConfiguration {
-  readonly salt = '';
-  readonly obfuscated = false;
-  readonly createdAt: string;
   readonly format = FormatEnum.PRECOMPUTED;
+  readonly response: string;
 
   constructor(
     readonly subjectKey: string,
-    readonly flags: Record<string, PrecomputedFlag>,
+    flags: Record<string, PrecomputedFlag>,
     readonly subjectAttributes?: Attributes | ContextAttributes,
-    readonly environment?: Environment,
+    environment?: Environment,
   ) {
-    this.createdAt = new Date().toISOString();
+    const precomputedResponse: PrecomputedConfigurationResponse = {
+      format: FormatEnum.PRECOMPUTED,
+      obfuscated: false,
+      salt: '',
+      createdAt: new Date().toISOString(),
+      environment,
+      flags,
+    };
+    this.response = JSON.stringify(precomputedResponse);
   }
 }
 
 export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfiguration {
-  readonly salt: string;
-  readonly obfuscated = true;
-  readonly createdAt: string;
   readonly format = FormatEnum.PRECOMPUTED;
-  readonly flags: Record<string, PrecomputedFlag>;
+  readonly response: string;
   private saltBase: Salt;
 
   constructor(
     readonly subjectKey: string,
     flags: Record<string, PrecomputedFlag>,
     readonly subjectAttributes?: Attributes | ContextAttributes,
-    readonly environment?: Environment,
+    environment?: Environment,
   ) {
     this.saltBase = generateSalt();
-    this.salt = this.saltBase.base64String;
-    this.flags = obfuscatePrecomputedFlags(this.saltBase.saltString, flags);
 
-    this.createdAt = new Date().toISOString();
+    const precomputedResponse: PrecomputedConfigurationResponse = {
+      format: FormatEnum.PRECOMPUTED,
+      obfuscated: true,
+      salt: this.saltBase.base64String,
+      createdAt: new Date().toISOString(),
+      environment,
+      flags: obfuscatePrecomputedFlags(this.saltBase.saltString, flags),
+    };
+    this.response = JSON.stringify(precomputedResponse);
   }
 }
 

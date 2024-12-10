@@ -737,6 +737,7 @@ describe('EppoPrecomputedClient E2E test', () => {
 
       await store.setEntries({
         'test-flag': {
+          flagKey: precomputedFlagKey,
           variationType: VariationType.STRING,
           variationKey: 'control',
           variationValue: 'test-value',

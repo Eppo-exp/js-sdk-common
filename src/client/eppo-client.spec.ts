@@ -209,10 +209,12 @@ describe('EppoClient E2E test', () => {
 
     it('skips disabled flags', () => {
       const client = new EppoClient({ flagConfigurationStore: storage });
-      const { precomputed } = JSON.parse(client.getPrecomputedAssignments('subject', {}));
+      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
+      const { precomputed } = JSON.parse(encodedPrecomputedWire);
+      const precomputedResponse = JSON.parse(precomputed.response);
 
-      expect(precomputed).toBeTruthy();
-      const precomputedFlags = precomputed?.flags ?? {};
+      expect(precomputedResponse).toBeTruthy();
+      const precomputedFlags = precomputedResponse?.flags ?? {};
       expect(Object.keys(precomputedFlags)).toContain('anotherFlag');
       expect(Object.keys(precomputedFlags)).toContain(flagKey);
       expect(Object.keys(precomputedFlags)).not.toContain('disabledFlag');
@@ -220,10 +222,12 @@ describe('EppoClient E2E test', () => {
 
     it('evaluates and returns assignments', () => {
       const client = new EppoClient({ flagConfigurationStore: storage });
-      const { precomputed } = JSON.parse(client.getPrecomputedAssignments('subject', {}));
+      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
+      const { precomputed } = JSON.parse(encodedPrecomputedWire);
+      const precomputedResponse = JSON.parse(precomputed.response);
 
-      expect(precomputed).toBeTruthy();
-      const precomputedFlags = precomputed?.flags ?? {};
+      expect(precomputedResponse).toBeTruthy();
+      const precomputedFlags = precomputedResponse?.flags ?? {};
       const firstFlag = precomputedFlags[flagKey];
       const secondFlag = precomputedFlags['anotherFlag'];
       expect(firstFlag.variationValue).toEqual('variation-a');
@@ -239,12 +243,14 @@ describe('EppoClient E2E test', () => {
       });
 
       const client = new EppoClient({ flagConfigurationStore: storage });
-      const { precomputed } = JSON.parse(client.getPrecomputedAssignments('subject', {}, true));
+      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {}, true);
+      const { precomputed } = JSON.parse(encodedPrecomputedWire);
+      const precomputedResponse = JSON.parse(precomputed.response);
 
-      expect(precomputed).toBeTruthy();
-      expect(precomputed.salt).toEqual('BzURTg==');
+      expect(precomputedResponse).toBeTruthy();
+      expect(precomputedResponse.salt).toEqual('BzURTg==');
 
-      const precomputedFlags = precomputed?.flags ?? {};
+      const precomputedFlags = precomputedResponse?.flags ?? {};
       expect(Object.keys(precomputedFlags)).toContain('ddc24ede545855b9bbae82cfec6a83a1'); // flagKey, md5 hashed
       expect(Object.keys(precomputedFlags)).toContain('2b439e5a0104d62400dc44c34230f6f2'); // 'anotherFlag', md5 hashed
 
