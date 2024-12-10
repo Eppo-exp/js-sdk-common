@@ -137,7 +137,7 @@ export function newDefaultEventDispatcher(
   config: Omit<EventDispatcherConfig, 'ingestionUrl'> = DEFAULT_EVENT_DISPATCHER_CONFIG,
 ): EventDispatcher {
   const sdkKeyDecoder = new SdkKeyDecoder();
-  const ingestionUrl = sdkKeyDecoder.decodeEventIngestionHostName(sdkKey);
+  const ingestionUrl = sdkKeyDecoder.decodeEventIngestionUrl(sdkKey);
   if (!ingestionUrl) {
     logger.debug(
       'Unable to parse Event ingestion URL from SDK key, falling back to no-op event dispatcher',
