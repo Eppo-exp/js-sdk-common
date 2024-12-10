@@ -42,6 +42,7 @@ export interface Allocation {
 export interface Environment {
   name: string;
 }
+export const UNKNOWN_ENVIRONMENT_NAME = 'UNKNOWN';
 
 export interface ConfigDetails {
   configFetchedAt: string;
@@ -143,6 +144,7 @@ export enum FormatEnum {
 }
 
 export interface PrecomputedFlag {
+  flagKey: string;
   allocationKey: string;
   variationKey: string;
   variationType: VariationType;

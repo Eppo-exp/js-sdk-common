@@ -16,6 +16,7 @@ import { IAssignmentLogger } from '../assignment-logger';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
+import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
 import { setSaltOverrideForTests } from '../obfuscation';
 import { AttributeType } from '../types';
@@ -249,8 +250,26 @@ describe('EppoClient E2E test', () => {
 
       const firstFlag = precomputedFlags['ddc24ede545855b9bbae82cfec6a83a1'];
       const secondFlag = precomputedFlags['2b439e5a0104d62400dc44c34230f6f2'];
-      expect(firstFlag.variationValue).toEqual('dmFyaWF0aW9uLWE='); // 'variation-a' base64 encoded
-      expect(secondFlag.variationValue).toEqual('dmFyaWF0aW9uLWI='); // 'variation-b' base64 encoded
+
+      const decodedFirstFlag = decodePrecomputedFlag(
+        precomputedFlags['ddc24ede545855b9bbae82cfec6a83a1'],
+      );
+      expect(decodedFirstFlag.flagKey).toEqual('ddc24ede545855b9bbae82cfec6a83a1');
+      expect(decodedFirstFlag.variationType).toEqual(VariationType.STRING);
+      expect(decodedFirstFlag.variationKey).toEqual('a');
+      expect(decodedFirstFlag.variationValue).toEqual('variation-a');
+      expect(decodedFirstFlag.doLog).toEqual(true);
+      expect(decodedFirstFlag.extraLogging).toEqual({});
+
+      const decodedSecondFlag = decodePrecomputedFlag(
+        precomputedFlags['2b439e5a0104d62400dc44c34230f6f2'],
+      );
+      expect(decodedSecondFlag.flagKey).toEqual('2b439e5a0104d62400dc44c34230f6f2');
+      expect(decodedSecondFlag.variationType).toEqual(VariationType.STRING);
+      expect(decodedSecondFlag.variationKey).toEqual('b');
+      expect(decodedSecondFlag.variationValue).toEqual('variation-b');
+      expect(decodedSecondFlag.doLog).toEqual(true);
+      expect(decodedSecondFlag.extraLogging).toEqual({});
     });
   });
 

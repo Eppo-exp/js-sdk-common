@@ -8,7 +8,7 @@ export function getMD5Hash(input: string): string {
 }
 
 function saltedHasher(salt: string) {
-  return (input: string) => SparkMD5.hash(salt + input);
+  return (input: string) => getMD5Hash(salt + input);
 }
 
 export function encodeBase64(input: string) {
@@ -34,7 +34,9 @@ export function obfuscatePrecomputedFlags(
       Object.entries(assignment.extraLogging).map((kvArr) => kvArr.map(encodeBase64)),
     );
 
-    response[hash(flagKey)] = {
+    const hashedKey = hash(flagKey);
+    response[hashedKey] = {
+      flagKey: hashedKey,
       variationType: assignment.variationType,
       extraLogging: encodedExtraLogging,
       doLog: assignment.doLog,

@@ -1,7 +1,7 @@
 import { IConfigurationStore } from './configuration-store/configuration-store';
 import { hydrateConfigurationStore } from './configuration-store/configuration-store-utils';
 import { IHttpClient } from './http-client';
-import { PrecomputedFlag } from './interfaces';
+import { PrecomputedFlag, UNKNOWN_ENVIRONMENT_NAME } from './interfaces';
 import { Attributes } from './types';
 
 // Requests AND stores precomputed flags, reuses the configuration store
@@ -25,7 +25,7 @@ export default class PrecomputedFlagRequestor {
 
     await hydrateConfigurationStore(this.precomputedFlagStore, {
       entries: precomputedResponse.flags,
-      environment: precomputedResponse.environment ?? { name: '' }, // NOTE: not sure wha the right default to have is here...
+      environment: precomputedResponse.environment ?? { name: UNKNOWN_ENVIRONMENT_NAME },
       createdAt: precomputedResponse.createdAt,
       format: precomputedResponse.format,
     });

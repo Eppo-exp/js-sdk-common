@@ -917,6 +917,7 @@ export default class EppoClient {
 
       // Transform into a PrecomputedFlag
       flags[flagKey] = {
+        flagKey,
         allocationKey: evaluation.allocationKey,
         doLog: evaluation.doLog,
         extraLogging: evaluation.extraLogging,
