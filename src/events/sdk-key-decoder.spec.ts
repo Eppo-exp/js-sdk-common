@@ -6,7 +6,7 @@ describe('SdkKeyDecoder', () => {
     const hostname = decoder.decodeEventIngestionUrl(
       'zCsQuoHJxVPp895.ZWg9MTIzNDU2LmUudGVzdGluZy5lcHBvLmNsb3Vk',
     );
-    expect(hostname).toEqual('https://123456.e.testing.eppo.cloud');
+    expect(hostname).toEqual('https://123456.e.testing.eppo.cloud/v0/i');
   });
 
   it('should decode strings with non URL-safe characters', () => {
@@ -14,7 +14,7 @@ describe('SdkKeyDecoder', () => {
     const invalidUrl = 'eh=12+3456/.e.testing.eppo.cloud';
     const encoded = Buffer.from(invalidUrl).toString('base64url');
     const hostname = decoder.decodeEventIngestionUrl(`zCsQuoHJxVPp895.${encoded}`);
-    expect(hostname).toEqual('https://12 3456/.e.testing.eppo.cloud');
+    expect(hostname).toEqual('https://12 3456/.e.testing.eppo.cloud/v0/i');
   });
 
   it("should return null if the SDK key doesn't contain the event ingestion hostname", () => {
