@@ -92,6 +92,7 @@ describe('EppoPrecomputedClient E2E test', () => {
 
   const precomputedFlagKey = 'mock-flag';
   const mockPrecomputedFlag: PrecomputedFlag = {
+    flagKey: precomputedFlagKey,
     variationKey: 'a',
     variationValue: 'variation-a',
     allocationKey: 'allocation-a',
@@ -736,6 +737,7 @@ describe('EppoPrecomputedClient E2E test', () => {
 
       await store.setEntries({
         'test-flag': {
+          flagKey: precomputedFlagKey,
           variationType: VariationType.STRING,
           variationKey: 'control',
           variationValue: 'test-value',
