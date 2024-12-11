@@ -29,14 +29,14 @@ export default class BatchRetryManager {
     logger.info(`[BatchRetryManager] Retrying batch delivery in ${delay}ms...`);
     await new Promise((resolve) => setTimeout(resolve, delay));
 
-    const { success } = await this.delivery.deliver(batch);
-    if (success) {
+    const { failedEvents } = await this.delivery.deliver(batch);
+    if (failedEvents.length === 0) {
       logger.info(`[BatchRetryManager] Batch delivery successfully after ${attempt} retries.`);
       return true;
     }
     // attempts are zero-indexed while maxRetries is not
     if (attempt < maxRetries - 1) {
-      return this.retry(batch, attempt + 1);
+      return this.retry(failedEvents, attempt + 1);
     } else {
       logger.warn(
         `[BatchRetryManager] Failed to deliver batch after ${maxRetries} retries, bailing`,

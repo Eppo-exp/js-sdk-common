@@ -94,10 +94,10 @@ export default class DefaultEventDispatcher implements EventDispatcher {
       return;
     }
 
-    const { success } = await this.eventDelivery.deliver(batch);
-    if (!success) {
-      logger.warn('[EventDispatcher] Failed to deliver batch, retrying...');
-      const retrySucceeded = await this.retryManager.retry(batch);
+    const { failedEvents } = await this.eventDelivery.deliver(batch);
+    if (failedEvents.length > 0) {
+      logger.warn('[EventDispatcher] Failed to deliver some events from batch, retrying...');
+      const retrySucceeded = await this.retryManager.retry(failedEvents);
       if (!retrySucceeded) {
         // re-enqueue events that failed to retry
         this.batchProcessor.push(...batch);

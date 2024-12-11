@@ -6,7 +6,9 @@ describe('EventDelivery', () => {
   const sdkKey = 'test-sdk-key';
   const ingestionUrl = 'https://test-ingestion.url';
   const testBatch: Event[] = [
-    { uuid: '1', timestamp: Date.now(), type: 'test_event', payload: { key: 'value' } },
+    { uuid: '1', timestamp: Date.now(), type: 'test_event', payload: { key: 'value1' } },
+    { uuid: '2', timestamp: Date.now(), type: 'test_event', payload: { key: 'value2' } },
+    { uuid: '3', timestamp: Date.now(), type: 'test_event', payload: { key: 'value3' } },
   ];
   let eventDelivery: EventDelivery;
 
@@ -19,7 +21,7 @@ describe('EventDelivery', () => {
     const mockResponse = { ok: true, json: async () => ({}) };
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
     const result = await eventDelivery.deliver(testBatch);
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual({ failedEvents: [] });
     expect(global.fetch).toHaveBeenCalledWith(ingestionUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-eppo-token': sdkKey },
@@ -31,7 +33,7 @@ describe('EventDelivery', () => {
     const mockResponse = { ok: false };
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
     const result = await eventDelivery.deliver(testBatch);
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ failedEvents: testBatch });
   });
 
   it('should return failed events when response includes failed events', async () => {
@@ -39,19 +41,19 @@ describe('EventDelivery', () => {
     const mockResponse = { ok: true, json: async () => ({ failed_events: failedEvents }) };
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
     const result = await eventDelivery.deliver(testBatch);
-    expect(result).toEqual({ success: false, failedEvents });
+    expect(result).toEqual({ failedEvents: [testBatch[0], testBatch[1]] });
   });
 
   it('should return success=true if no failed events in the response', async () => {
     const mockResponse = { ok: true, json: async () => ({}) };
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
     const result = await eventDelivery.deliver(testBatch);
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual({ failedEvents: [] });
   });
 
   it('should handle fetch errors gracefully', async () => {
     (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
     const result = await eventDelivery.deliver(testBatch);
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ failedEvents: testBatch });
   });
 });
