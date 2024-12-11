@@ -7,7 +7,9 @@ export default class EventDelivery {
 
   async deliver(batch: Event[]): Promise<boolean> {
     try {
-      logger.info(`[EventDispatcher] Delivering batch of ${batch.length} events...`);
+      logger.info(
+        `[EventDispatcher] Delivering batch of ${batch.length} events to ${this.ingestionUrl}...`,
+      );
       const response = await fetch(this.ingestionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

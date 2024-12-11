@@ -1,5 +1,7 @@
 import { Base64 } from 'js-base64';
 
+const PATH = 'v0/i';
+
 export default class SdkKeyDecoder {
   /**
    * Decodes and returns the event ingestion hostname from the provided Eppo SDK key string.
@@ -14,11 +16,12 @@ export default class SdkKeyDecoder {
     const hostname = params.get('eh');
     if (!hostname) return null;
 
-    if (!hostname.startsWith('http://') && !hostname.startsWith('https://')) {
+    const hostAndPath = hostname.endsWith('/') ? `${hostname}${PATH}` : `${hostname}/${PATH}`;
+    if (!hostAndPath.startsWith('http://') && !hostAndPath.startsWith('https://')) {
       // prefix hostname with https scheme if none present
-      return `https://${hostname}`;
+      return `https://${hostAndPath}`;
     } else {
-      return hostname;
+      return hostAndPath;
     }
   }
 }
