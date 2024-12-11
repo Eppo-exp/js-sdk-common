@@ -1,5 +1,5 @@
 import ApiEndpoints from './api-endpoints';
-import { PrecomputedConfigurationResponse } from './configuration';
+import { IPrecomputedConfigurationResponse } from './configuration';
 import {
   BanditParameters,
   BanditVariation,
@@ -47,7 +47,7 @@ export interface IHttpClient {
   getBanditParameters(): Promise<IBanditParametersResponse | undefined>;
   getPrecomputedFlags(
     payload: PrecomputedFlagsPayload,
-  ): Promise<PrecomputedConfigurationResponse | undefined>;
+  ): Promise<IPrecomputedConfigurationResponse | undefined>;
   rawGet<T>(url: URL): Promise<T | undefined>;
   rawPost<T, P>(url: URL, payload: P): Promise<T | undefined>;
 }
@@ -67,9 +67,9 @@ export default class FetchHttpClient implements IHttpClient {
 
   async getPrecomputedFlags(
     payload: PrecomputedFlagsPayload,
-  ): Promise<PrecomputedConfigurationResponse | undefined> {
+  ): Promise<IPrecomputedConfigurationResponse | undefined> {
     const url = this.apiEndpoints.precomputedFlagsEndpoint();
-    return await this.rawPost<PrecomputedConfigurationResponse, PrecomputedFlagsPayload>(
+    return await this.rawPost<IPrecomputedConfigurationResponse, PrecomputedFlagsPayload>(
       url,
       payload,
     );

@@ -23,7 +23,7 @@ import EppoClient, {
 import EppoPrecomputedClient, {
   PrecomputedFlagsRequestParameters,
 } from './client/eppo-precomputed-client';
-import { ConfigurationWire } from './configuration';
+import { IConfigurationWire, IPrecomputedConfigurationResponse } from './configuration';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -65,13 +65,15 @@ export {
   IBanditLogger,
   IBanditEvent,
   IContainerExperiment,
-  PrecomputedFlagsRequestParameters,
   EppoClient,
   constants,
   ApiEndpoints,
   FlagConfigRequestor,
   HttpClient,
   validation,
+
+  // Precomputed Client
+  PrecomputedFlagsRequestParameters,
   EppoPrecomputedClient,
 
   // Configuration store
@@ -97,7 +99,6 @@ export {
   FlagConfigurationRequestParameters,
   Flag,
   ObfuscatedFlag,
-  PrecomputedFlag,
   VariationType,
   AttributeType,
   Attributes,
@@ -119,5 +120,9 @@ export {
   setSaltOverrideForTests,
 
   // Configuration interchange.
-  ConfigurationWire,
+  IConfigurationWire,
+  IPrecomputedConfigurationResponse,
+  PrecomputedFlag,
+
+
 };

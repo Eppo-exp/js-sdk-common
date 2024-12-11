@@ -23,6 +23,7 @@ import { AttributeType } from '../types';
 
 import EppoClient, { FlagConfigurationRequestParameters, checkTypeMatch } from './eppo-client';
 import { initConfiguration } from './test-utils';
+import { IConfigurationWire } from '../configuration';
 
 describe('EppoClient E2E test', () => {
   global.fetch = jest.fn(() => {
@@ -214,7 +215,7 @@ describe('EppoClient E2E test', () => {
 
     it('skips disabled flags', () => {
       const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
-      const { precomputed } = encodedPrecomputedWire;
+      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
       }
@@ -229,7 +230,7 @@ describe('EppoClient E2E test', () => {
 
     it('evaluates and returns assignments', () => {
       const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
-      const { precomputed } = encodedPrecomputedWire;
+      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
       }
@@ -252,7 +253,7 @@ describe('EppoClient E2E test', () => {
       });
 
       const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {}, true);
-      const { precomputed } = encodedPrecomputedWire;
+      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
       }

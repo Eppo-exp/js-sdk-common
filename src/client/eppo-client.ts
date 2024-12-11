@@ -10,7 +10,7 @@ import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-ca
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
 import {
-  ConfigurationWire,
+  IConfigurationWire,
   ConfigurationWireV1,
   IPrecomputedConfiguration,
   ObfuscatedPrecomputedConfiguration,
@@ -941,7 +941,7 @@ export default class EppoClient {
     subjectKey: string,
     subjectAttributes: Attributes = {},
     obfuscated = false,
-  ): ConfigurationWire {
+  ): string {
     const configDetails = this.getConfigDetails();
     const flags = this.getAllAssignments(subjectKey, subjectAttributes);
 
@@ -959,7 +959,8 @@ export default class EppoClient {
           configDetails.configEnvironment,
         );
 
-    return new ConfigurationWireV1(precomputedConfig);
+    const configWire: IConfigurationWire = new ConfigurationWireV1(precomputedConfig);
+    return JSON.stringify(configWire);
   }
 
   /**

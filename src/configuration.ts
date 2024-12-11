@@ -2,7 +2,7 @@ import { Environment, FormatEnum, PrecomputedFlag } from './interfaces';
 import { generateSalt, obfuscatePrecomputedFlags, Salt } from './obfuscation';
 import { Attributes, ContextAttributes } from './types';
 
-export interface PrecomputedConfigurationResponse {
+export interface IPrecomputedConfigurationResponse {
   // `format` is always `PRECOMPUTED`
   readonly format: FormatEnum;
   readonly obfuscated: boolean;
@@ -32,7 +32,7 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
     readonly subjectAttributes?: Attributes | ContextAttributes,
     environment?: Environment,
   ) {
-    const precomputedResponse: PrecomputedConfigurationResponse = {
+    const precomputedResponse: IPrecomputedConfigurationResponse = {
       format: FormatEnum.PRECOMPUTED,
       obfuscated: false,
       salt: '',
@@ -57,7 +57,7 @@ export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfigura
   ) {
     this.saltBase = generateSalt();
 
-    const precomputedResponse: PrecomputedConfigurationResponse = {
+    const precomputedResponse: IPrecomputedConfigurationResponse = {
       format: FormatEnum.PRECOMPUTED,
       obfuscated: true,
       salt: this.saltBase.base64String,
@@ -71,7 +71,7 @@ export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfigura
 
 // "Wire" in the name means "in-transit"/"file" format.
 // In-memory representation may differ significantly and is up to SDKs.
-export interface ConfigurationWire {
+export interface IConfigurationWire {
   /**
    * Version field should be incremented for breaking format changes.
    * For example, removing required fields or changing field type/meaning.
@@ -82,8 +82,7 @@ export interface ConfigurationWire {
   readonly precomputed?: IPrecomputedConfiguration;
 }
 
-export class ConfigurationWireV1 implements ConfigurationWire {
-  constructor(readonly precomputed?: IPrecomputedConfiguration) {}
-
+export class ConfigurationWireV1 implements IConfigurationWire {
   version = 1;
+  constructor(readonly precomputed?: IPrecomputedConfiguration) {}
 }
