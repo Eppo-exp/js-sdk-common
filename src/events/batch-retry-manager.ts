@@ -1,7 +1,7 @@
 import { logger } from '../application-logger';
 
+import Event from './event';
 import EventDelivery from './event-delivery';
-import { Event } from './event-dispatcher';
 
 /**
  * Attempts to retry delivering a batch of events to the ingestionUrl up to `maxRetries` times
@@ -29,7 +29,7 @@ export default class BatchRetryManager {
     logger.info(`[BatchRetryManager] Retrying batch delivery in ${delay}ms...`);
     await new Promise((resolve) => setTimeout(resolve, delay));
 
-    const success = await this.delivery.deliver(batch);
+    const { success } = await this.delivery.deliver(batch);
     if (success) {
       logger.info(`[BatchRetryManager] Batch delivery successfully after ${attempt} retries.`);
       return true;

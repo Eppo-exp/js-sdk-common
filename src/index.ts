@@ -39,7 +39,8 @@ import DefaultEventDispatcher, {
   DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
   newDefaultEventDispatcher,
 } from './events/default-event-dispatcher';
-import EventDispatcher, { Event } from './events/event-dispatcher';
+import Event from './events/event';
+import EventDispatcher from './events/event-dispatcher';
 import NamedEventQueue from './events/named-event-queue';
 import NetworkStatusListener from './events/network-status-listener';
 import HttpClient from './http-client';

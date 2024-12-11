@@ -1,6 +1,6 @@
 import ArrayBackedNamedEventQueue from './array-backed-named-event-queue';
 import BatchEventProcessor from './batch-event-processor';
-import { Event } from './event-dispatcher';
+import Event from './event';
 
 describe('BatchEventProcessor', () => {
   describe('nextBatch', () => {

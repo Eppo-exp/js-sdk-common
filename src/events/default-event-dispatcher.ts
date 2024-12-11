@@ -2,8 +2,9 @@ import { logger } from '../application-logger';
 
 import BatchEventProcessor from './batch-event-processor';
 import BatchRetryManager from './batch-retry-manager';
+import Event from './event';
 import EventDelivery from './event-delivery';
-import EventDispatcher, { Event } from './event-dispatcher';
+import EventDispatcher from './event-dispatcher';
 import NamedEventQueue from './named-event-queue';
 import NetworkStatusListener from './network-status-listener';
 import NoOpEventDispatcher from './no-op-event-dispatcher';
@@ -93,7 +94,7 @@ export default class DefaultEventDispatcher implements EventDispatcher {
       return;
     }
 
-    const success = await this.eventDelivery.deliver(batch);
+    const { success } = await this.eventDelivery.deliver(batch);
     if (!success) {
       logger.warn('[EventDispatcher] Failed to deliver batch, retrying...');
       const retrySucceeded = await this.retryManager.retry(batch);

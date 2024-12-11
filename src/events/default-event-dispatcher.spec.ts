@@ -4,7 +4,7 @@ import DefaultEventDispatcher, {
   EventDispatcherConfig,
   newDefaultEventDispatcher,
 } from './default-event-dispatcher';
-import { Event } from './event-dispatcher';
+import Event from './event';
 import NetworkStatusListener from './network-status-listener';
 import NoOpEventDispatcher from './no-op-event-dispatcher';
 
