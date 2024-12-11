@@ -10,6 +10,8 @@ import NoOpEventDispatcher from './no-op-event-dispatcher';
 import SdkKeyDecoder from './sdk-key-decoder';
 
 export type EventDispatcherConfig = {
+  // The Eppo SDK key
+  sdkKey: string;
   // target url to deliver events to
   ingestionUrl: string;
   // number of milliseconds to wait between each batch delivery
@@ -25,7 +27,10 @@ export type EventDispatcherConfig = {
 // TODO: Have more realistic default batch size based on average event payload size once we have
 //  more concrete data.
 export const DEFAULT_EVENT_DISPATCHER_BATCH_SIZE = 100;
-export const DEFAULT_EVENT_DISPATCHER_CONFIG: Omit<EventDispatcherConfig, 'ingestionUrl'> = {
+export const DEFAULT_EVENT_DISPATCHER_CONFIG: Omit<
+  EventDispatcherConfig,
+  'ingestionUrl' | 'sdkKey'
+> = {
   deliveryIntervalMs: 10_000,
   retryIntervalMs: 5_000,
   maxRetryDelayMs: 30_000,
@@ -51,11 +56,12 @@ export default class DefaultEventDispatcher implements EventDispatcher {
     config: EventDispatcherConfig,
   ) {
     this.ensureConfigFields(config);
-    this.eventDelivery = new EventDelivery(config.ingestionUrl);
+    const { sdkKey, ingestionUrl, retryIntervalMs, maxRetryDelayMs, maxRetries = 3 } = config;
+    this.eventDelivery = new EventDelivery(sdkKey, ingestionUrl);
     this.retryManager = new BatchRetryManager(this.eventDelivery, {
-      retryIntervalMs: config.retryIntervalMs,
-      maxRetryDelayMs: config.maxRetryDelayMs,
-      maxRetries: config.maxRetries || 3,
+      retryIntervalMs,
+      maxRetryDelayMs,
+      maxRetries,
     });
     this.deliveryIntervalMs = config.deliveryIntervalMs;
     this.networkStatusListener.onNetworkStatusChange((isOffline) => {
@@ -134,7 +140,7 @@ export function newDefaultEventDispatcher(
   networkStatusListener: NetworkStatusListener,
   sdkKey: string,
   batchSize: number = DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
-  config: Omit<EventDispatcherConfig, 'ingestionUrl'> = DEFAULT_EVENT_DISPATCHER_CONFIG,
+  config: Omit<EventDispatcherConfig, 'ingestionUrl' | 'sdkKey'> = DEFAULT_EVENT_DISPATCHER_CONFIG,
 ): EventDispatcher {
   const sdkKeyDecoder = new SdkKeyDecoder();
   const ingestionUrl = sdkKeyDecoder.decodeEventIngestionUrl(sdkKey);
@@ -147,6 +153,6 @@ export function newDefaultEventDispatcher(
   return new DefaultEventDispatcher(
     new BatchEventProcessor(eventQueue, batchSize),
     networkStatusListener,
-    { ...config, ingestionUrl },
+    { ...config, ingestionUrl, sdkKey },
   );
 }
