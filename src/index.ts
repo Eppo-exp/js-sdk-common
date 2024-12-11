@@ -23,6 +23,7 @@ import EppoClient, {
 import EppoPrecomputedClient, {
   PrecomputedFlagsRequestParameters,
 } from './client/eppo-precomputed-client';
+import { ConfigurationWire } from './configuration';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -44,6 +45,7 @@ import NamedEventQueue from './events/named-event-queue';
 import NetworkStatusListener from './events/network-status-listener';
 import HttpClient from './http-client';
 import { PrecomputedFlag, Flag, ObfuscatedFlag, VariationType } from './interfaces';
+import { setSaltOverrideForTests } from './obfuscation';
 import {
   AttributeType,
   Attributes,
@@ -114,4 +116,8 @@ export {
   NetworkStatusListener,
   DefaultEventDispatcher,
   Event,
+  setSaltOverrideForTests,
+
+  // Configuration interchange.
+  ConfigurationWire,
 };
