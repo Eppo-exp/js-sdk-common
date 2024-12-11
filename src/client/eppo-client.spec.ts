@@ -13,6 +13,7 @@ import {
   validateTestAssignments,
 } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
+import { IConfigurationWire } from '../configuration';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
@@ -23,7 +24,6 @@ import { AttributeType } from '../types';
 
 import EppoClient, { FlagConfigurationRequestParameters, checkTypeMatch } from './eppo-client';
 import { initConfiguration } from './test-utils';
-import { IConfigurationWire } from '../configuration';
 
 describe('EppoClient E2E test', () => {
   global.fetch = jest.fn(() => {
@@ -265,9 +265,6 @@ describe('EppoClient E2E test', () => {
       const precomputedFlags = precomputedResponse?.flags ?? {};
       expect(Object.keys(precomputedFlags)).toContain('ddc24ede545855b9bbae82cfec6a83a1'); // flagKey, md5 hashed
       expect(Object.keys(precomputedFlags)).toContain('2b439e5a0104d62400dc44c34230f6f2'); // 'anotherFlag', md5 hashed
-
-      const firstFlag = precomputedFlags['ddc24ede545855b9bbae82cfec6a83a1'];
-      const secondFlag = precomputedFlags['2b439e5a0104d62400dc44c34230f6f2'];
 
       const decodedFirstFlag = decodePrecomputedFlag(
         precomputedFlags['ddc24ede545855b9bbae82cfec6a83a1'],
