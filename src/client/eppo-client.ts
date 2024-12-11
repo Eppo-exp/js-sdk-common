@@ -40,7 +40,7 @@ import {
   BanditParameters,
   BanditVariation,
   ConfigDetails,
-  Flag,
+  Flag, IPrecomputedBandit,
   ObfuscatedFlag,
   PrecomputedFlag,
   Variation,
@@ -944,17 +944,60 @@ export default class EppoClient {
   ): string {
     const configDetails = this.getConfigDetails();
     const flags = this.getAllAssignments(subjectKey, subjectAttributes);
+    const bandits = {};
 
     const precomputedConfig: IPrecomputedConfiguration = obfuscated
       ? new ObfuscatedPrecomputedConfiguration(
           subjectKey,
           flags,
+          bandits,
           subjectAttributes,
           configDetails.configEnvironment,
         )
       : new PrecomputedConfiguration(
           subjectKey,
           flags,
+          bandits,
+          subjectAttributes,
+          configDetails.configEnvironment,
+        );
+
+    const configWire: IConfigurationWire = new ConfigurationWireV1(precomputedConfig);
+    return JSON.stringify(configWire);
+  }
+
+  /**
+   * Computes and returns assignments and bandits for a subject from all loaded flags.
+   *
+   * @param subjectKey an identifier of the experiment subject, for example a user ID.
+   * @param subjectAttributes optional attributes associated with the subject, for example name and email.
+   * @param obfuscated optional whether to obfuscate the results.
+   */
+  getPrecomputedConfiguration(
+    subjectKey: string,
+    subjectAttributes: Attributes | ContextAttributes = {},
+    banditActions: Record<string, ContextAttributes | Attributes>,
+    obfuscated = false,
+  ): string {
+    const configDetails = this.getConfigDetails();
+    const nonContextualSubjectAttributes =
+      this.ensureNonContextualSubjectAttributes(subjectAttributes);
+
+    const flags = this.getAllAssignments(subjectKey, nonContextualSubjectAttributes);
+    const bandits = this.getAllBandits(subjectKey, subjectAttributes, banditActions);
+
+    const precomputedConfig: IPrecomputedConfiguration = obfuscated
+      ? new ObfuscatedPrecomputedConfiguration(
+          subjectKey,
+          flags,
+          bandits,
+          subjectAttributes,
+          configDetails.configEnvironment,
+        )
+      : new PrecomputedConfiguration(
+          subjectKey,
+          flags,
+          bandits,
           subjectAttributes,
           configDetails.configEnvironment,
         );
@@ -1263,6 +1306,39 @@ export default class EppoClient {
       sdkLanguage: 'javascript',
       sdkLibVersion: LIB_VERSION,
     };
+  }
+
+  private getAllBandits(subjectKey: string, subjectAttributes: Attributes | ContextAttributes, banditActions: Record<string, ContextAttributes | Attributes>, flags: Record<string, PrecomputedFlag>) {
+    const configDetails = this.getConfigDetails();
+    const bandits: Record<string, IPrecomputedBandit> = {};
+
+    const nonContextualSubjectAttributes =
+      this.ensureNonContextualSubjectAttributes(subjectAttributes);
+
+    // Computing Bandits
+    // The first case is easy: a flag resolves to a bandit-key for this subject; compute that bandit.
+    // The second case is more involved: the flag resolves to null. On the client side, the user can now enter a bandit
+    // key as the `default` variation, so we need have every bandit referenced by this flag computed and available.
+
+    const banditsToCompute = new Set<string>();
+
+    Object.keys(banditActions).forEach((flagKey: string) => {
+      const banditVariations = this.banditVariationConfigurationStore?.get(flagKey);
+
+
+      // First, check how the flag evaluated.
+      const flagResult = flags[flagKey];
+      if (flagResult !== null) {
+        // First case: flag resolved to a value, check if it's a bandit and compute it.
+        // const banditKey = banditVariations?.find(
+        //   (banditVariation) => banditVariation.variationValue === variation,
+        // )?.key;
+
+      } else {
+        // Second case; compute all the bandits referenced by this flag.
+        this.band
+      }
+    })
   }
 }
 

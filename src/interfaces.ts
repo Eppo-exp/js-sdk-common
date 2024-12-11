@@ -153,6 +153,17 @@ export interface PrecomputedFlag {
   doLog: boolean;
 }
 
+export interface IPrecomputedBandit {
+  action: string | null;
+  variation: string;
+  actionProbability: number;
+  optimalityGap: number;
+  modelVersion: string;
+  actionNumericAttributes: Attributes;
+  actionCategoricalAttributes: Attributes;
+  extraLogging: Record<string, string>;
+}
+
 export interface PrecomputedFlagsDetails {
   precomputedFlagsFetchedAt: string;
   precomputedFlagsPublishedAt: string;

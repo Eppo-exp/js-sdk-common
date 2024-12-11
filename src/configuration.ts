@@ -1,5 +1,10 @@
-import { Environment, FormatEnum, PrecomputedFlag } from './interfaces';
-import { generateSalt, obfuscatePrecomputedFlags, Salt } from './obfuscation';
+import { Environment, FormatEnum, IPrecomputedBandit, PrecomputedFlag } from './interfaces';
+import {
+  generateSalt,
+  obfuscatedPrecomputedBandits,
+  obfuscatePrecomputedFlags,
+  Salt,
+} from './obfuscation';
 import { Attributes, ContextAttributes } from './types';
 
 export interface IPrecomputedConfigurationResponse {
@@ -12,6 +17,7 @@ export interface IPrecomputedConfigurationResponse {
   // Environment might be missing if configuration was absent during evaluation.
   readonly environment?: Environment;
   readonly flags: Record<string, PrecomputedFlag>;
+  bandits: Record<string, IPrecomputedBandit>;
 }
 
 export interface IPrecomputedConfiguration {
@@ -29,6 +35,7 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
   constructor(
     readonly subjectKey: string,
     flags: Record<string, PrecomputedFlag>,
+    bandits: Record<string, IPrecomputedBandit>,
     readonly subjectAttributes?: Attributes | ContextAttributes,
     environment?: Environment,
   ) {
@@ -39,6 +46,7 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
       createdAt: new Date().toISOString(),
       environment,
       flags,
+      bandits,
     };
     this.response = JSON.stringify(precomputedResponse);
   }
@@ -52,6 +60,7 @@ export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfigura
   constructor(
     readonly subjectKey: string,
     flags: Record<string, PrecomputedFlag>,
+    bandits: Record<string, IPrecomputedBandit>,
     readonly subjectAttributes?: Attributes | ContextAttributes,
     environment?: Environment,
   ) {
@@ -64,6 +73,7 @@ export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfigura
       createdAt: new Date().toISOString(),
       environment,
       flags: obfuscatePrecomputedFlags(this.saltBase.saltString, flags),
+      bandits: obfuscatedPrecomputedBandits(this.saltBase.saltString, bandits),
     };
     this.response = JSON.stringify(precomputedResponse);
   }

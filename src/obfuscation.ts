@@ -1,7 +1,7 @@
 import base64 = require('js-base64');
 import * as SparkMD5 from 'spark-md5';
 
-import { PrecomputedFlag } from './interfaces';
+import { IPrecomputedBandit, PrecomputedFlag } from './interfaces';
 
 export function getMD5Hash(input: string): string {
   return SparkMD5.hash(input);
@@ -17,6 +17,13 @@ export function encodeBase64(input: string) {
 
 export function decodeBase64(input: string) {
   return base64.atobPolyfill(input);
+}
+
+export function obfuscatedPrecomputedBandits(
+  salt: string,
+  precomputedFlags: Record<string, IPrecomputedBandit>,
+): Record<string, IPrecomputedBandit> {
+  return {};
 }
 
 export function obfuscatePrecomputedFlags(
