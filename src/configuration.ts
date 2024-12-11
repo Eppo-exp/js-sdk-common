@@ -17,7 +17,7 @@ export interface IPrecomputedConfigurationResponse {
   // Environment might be missing if configuration was absent during evaluation.
   readonly environment?: Environment;
   readonly flags: Record<string, PrecomputedFlag>;
-  bandits: Record<string, IPrecomputedBandit>;
+  bandits: Record<string, Record<string, IPrecomputedBandit>>;
 }
 
 export interface IPrecomputedConfiguration {
@@ -35,7 +35,7 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
   constructor(
     readonly subjectKey: string,
     flags: Record<string, PrecomputedFlag>,
-    bandits: Record<string, IPrecomputedBandit>,
+    bandits: Record<string, Record<string, IPrecomputedBandit>>,
     readonly subjectAttributes?: Attributes | ContextAttributes,
     environment?: Environment,
   ) {
@@ -60,11 +60,21 @@ export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfigura
   constructor(
     readonly subjectKey: string,
     flags: Record<string, PrecomputedFlag>,
-    bandits: Record<string, IPrecomputedBandit>,
+    bandits: Record<string, Record<string, IPrecomputedBandit>>,
     readonly subjectAttributes?: Attributes | ContextAttributes,
     environment?: Environment,
   ) {
     this.saltBase = generateSalt();
+
+    const obfuscatedBandits = Object.fromEntries(
+      Object.entries(bandits).map((entry) => {
+        const flagKey = entry[0];
+        const bandits = entry[1];
+        const obfuscatedBandits = obfuscatedPrecomputedBandits(this.saltBase.saltString, bandits);
+
+        return [flagKey, obfuscatedBandits];
+      }),
+    );
 
     const precomputedResponse: IPrecomputedConfigurationResponse = {
       format: FormatEnum.PRECOMPUTED,
@@ -73,7 +83,7 @@ export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfigura
       createdAt: new Date().toISOString(),
       environment,
       flags: obfuscatePrecomputedFlags(this.saltBase.saltString, flags),
-      bandits: obfuscatedPrecomputedBandits(this.saltBase.saltString, bandits),
+      bandits: obfuscatedBandits,
     };
     this.response = JSON.stringify(precomputedResponse);
   }
