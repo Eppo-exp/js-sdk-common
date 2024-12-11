@@ -4,7 +4,7 @@ import DefaultEventDispatcher, {
   EventDispatcherConfig,
   newDefaultEventDispatcher,
 } from './default-event-dispatcher';
-import { Event } from './event-dispatcher';
+import Event from './event';
 import NetworkStatusListener from './network-status-listener';
 import NoOpEventDispatcher from './no-op-event-dispatcher';
 
@@ -100,7 +100,7 @@ describe('DefaultEventDispatcher', () => {
       });
 
       const fetch = global.fetch as jest.Mock;
-      fetch.mockResolvedValue({ ok: true });
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -207,7 +207,7 @@ describe('DefaultEventDispatcher', () => {
       });
 
       const fetch = global.fetch as jest.Mock;
-      fetch.mockResolvedValue({ ok: true });
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
 
       isOffline = true;
       // simulate the network going offline
@@ -242,7 +242,7 @@ describe('DefaultEventDispatcher', () => {
       // Simulate fetch failure on the first attempt
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce({ ok: false }) // First attempt fails
-        .mockResolvedValueOnce({ ok: true }); // Second attempt succeeds
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) }); // Second attempt succeeds
 
       // Fast-forward to trigger the first attempt
       await new Promise((resolve) => setTimeout(resolve, 100));

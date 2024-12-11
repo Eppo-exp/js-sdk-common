@@ -1,9 +1,4 @@
-export type Event = {
-  uuid: string;
-  timestamp: number;
-  type: string;
-  payload: Record<string, unknown>;
-};
+import Event from './event';
 
 export default interface EventDispatcher {
   /** Dispatches (enqueues) an event for eventual delivery. */

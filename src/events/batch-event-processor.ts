@@ -1,4 +1,4 @@
-import { Event } from './event-dispatcher';
+import Event from './event';
 import NamedEventQueue from './named-event-queue';
 
 export default class BatchEventProcessor {
