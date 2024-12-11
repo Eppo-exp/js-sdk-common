@@ -28,6 +28,7 @@ const createDispatcher = (
     retryIntervalMs: 300,
     maxRetryDelayMs: 5000,
     maxRetries: 3,
+    sdkKey: 'test-sdk-key',
   };
   const config = { ...defaultConfig, ...configOverrides };
   const batchProcessor = new BatchEventProcessor(eventQueue, batchSize);
@@ -107,16 +108,18 @@ describe('DefaultEventDispatcher', () => {
         'http://example.com',
         expect.objectContaining({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-eppo-token': 'test-sdk-key' },
         }),
       );
 
       let fetchOptions = fetch.mock.calls[0][1];
       let payload = JSON.parse(fetchOptions.body);
-      expect(payload).toEqual([
-        expect.objectContaining({ payload: { foo: 'event1' } }),
-        expect.objectContaining({ payload: { foo: 'event2' } }),
-      ]);
+      expect(payload).toEqual({
+        eppo_events: [
+          expect.objectContaining({ payload: { foo: 'event1' } }),
+          expect.objectContaining({ payload: { foo: 'event2' } }),
+        ],
+      });
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -124,13 +127,15 @@ describe('DefaultEventDispatcher', () => {
         'http://example.com',
         expect.objectContaining({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-eppo-token': 'test-sdk-key' },
         }),
       );
 
       fetchOptions = fetch.mock.calls[1][1];
       payload = JSON.parse(fetchOptions.body);
-      expect(payload).toEqual([expect.objectContaining({ payload: { foo: 'event3' } })]);
+      expect(payload).toEqual({
+        eppo_events: [expect.objectContaining({ payload: { foo: 'event3' } })],
+      });
     });
 
     it('does not schedule delivery if the queue is empty', async () => {
