@@ -144,7 +144,7 @@ export enum FormatEnum {
 }
 
 export interface PrecomputedFlag {
-  flagKey: string;
+  flagKey?: string;
   allocationKey: string;
   variationKey: string;
   variationType: VariationType;
