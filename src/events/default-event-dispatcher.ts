@@ -25,9 +25,7 @@ export type EventDispatcherConfig = {
   maxRetries?: number;
 };
 
-// TODO: Have more realistic default batch size based on average event payload size once we have
-//  more concrete data.
-export const DEFAULT_EVENT_DISPATCHER_BATCH_SIZE = 100;
+export const DEFAULT_EVENT_DISPATCHER_BATCH_SIZE = 1_000;
 export const DEFAULT_EVENT_DISPATCHER_CONFIG: Omit<
   EventDispatcherConfig,
   'ingestionUrl' | 'sdkKey'
