@@ -1,4 +1,4 @@
-import { decodeBase64, encodeBase64 } from './obfuscation';
+import { decodeBase64, encodeBase64, Salt } from './obfuscation';
 
 describe('obfuscation', () => {
   it('encodes strings to base64', () => {
@@ -14,6 +14,16 @@ describe('obfuscation', () => {
 
     regexes.forEach((regex) => {
       expect(decodeBase64(encodeBase64(regex))).toEqual(regex);
+    });
+  });
+
+  describe('salt', () => {
+    it('converts from bytes to string and base64 string', () => {
+      const chars = new Uint8Array([101, 112, 112, 111]); // eppo
+      const eppoSalt = new Salt(chars);
+
+      expect(eppoSalt.saltString).toEqual('eppo');
+      expect(eppoSalt.base64String).toEqual('ZXBwbw==');
     });
   });
 });
