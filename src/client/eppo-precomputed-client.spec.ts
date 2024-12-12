@@ -1,5 +1,9 @@
 import * as td from 'testdouble';
 
+import {
+  MOCK_PRECOMPUTED_RESPONSE_FILE,
+  readMockPrecomputedResponse,
+} from '../../test/testHelpers';
 import ApiEndpoints from '../api-endpoints';
 import { IAssignmentLogger } from '../assignment-logger';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
@@ -15,61 +19,14 @@ import EppoPrecomputedClient, {
 } from './eppo-precomputed-client';
 
 describe('EppoPrecomputedClient E2E test', () => {
-  const precomputedFlags = {
-    createdAt: '2024-11-18T14:23:39.456Z',
-    format: 'PRECOMPUTED',
-    environment: {
-      name: 'Test',
-    },
-    flags: {
-      'string-flag': {
-        allocationKey: 'allocation-123',
-        variationKey: 'variation-123',
-        variationType: 'STRING',
-        variationValue: 'red',
-        extraLogging: {},
-        doLog: true,
-      },
-      'boolean-flag': {
-        allocationKey: 'allocation-124',
-        variationKey: 'variation-124',
-        variationType: 'BOOLEAN',
-        variationValue: true,
-        extraLogging: {},
-        doLog: true,
-      },
-      'integer-flag': {
-        allocationKey: 'allocation-125',
-        variationKey: 'variation-125',
-        variationType: 'INTEGER',
-        variationValue: 42,
-        extraLogging: {},
-        doLog: true,
-      },
-      'numeric-flag': {
-        allocationKey: 'allocation-126',
-        variationKey: 'variation-126',
-        variationType: 'NUMERIC',
-        variationValue: 3.14,
-        extraLogging: {},
-        doLog: true,
-      },
-      'json-flag': {
-        allocationKey: 'allocation-127',
-        variationKey: 'variation-127',
-        variationType: 'JSON',
-        variationValue: '{"key": "value", "number": 123}',
-        extraLogging: {},
-        doLog: true,
-      },
-    },
-  }; // TODO: readMockPrecomputedFlagsResponse(MOCK_PRECOMPUTED_FLAGS_RESPONSE_FILE);
+  const precomputedConfigurationWire = readMockPrecomputedResponse(MOCK_PRECOMPUTED_RESPONSE_FILE);
+  const precomputedResponse = JSON.parse(precomputedConfigurationWire).precomputed.response;
 
   global.fetch = jest.fn(() => {
     return Promise.resolve({
       ok: true,
       status: 200,
-      json: () => Promise.resolve(precomputedFlags),
+      json: () => Promise.resolve(precomputedResponse),
     });
   }) as jest.Mock;
   const storage = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
@@ -382,7 +339,7 @@ describe('EppoPrecomputedClient E2E test', () => {
         return Promise.resolve({
           ok: true,
           status: 200,
-          json: () => Promise.resolve(precomputedFlags),
+          json: () => Promise.resolve(precomputedResponse),
         });
       }) as jest.Mock;
     });
@@ -570,7 +527,7 @@ describe('EppoPrecomputedClient E2E test', () => {
             ok: true,
             status: 200,
             json: () => {
-              return precomputedFlags;
+              return precomputedResponse;
             },
           });
         }
@@ -629,7 +586,7 @@ describe('EppoPrecomputedClient E2E test', () => {
           return Promise.resolve({
             ok: true,
             status: 200,
-            json: () => Promise.resolve(precomputedFlags),
+            json: () => Promise.resolve(precomputedResponse),
           } as Response);
         }
       });

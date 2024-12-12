@@ -27,7 +27,7 @@ help: Makefile
 testDataDir := test/data/
 tempDir := ${testDataDir}temp/
 gitDataDir := ${tempDir}sdk-test-data/
-branchName := main
+branchName := sameeran/ff-3687-obfuscated-precomputed-json
 githubRepoLink := https://github.com/Eppo-exp/sdk-test-data.git
 repoName := sdk-test-data
 .PHONY: test-data
@@ -36,6 +36,7 @@ test-data:
 	mkdir -p $(tempDir)
 	git clone -b ${branchName} --depth 1 --single-branch ${githubRepoLink} ${gitDataDir}
 	cp -r ${gitDataDir}ufc ${testDataDir}
+	cp -r ${gitDataDir}configuration-wire ${testDataDir}
 	rm -rf ${tempDir}
 
 ## prepare
