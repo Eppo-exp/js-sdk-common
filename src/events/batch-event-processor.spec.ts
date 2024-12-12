@@ -8,6 +8,7 @@ describe('BatchEventProcessor', () => {
       const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
       const processor = new BatchEventProcessor(eventQueue, 2);
       // force batch size to 2 for testing
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
       processor['batchSize'] = 2;
       expect(processor.isEmpty()).toBeTruthy();
