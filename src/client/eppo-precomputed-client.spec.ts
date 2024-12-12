@@ -1,7 +1,7 @@
 import * as td from 'testdouble';
 
 import {
-  MOCK_PRECOMPUTED_RESPONSE_FILE,
+  OBFUSCATED_MOCK_PRECOMPUTED_RESPONSE_FILE,
   readMockPrecomputedResponse,
 } from '../../test/testHelpers';
 import ApiEndpoints from '../api-endpoints';
@@ -19,8 +19,12 @@ import EppoPrecomputedClient, {
 } from './eppo-precomputed-client';
 
 describe('EppoPrecomputedClient E2E test', () => {
-  const precomputedConfigurationWire = readMockPrecomputedResponse(MOCK_PRECOMPUTED_RESPONSE_FILE);
-  const precomputedResponse = JSON.parse(precomputedConfigurationWire).precomputed.response;
+  const precomputedConfigurationWire = readMockPrecomputedResponse(
+    OBFUSCATED_MOCK_PRECOMPUTED_RESPONSE_FILE,
+  );
+  const precomputedResponse = JSON.parse(
+    JSON.parse(precomputedConfigurationWire).precomputed.response,
+  );
 
   global.fetch = jest.fn(() => {
     return Promise.resolve({
@@ -388,7 +392,7 @@ describe('EppoPrecomputedClient E2E test', () => {
     });
 
     it('Fetches initial configuration with parameters in constructor', async () => {
-      client = new EppoPrecomputedClient(precomputedFlagStore);
+      client = new EppoPrecomputedClient(precomputedFlagStore, true);
       client.setSubjectAndPrecomputedFlagsRequestParameters(requestParameters);
       // no configuration loaded
       let variation = client.getStringAssignment(precomputedFlagKey, 'default');
@@ -466,7 +470,7 @@ describe('EppoPrecomputedClient E2E test', () => {
       let client: EppoPrecomputedClient;
 
       beforeEach(async () => {
-        client = new EppoPrecomputedClient(storage);
+        client = new EppoPrecomputedClient(storage, true);
         client.setSubjectAndPrecomputedFlagsRequestParameters(requestParameters);
         await client.fetchPrecomputedFlags();
       });
@@ -659,7 +663,7 @@ describe('EppoPrecomputedClient E2E test', () => {
   it('logs variation assignment with format from precomputed flags response', () => {
     const mockLogger = td.object<IAssignmentLogger>();
     storage.setEntries({ [precomputedFlagKey]: mockPrecomputedFlag });
-    const client = new EppoPrecomputedClient(storage);
+    const client = new EppoPrecomputedClient(storage, true);
     client.setAssignmentLogger(mockLogger);
 
     client.getStringAssignment(precomputedFlagKey, 'default');
