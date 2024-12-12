@@ -19,7 +19,7 @@ import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.stor
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
-import { generateSalt, setSaltOverrideForTests } from '../obfuscation';
+import { setSaltOverrideForTests } from '../obfuscation';
 import { AttributeType } from '../types';
 
 import EppoClient, { FlagConfigurationRequestParameters, checkTypeMatch } from './eppo-client';
