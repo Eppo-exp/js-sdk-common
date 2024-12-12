@@ -247,12 +247,6 @@ describe('EppoClient E2E test', () => {
     it('obfuscates assignments', () => {
       // Use a known salt to produce deterministic hashes
       setSaltOverrideForTests(new Uint8Array([7, 53, 17, 78]));
-      // {
-      //   base64String: 'BzURTg==',
-      //   saltString: '0735114e',
-      //   bytes: new Uint8Array([7, 53, 17, 78]),
-      // });
-      console.log(generateSalt());
 
       const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {}, true);
       const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
