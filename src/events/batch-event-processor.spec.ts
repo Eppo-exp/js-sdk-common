@@ -24,4 +24,23 @@ describe('BatchEventProcessor', () => {
       expect(processor.isEmpty()).toBeTruthy();
     });
   });
+
+  describe('batchSize', () => {
+    const queue = new ArrayBackedNamedEventQueue<Event>('test-queue');
+
+    it('should clamp batch size to min', () => {
+      const processor = new BatchEventProcessor(queue, 2);
+      expect(processor['batchSize']).toBe(100);
+    });
+
+    it('should clamp batch size to max', () => {
+      const processor = new BatchEventProcessor(queue, 100_000_000);
+      expect(processor['batchSize']).toBe(10_000);
+    });
+
+    it('should set batch size if within bounds', () => {
+      const processor = new BatchEventProcessor(queue, 1_000);
+      expect(processor['batchSize']).toBe(1_000);
+    });
+  });
 });
