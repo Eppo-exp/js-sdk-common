@@ -1,6 +1,6 @@
 import { Environment, FormatEnum, PrecomputedFlag } from './interfaces';
 import { generateSalt, obfuscatePrecomputedFlags, ISalt } from './obfuscation';
-import { Attributes, ContextAttributes } from './types';
+import { ContextAttributes } from './types';
 
 export interface IPrecomputedConfigurationResponse {
   // `format` is always `PRECOMPUTED`
@@ -19,7 +19,7 @@ export interface IPrecomputedConfiguration {
   readonly response: string;
   readonly subjectKey: string;
   // Optional in case server does not want to expose attributes to a client.
-  readonly subjectAttributes?: Attributes | ContextAttributes;
+  readonly subjectAttributes?: ContextAttributes;
 }
 
 export class PrecomputedConfiguration implements IPrecomputedConfiguration {
@@ -29,7 +29,7 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
   constructor(
     readonly subjectKey: string,
     flags: Record<string, PrecomputedFlag>,
-    readonly subjectAttributes?: Attributes | ContextAttributes,
+    readonly subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ) {
     const precomputedResponse: IPrecomputedConfigurationResponse = {
@@ -52,7 +52,7 @@ export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfigura
   constructor(
     readonly subjectKey: string,
     flags: Record<string, PrecomputedFlag>,
-    readonly subjectAttributes?: Attributes | ContextAttributes,
+    readonly subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ) {
     this.saltBase = generateSalt();

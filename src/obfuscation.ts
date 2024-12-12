@@ -49,7 +49,7 @@ export interface ISalt {
   bytes: Uint8Array;
 }
 
-class Salt implements ISalt {
+export class Salt implements ISalt {
   public readonly saltString: string;
   public readonly base64String: string;
   constructor(public readonly bytes: Uint8Array) {
