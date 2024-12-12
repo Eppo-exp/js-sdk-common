@@ -3,12 +3,8 @@ import * as SparkMD5 from 'spark-md5';
 
 import { PrecomputedFlag } from './interfaces';
 
-export function getMD5Hash(input: string, salt: string | null = null): string {
-  const md5 = new SparkMD5();
-  if (salt) {
-    md5.append(salt);
-  }
-  return md5.append(input).end();
+export function getMD5Hash(input: string, salt = ''): string {
+  return new SparkMD5().append(salt).append(input).end();
 }
 
 export function encodeBase64(input: string) {
