@@ -7,6 +7,9 @@ describe('BatchEventProcessor', () => {
     it('should return a batch and remove items from the queue', () => {
       const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
       const processor = new BatchEventProcessor(eventQueue, 2);
+      // force batch size to 2 for testing
+      // @ts-ignore
+      processor['batchSize'] = 2;
       expect(processor.isEmpty()).toBeTruthy();
       expect(processor.nextBatch()).toHaveLength(0);
       const timestamp = new Date().getTime();

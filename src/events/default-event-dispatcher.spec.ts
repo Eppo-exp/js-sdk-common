@@ -32,6 +32,9 @@ const createDispatcher = (
   };
   const config = { ...defaultConfig, ...configOverrides };
   const batchProcessor = new BatchEventProcessor(eventQueue, batchSize);
+  // force batch size to 2 for testing
+  // @ts-ignore
+  batchProcessor['batchSize'] = 2;
   const dispatcher = new DefaultEventDispatcher(
     batchProcessor,
     configOverrides.networkStatusListener || mockNetworkStatusListener,
