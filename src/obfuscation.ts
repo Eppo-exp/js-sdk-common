@@ -7,7 +7,7 @@ export function getMD5Hash(input: string): string {
   return SparkMD5.hash(input);
 }
 
-function saltedHasher(salt: string) {
+export function saltedHasher(salt: string) {
   return (input: string) => getMD5Hash(salt + input);
 }
 
