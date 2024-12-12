@@ -23,6 +23,7 @@ import EppoClient, {
 import EppoPrecomputedClient, {
   PrecomputedFlagsRequestParameters,
 } from './client/eppo-precomputed-client';
+import { IConfigurationWire, IPrecomputedConfigurationResponse } from './configuration';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -39,7 +40,7 @@ import DefaultEventDispatcher, {
   DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
   newDefaultEventDispatcher,
 } from './events/default-event-dispatcher';
-import EventDispatcher from './events/event-dispatcher';
+import EventDispatcher, { Event } from './events/event-dispatcher';
 import NamedEventQueue from './events/named-event-queue';
 import NetworkStatusListener from './events/network-status-listener';
 import HttpClient from './http-client';
@@ -63,13 +64,15 @@ export {
   IBanditLogger,
   IBanditEvent,
   IContainerExperiment,
-  PrecomputedFlagsRequestParameters,
   EppoClient,
   constants,
   ApiEndpoints,
   FlagConfigRequestor,
   HttpClient,
   validation,
+
+  // Precomputed Client
+  PrecomputedFlagsRequestParameters,
   EppoPrecomputedClient,
 
   // Configuration store
@@ -95,7 +98,6 @@ export {
   FlagConfigurationRequestParameters,
   Flag,
   ObfuscatedFlag,
-  PrecomputedFlag,
   VariationType,
   AttributeType,
   Attributes,
@@ -113,4 +115,10 @@ export {
   BatchEventProcessor,
   NetworkStatusListener,
   DefaultEventDispatcher,
+  Event,
+
+  // Configuration interchange.
+  IConfigurationWire,
+  IPrecomputedConfigurationResponse,
+  PrecomputedFlag,
 };

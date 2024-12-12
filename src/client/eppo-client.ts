@@ -9,6 +9,13 @@ import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
+import {
+  IConfigurationWire,
+  ConfigurationWireV1,
+  IPrecomputedConfiguration,
+  ObfuscatedPrecomputedConfiguration,
+  PrecomputedConfiguration,
+} from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import {
@@ -35,6 +42,7 @@ import {
   ConfigDetails,
   Flag,
   ObfuscatedFlag,
+  PrecomputedFlag,
   Variation,
   VariationType,
 } from '../interfaces';
@@ -876,6 +884,85 @@ export default class EppoClient {
     throw err;
   }
 
+  private getAllAssignments(
+    subjectKey: string,
+    subjectAttributes: Attributes = {},
+  ): Record<string, PrecomputedFlag> {
+    const configDetails = this.getConfigDetails();
+    const flagKeys = this.getFlagKeys();
+    const flags: Record<string, PrecomputedFlag> = {};
+
+    // Evaluate all the enabled flags for the user
+    flagKeys.forEach((flagKey) => {
+      const flag = this.getFlag(flagKey);
+      if (!flag) {
+        logger.debug(`[Eppo SDK] No assigned variation. Flag does not exist.`);
+        return;
+      }
+
+      // Evaluate the flag for this subject.
+      const evaluation = this.evaluator.evaluateFlag(
+        flag,
+        configDetails,
+        subjectKey,
+        subjectAttributes,
+        this.isObfuscated,
+      );
+
+      // allocationKey is set along with variation when there is a result. this check appeases typescript below
+      if (!evaluation.variation || !evaluation.allocationKey) {
+        logger.debug(`[Eppo SDK] No assigned variation: ${flagKey}`);
+        return;
+      }
+
+      // Transform into a PrecomputedFlag
+      flags[flagKey] = {
+        flagKey,
+        allocationKey: evaluation.allocationKey,
+        doLog: evaluation.doLog,
+        extraLogging: evaluation.extraLogging,
+        variationKey: evaluation.variation.key,
+        variationType: flag.variationType,
+        variationValue: evaluation.variation.value.toString(),
+      };
+    });
+
+    return flags;
+  }
+
+  /**
+   * Computes and returns assignments for a subject from all loaded flags.
+   *
+   * @param subjectKey an identifier of the experiment subject, for example a user ID.
+   * @param subjectAttributes optional attributes associated with the subject, for example name and email.
+   * @param obfuscated optional whether to obfuscate the results.
+   */
+  getPrecomputedAssignments(
+    subjectKey: string,
+    subjectAttributes: Attributes = {},
+    obfuscated = false,
+  ): string {
+    const configDetails = this.getConfigDetails();
+    const flags = this.getAllAssignments(subjectKey, subjectAttributes);
+
+    const precomputedConfig: IPrecomputedConfiguration = obfuscated
+      ? new ObfuscatedPrecomputedConfiguration(
+          subjectKey,
+          flags,
+          subjectAttributes,
+          configDetails.configEnvironment,
+        )
+      : new PrecomputedConfiguration(
+          subjectKey,
+          flags,
+          subjectAttributes,
+          configDetails.configEnvironment,
+        );
+
+    const configWire: IConfigurationWire = new ConfigurationWireV1(precomputedConfig);
+    return JSON.stringify(configWire);
+  }
+
   /**
    * [Experimental] Get a detailed return of assignment for a particular subject and flag.
    *
@@ -979,12 +1066,12 @@ export default class EppoClient {
    * Enqueues an arbitrary event. Events must have a type and a payload.
    * TODO: enforce max message size
    */
-  track(type: string, event: unknown) {
+  track(type: string, payload: Record<string, unknown>) {
     this.eventDispatcher.dispatch({
       uuid: randomUUID(),
       type,
       timestamp: new Date().getTime(),
-      payload: event,
+      payload,
     });
   }
 

@@ -1,4 +1,4 @@
-import { decodeBase64, encodeBase64, getMD5HashWithSalt } from './obfuscation';
+import { decodeBase64, encodeBase64, saltedHasher } from './obfuscation';
 
 describe('obfuscation', () => {
   it('encodes strings to base64', () => {
@@ -17,13 +17,13 @@ describe('obfuscation', () => {
     });
   });
 
-  describe('getMD5HashWithSalt', () => {
+  describe('saltedHasher', () => {
     it('generates consistent hashes for same input and salt', () => {
       const input = 'test-input';
       const salt = 'test-salt';
 
-      const hash1 = getMD5HashWithSalt(input, salt);
-      const hash2 = getMD5HashWithSalt(input, salt);
+      const hash1 = saltedHasher(salt)(input);
+      const hash2 = saltedHasher(salt)(input);
 
       expect(hash1).toBe(hash2);
     });
@@ -33,8 +33,8 @@ describe('obfuscation', () => {
       const salt1 = 'salt1';
       const salt2 = 'salt2';
 
-      const hash1 = getMD5HashWithSalt(input, salt1);
-      const hash2 = getMD5HashWithSalt(input, salt2);
+      const hash1 = saltedHasher(salt1)(input);
+      const hash2 = saltedHasher(salt2)(input);
 
       expect(hash1).not.toBe(hash2);
     });
@@ -44,8 +44,8 @@ describe('obfuscation', () => {
       const input2 = 'input2';
       const salt = 'same-salt';
 
-      const hash1 = getMD5HashWithSalt(input1, salt);
-      const hash2 = getMD5HashWithSalt(input2, salt);
+      const hash1 = saltedHasher(salt)(input1);
+      const hash2 = saltedHasher(salt)(input2);
 
       expect(hash1).not.toBe(hash2);
     });
@@ -55,7 +55,7 @@ describe('obfuscation', () => {
       const salt = 'world';
       const expectedHash = '5acd1fb6f07255681a2f6187123c0d39';
 
-      const hash = getMD5HashWithSalt(input, salt);
+      const hash = saltedHasher(salt)(input);
 
       expect(hash).toBe(expectedHash);
     });

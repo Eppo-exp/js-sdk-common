@@ -2,7 +2,7 @@ export type Event = {
   uuid: string;
   timestamp: number;
   type: string;
-  payload: unknown;
+  payload: Record<string, unknown>;
 };
 
 export default interface EventDispatcher {

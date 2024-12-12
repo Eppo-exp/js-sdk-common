@@ -13,10 +13,13 @@ import {
   validateTestAssignments,
 } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
+import { IConfigurationWire } from '../configuration';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
+import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
+import { setSaltOverrideForTests } from '../obfuscation';
 import { AttributeType } from '../types';
 
 import EppoClient, { FlagConfigurationRequestParameters, checkTypeMatch } from './eppo-client';
@@ -174,6 +177,114 @@ describe('EppoClient E2E test', () => {
   describe('check type match', () => {
     it('returns false when types do not match', () => {
       expect(checkTypeMatch(VariationType.JSON, VariationType.STRING)).toBe(false);
+    });
+  });
+
+  describe('precomputed flags', () => {
+    beforeAll(() => {
+      storage.setEntries({
+        [flagKey]: mockFlag,
+        disabledFlag: { ...mockFlag, enabled: false },
+        anotherFlag: {
+          ...mockFlag,
+          allocations: [
+            {
+              key: 'allocation-b',
+              rules: [],
+              splits: [
+                {
+                  shards: [],
+                  variationKey: 'b',
+                },
+              ],
+              doLog: true,
+            },
+          ],
+        },
+      });
+    });
+
+    let client: EppoClient;
+    beforeEach(() => {
+      client = new EppoClient({ flagConfigurationStore: storage });
+    });
+
+    afterEach(() => {
+      setSaltOverrideForTests(null);
+    });
+
+    it('skips disabled flags', () => {
+      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
+      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
+      if (!precomputed) {
+        fail('Precomputed data not in Configuration response');
+      }
+      const precomputedResponse = JSON.parse(precomputed.response);
+
+      expect(precomputedResponse).toBeTruthy();
+      const precomputedFlags = precomputedResponse?.flags ?? {};
+      expect(Object.keys(precomputedFlags)).toContain('anotherFlag');
+      expect(Object.keys(precomputedFlags)).toContain(flagKey);
+      expect(Object.keys(precomputedFlags)).not.toContain('disabledFlag');
+    });
+
+    it('evaluates and returns assignments', () => {
+      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
+      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
+      if (!precomputed) {
+        fail('Precomputed data not in Configuration response');
+      }
+      const precomputedResponse = JSON.parse(precomputed.response);
+
+      expect(precomputedResponse).toBeTruthy();
+      const precomputedFlags = precomputedResponse?.flags ?? {};
+      const firstFlag = precomputedFlags[flagKey];
+      const secondFlag = precomputedFlags['anotherFlag'];
+      expect(firstFlag.variationValue).toEqual('variation-a');
+      expect(secondFlag.variationValue).toEqual('variation-b');
+    });
+
+    it('obfuscates assignments', () => {
+      // Use a known salt to produce deterministic hashes
+      setSaltOverrideForTests({
+        base64String: 'BzURTg==',
+        saltString: '0735114e',
+        bytes: new Uint8Array([7, 53, 17, 78]),
+      });
+
+      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {}, true);
+      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
+      if (!precomputed) {
+        fail('Precomputed data not in Configuration response');
+      }
+      const precomputedResponse = JSON.parse(precomputed.response);
+
+      expect(precomputedResponse).toBeTruthy();
+      expect(precomputedResponse.salt).toEqual('BzURTg==');
+
+      const precomputedFlags = precomputedResponse?.flags ?? {};
+      expect(Object.keys(precomputedFlags)).toContain('ddc24ede545855b9bbae82cfec6a83a1'); // flagKey, md5 hashed
+      expect(Object.keys(precomputedFlags)).toContain('2b439e5a0104d62400dc44c34230f6f2'); // 'anotherFlag', md5 hashed
+
+      const decodedFirstFlag = decodePrecomputedFlag(
+        precomputedFlags['ddc24ede545855b9bbae82cfec6a83a1'],
+      );
+      expect(decodedFirstFlag.flagKey).toEqual('ddc24ede545855b9bbae82cfec6a83a1');
+      expect(decodedFirstFlag.variationType).toEqual(VariationType.STRING);
+      expect(decodedFirstFlag.variationKey).toEqual('a');
+      expect(decodedFirstFlag.variationValue).toEqual('variation-a');
+      expect(decodedFirstFlag.doLog).toEqual(true);
+      expect(decodedFirstFlag.extraLogging).toEqual({});
+
+      const decodedSecondFlag = decodePrecomputedFlag(
+        precomputedFlags['2b439e5a0104d62400dc44c34230f6f2'],
+      );
+      expect(decodedSecondFlag.flagKey).toEqual('2b439e5a0104d62400dc44c34230f6f2');
+      expect(decodedSecondFlag.variationType).toEqual(VariationType.STRING);
+      expect(decodedSecondFlag.variationKey).toEqual('b');
+      expect(decodedSecondFlag.variationValue).toEqual('variation-b');
+      expect(decodedSecondFlag.doLog).toEqual(true);
+      expect(decodedSecondFlag.extraLogging).toEqual({});
     });
   });
 

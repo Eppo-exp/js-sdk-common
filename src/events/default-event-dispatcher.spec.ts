@@ -28,6 +28,7 @@ const createDispatcher = (
     retryIntervalMs: 300,
     maxRetryDelayMs: 5000,
     maxRetries: 3,
+    sdkKey: 'test-sdk-key',
   };
   const config = { ...defaultConfig, ...configOverrides };
   const batchProcessor = new BatchEventProcessor(eventQueue, batchSize);
@@ -49,19 +50,19 @@ describe('DefaultEventDispatcher', () => {
       // Add three events to the queue
       dispatcher.dispatch({
         uuid: 'foo-1',
-        payload: 'event1',
+        payload: { foo: 'event1' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
       dispatcher.dispatch({
         uuid: 'foo-2',
-        payload: 'event2',
+        payload: { foo: 'event2' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
       dispatcher.dispatch({
         uuid: 'foo-3',
-        payload: 'event3',
+        payload: { foo: 'event3' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
@@ -81,19 +82,19 @@ describe('DefaultEventDispatcher', () => {
       const { dispatcher } = createDispatcher();
       dispatcher.dispatch({
         uuid: 'foo-1',
-        payload: 'event1',
+        payload: { foo: 'event1' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
       dispatcher.dispatch({
         uuid: 'foo-2',
-        payload: 'event2',
+        payload: { foo: 'event2' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
       dispatcher.dispatch({
         uuid: 'foo-3',
-        payload: 'event3',
+        payload: { foo: 'event3' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
@@ -107,16 +108,18 @@ describe('DefaultEventDispatcher', () => {
         'http://example.com',
         expect.objectContaining({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-eppo-token': 'test-sdk-key' },
         }),
       );
 
       let fetchOptions = fetch.mock.calls[0][1];
       let payload = JSON.parse(fetchOptions.body);
-      expect(payload).toEqual([
-        expect.objectContaining({ payload: 'event1' }),
-        expect.objectContaining({ payload: 'event2' }),
-      ]);
+      expect(payload).toEqual({
+        eppo_events: [
+          expect.objectContaining({ payload: { foo: 'event1' } }),
+          expect.objectContaining({ payload: { foo: 'event2' } }),
+        ],
+      });
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -124,13 +127,15 @@ describe('DefaultEventDispatcher', () => {
         'http://example.com',
         expect.objectContaining({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-eppo-token': 'test-sdk-key' },
         }),
       );
 
       fetchOptions = fetch.mock.calls[1][1];
       payload = JSON.parse(fetchOptions.body);
-      expect(payload).toEqual([expect.objectContaining({ payload: 'event3' })]);
+      expect(payload).toEqual({
+        eppo_events: [expect.objectContaining({ payload: { foo: 'event3' } })],
+      });
     });
 
     it('does not schedule delivery if the queue is empty', async () => {
@@ -156,13 +161,13 @@ describe('DefaultEventDispatcher', () => {
       const { dispatcher } = createDispatcher({ networkStatusListener });
       dispatcher.dispatch({
         uuid: '1',
-        payload: 'event1',
+        payload: { foo: 'event1' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
       dispatcher.dispatch({
         uuid: '2',
-        payload: 'event2',
+        payload: { foo: 'event2' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
@@ -190,13 +195,13 @@ describe('DefaultEventDispatcher', () => {
       const { dispatcher } = createDispatcher({ networkStatusListener });
       dispatcher.dispatch({
         uuid: '1',
-        payload: 'event1',
+        payload: { foo: 'event1' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
       dispatcher.dispatch({
         uuid: '2',
-        payload: 'event2',
+        payload: { foo: 'event2' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
@@ -229,7 +234,7 @@ describe('DefaultEventDispatcher', () => {
       const { dispatcher } = createDispatcher();
       dispatcher.dispatch({
         uuid: 'foo',
-        payload: 'event1',
+        payload: { foo: 'event1' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
@@ -258,7 +263,7 @@ describe('DefaultEventDispatcher', () => {
       const { dispatcher } = createDispatcher({ maxRetries: 1 }, eventQueue);
       dispatcher.dispatch({
         uuid: 'foo',
-        payload: 'event1',
+        payload: { foo: 'event1' },
         timestamp: new Date().getTime(),
         type: 'foo',
       });
