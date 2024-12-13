@@ -160,7 +160,7 @@ export interface IPrecomputedBandit {
   optimalityGap: number;
   modelVersion: string;
   actionAttributes: ContextAttributes;
-  extraLogging: Record<string, string>;
+  metaData: Record<string, unknown>;
 }
 
 export interface PrecomputedFlagsDetails {

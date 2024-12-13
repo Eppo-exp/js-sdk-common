@@ -979,9 +979,15 @@ export default class EppoClient {
     const configDetails = this.getConfigDetails();
     const nonContextualSubjectAttributes =
       this.ensureNonContextualSubjectAttributes(subjectAttributes);
+    const contextualSubjectAttributes = this.ensureContextualSubjectAttributes(subjectAttributes);
 
     const flags = this.getAllAssignments(subjectKey, nonContextualSubjectAttributes);
-    const bandits = this.getAllBandits(subjectKey, subjectAttributes, banditActions, flags);
+    const bandits = this.getAllBandits(
+      subjectKey,
+      contextualSubjectAttributes,
+      banditActions,
+      flags,
+    );
 
     const precomputedConfig: IPrecomputedConfiguration = obfuscated
       ? new ObfuscatedPrecomputedConfiguration(
@@ -1312,54 +1318,54 @@ export default class EppoClient {
 
   private getAllBandits(
     subjectKey: string,
-    subjectAttributes: Attributes | ContextAttributes,
+    subjectAttributes: ContextAttributes,
     banditActions: Record<string, BanditActions>,
     flags: Record<string, PrecomputedFlag>,
   ): Record<string, Record<string, IPrecomputedBandit>> {
     const banditResults: Record<string, Record<string, IPrecomputedBandit>> = {};
 
-    const nonContextualSubjectAttributes =
-      this.ensureNonContextualSubjectAttributes(subjectAttributes);
-
     // Computing Bandits
     // The first case is easy: a flag resolves to a bandit-key for this subject; compute that bandit.
     // The second case is more involved: the flag resolves to null. On the client side, the user can now enter a bandit
     // key as the `default` variation, so we need have every bandit referenced by this flag computed and available.
-
-    const banditsToCompute = new Set<string>();
-
     Object.keys(banditActions).forEach((flagKey: string) => {
-      const banditVariations = this.banditVariationConfigurationStore?.get(flagKey);
-
       // First, check how the flag evaluated.
       const flagVariation = flags[flagKey];
       if (flagVariation !== null) {
         banditResults[flagKey] ??= {};
 
         // First case: flag resolved to a value, check if it's a bandit and if so, compute it.
-        const bandit = this.findBanditByVariation(flagKey, flagVariation.variationValue);
-        if (bandit) {
-          const result = this.evaluateBanditAction(
-            flagKey,
-            subjectKey,
-            subjectAttributes,
-            banditActions[flagKey],
-            bandit.modelData,
-          );
-          if (result) {
-            banditResults[flagKey][bandit.banditKey] = {
-              action: result.actionKey,
-              actionAttributes: result.actionAttributes,
-              actionProbability: result.actionWeight,
-              extraLogging: {},
-              modelVersion: bandit.modelVersion,
-              optimalityGap: result.optimalityGap,
-              variation: flagVariation.variationValue,
-            };
-          }
+        const precomputedResult = this.getPrecomputedBandit(
+          flagKey,
+          flagVariation.variationValue,
+          subjectKey,
+          subjectAttributes,
+          banditActions[flagKey],
+        );
+        if (precomputedResult) {
+          banditResults[flagKey][flagVariation.variationValue] = precomputedResult;
         }
       } else {
         // Second case; compute all the bandits referenced by this flag.
+        const banditVariations = this.banditVariationConfigurationStore?.get(flagKey);
+        if (!banditVariations) {
+          return;
+        }
+        banditResults[flagKey] = {};
+
+        banditVariations.forEach((banditVariation: BanditVariation) => {
+          const precomputedResult = this.getPrecomputedBandit(
+            flagKey,
+            banditVariation.variationValue,
+            subjectKey,
+            subjectAttributes,
+            banditActions[flagKey],
+          );
+
+          if (precomputedResult) {
+            banditResults[flagKey][banditVariation.variationValue] = precomputedResult;
+          }
+        });
       }
     });
     return banditResults;
@@ -1374,6 +1380,37 @@ export default class EppoClient {
     if (banditKey) {
       // Retrieve the model parameters for the bandit
       return this.getBandit(banditKey);
+    }
+    return null;
+  }
+
+  private getPrecomputedBandit(
+    flagKey: string,
+    variationValue: string,
+    subjectKey: string,
+    subjectAttributes: ContextAttributes,
+    banditActions: BanditActions,
+  ): IPrecomputedBandit | null {
+    const bandit = this.findBanditByVariation(flagKey, variationValue);
+    if (bandit) {
+      const result = this.evaluateBanditAction(
+        flagKey,
+        subjectKey,
+        subjectAttributes,
+        banditActions,
+        bandit.modelData,
+      );
+      if (result) {
+        return {
+          action: result.actionKey,
+          actionAttributes: result.actionAttributes,
+          actionProbability: result.actionWeight,
+          metaData: this.buildLoggerMetadata(),
+          modelVersion: bandit.modelVersion,
+          optimalityGap: result.optimalityGap,
+          variation: variationValue,
+        };
+      }
     }
     return null;
   }

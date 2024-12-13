@@ -82,6 +82,11 @@ describe('EppoClient Bandits E2E test', () => {
     jest.restoreAllMocks();
   });
 
+  describe('precomputed bandits', ()=> {
+
+
+  });
+
   describe('Shared test cases', () => {
     const testCases = testCasesByFileName<BanditTestCase>(BANDIT_TEST_DATA_DIR);
 
