@@ -941,14 +941,14 @@ export default class EppoClient {
     obfuscated = false,
   ): string {
     const configDetails = this.getConfigDetails();
-    const nonContextualSubjectAttributes =
-      this.ensureNonContextualSubjectAttributes(subjectAttributes);
-    const contextualSubjectAttributes = this.ensureContextualSubjectAttributes(subjectAttributes);
 
-    const flags = this.getAllAssignments(subjectKey, nonContextualSubjectAttributes);
+    const subjectContextualAttributes = this.ensureContextualSubjectAttributes(subjectAttributes);
+    const subjectFlatAttributes = this.ensureNonContextualSubjectAttributes(subjectAttributes);
+    const flags = this.getAllAssignments(subjectKey, subjectFlatAttributes);
+
     const bandits = this.getAllBandits(
       subjectKey,
-      contextualSubjectAttributes,
+      subjectContextualAttributes,
       banditActions,
       flags,
     );
@@ -958,14 +958,14 @@ export default class EppoClient {
           subjectKey,
           flags,
           bandits,
-          subjectAttributes,
+          subjectContextualAttributes,
           configDetails.configEnvironment,
         )
       : new PrecomputedConfiguration(
           subjectKey,
           flags,
           bandits,
-          subjectAttributes,
+          subjectContextualAttributes,
           configDetails.configEnvironment,
         );
 

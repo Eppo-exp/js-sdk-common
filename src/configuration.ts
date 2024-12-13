@@ -1,11 +1,10 @@
 import { Environment, FormatEnum, IPrecomputedBandit, PrecomputedFlag } from './interfaces';
 import {
   generateSalt,
-  obfuscatedPrecomputedBandits,
+  obfuscatePrecomputedBandits,
   obfuscatePrecomputedFlags,
-  Salt,
 } from './obfuscation';
-import { Attributes, ContextAttributes } from './types';
+import { ContextAttributes } from './types';
 
 export interface IPrecomputedConfigurationResponse {
   // `format` is always `PRECOMPUTED`
@@ -25,7 +24,7 @@ export interface IPrecomputedConfiguration {
   readonly response: string;
   readonly subjectKey: string;
   // Optional in case server does not want to expose attributes to a client.
-  readonly subjectAttributes?: Attributes | ContextAttributes;
+  readonly subjectAttributes?: ContextAttributes;
 }
 
 export class PrecomputedConfiguration implements IPrecomputedConfiguration {
@@ -35,7 +34,7 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
     readonly subjectKey: string,
     flags: Record<string, PrecomputedFlag>,
     bandits: Record<string, Record<string, IPrecomputedBandit>>,
-    readonly subjectAttributes?: Attributes | ContextAttributes,
+    readonly subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ) {
     const precomputedResponse: IPrecomputedConfigurationResponse = {
@@ -53,22 +52,21 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
 
 export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfiguration {
   readonly response: string;
-  private saltBase: Salt;
 
   constructor(
     readonly subjectKey: string,
     flags: Record<string, PrecomputedFlag>,
     bandits: Record<string, Record<string, IPrecomputedBandit>>,
-    readonly subjectAttributes?: Attributes | ContextAttributes,
+    readonly subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ) {
-    this.saltBase = generateSalt();
+    const salt = generateSalt();
 
     const obfuscatedBandits = Object.fromEntries(
       Object.entries(bandits).map((entry) => {
         const flagKey = entry[0];
         const bandits = entry[1];
-        const obfuscatedBandits = obfuscatedPrecomputedBandits(this.saltBase.saltString, bandits);
+        const obfuscatedBandits = obfuscatePrecomputedBandits(salt, bandits);
 
         return [flagKey, obfuscatedBandits];
       }),
@@ -77,10 +75,10 @@ export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfigura
     const precomputedResponse: IPrecomputedConfigurationResponse = {
       format: FormatEnum.PRECOMPUTED,
       obfuscated: true,
-      salt: this.saltBase.base64String,
+      salt,
       createdAt: new Date().toISOString(),
       environment,
-      flags: obfuscatePrecomputedFlags(this.saltBase.saltString, flags),
+      flags: obfuscatePrecomputedFlags(salt, flags),
       bandits: obfuscatedBandits,
     };
     this.response = JSON.stringify(precomputedResponse);
