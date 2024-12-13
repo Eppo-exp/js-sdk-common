@@ -43,29 +43,13 @@ export function obfuscatePrecomputedFlags(
   return response;
 }
 
-export interface ISalt {
-  saltString: string;
-  base64String: string;
-  bytes: Uint8Array;
-}
-
-export class Salt implements ISalt {
-  public readonly saltString: string;
-  public readonly base64String: string;
-  constructor(public readonly bytes: Uint8Array) {
-    this.saltString = String.fromCharCode(...bytes);
-    this.base64String = encodeBase64(this.saltString);
-  }
-}
-
-let _saltOverride: ISalt | null = null;
+let saltOverrideBytes: Uint8Array | null;
 export function setSaltOverrideForTests(salt: Uint8Array | null) {
-  _saltOverride = salt ? new Salt(salt) : null;
+  saltOverrideBytes = salt ? salt : null;
 }
 
-export function generateSalt(length = 16): ISalt {
-  if (_saltOverride) return _saltOverride;
-  const array = new Uint8Array(length);
-  crypto.getRandomValues(array);
-  return new Salt(array);
+export function generateSalt(length = 16): string {
+  return base64.fromUint8Array(
+    saltOverrideBytes ? saltOverrideBytes : crypto.getRandomValues(new Uint8Array(length)),
+  );
 }

@@ -259,13 +259,13 @@ describe('EppoClient E2E test', () => {
       expect(precomputedResponse.salt).toEqual('BzURTg==');
 
       const precomputedFlags = precomputedResponse?.flags ?? {};
-      expect(Object.keys(precomputedFlags)).toContain('34863af2a6019c80e054c6997241b3d5'); // flagKey, md5 hashed
-      expect(Object.keys(precomputedFlags)).toContain('076aaf100f76cb2f93205dc6cd05f756'); // 'anotherFlag', md5 hashed
+      expect(Object.keys(precomputedFlags)).toContain('61b6df4b153fdc8ee4498a008d0e40dc'); // flagKey, md5 hashed
+      expect(Object.keys(precomputedFlags)).toContain('23ade17a2c18c4c3b8c9f780dca19fc1'); // 'anotherFlag', md5 hashed
 
       const decodedFirstFlag = decodePrecomputedFlag(
-        precomputedFlags['34863af2a6019c80e054c6997241b3d5'],
+        precomputedFlags['61b6df4b153fdc8ee4498a008d0e40dc'],
       );
-      expect(decodedFirstFlag.flagKey).toEqual('34863af2a6019c80e054c6997241b3d5');
+      expect(decodedFirstFlag.flagKey).toEqual('61b6df4b153fdc8ee4498a008d0e40dc');
       expect(decodedFirstFlag.variationType).toEqual(VariationType.STRING);
       expect(decodedFirstFlag.variationKey).toEqual('a');
       expect(decodedFirstFlag.variationValue).toEqual('variation-a');
@@ -273,9 +273,9 @@ describe('EppoClient E2E test', () => {
       expect(decodedFirstFlag.extraLogging).toEqual({});
 
       const decodedSecondFlag = decodePrecomputedFlag(
-        precomputedFlags['076aaf100f76cb2f93205dc6cd05f756'],
+        precomputedFlags['23ade17a2c18c4c3b8c9f780dca19fc1'],
       );
-      expect(decodedSecondFlag.flagKey).toEqual('076aaf100f76cb2f93205dc6cd05f756');
+      expect(decodedSecondFlag.flagKey).toEqual('23ade17a2c18c4c3b8c9f780dca19fc1');
       expect(decodedSecondFlag.variationType).toEqual(VariationType.STRING);
       expect(decodedSecondFlag.variationKey).toEqual('b');
       expect(decodedSecondFlag.variationValue).toEqual('variation-b');
