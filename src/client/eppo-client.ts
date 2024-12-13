@@ -124,6 +124,7 @@ export default class EppoClient {
   private isObfuscated: boolean;
   private requestPoller?: IPoller;
   private readonly evaluator = new Evaluator();
+  protected overridesStore?: IConfigurationStore<Variation>;
 
   constructor({
     eventDispatcher = new NoOpEventDispatcher(),
@@ -132,13 +133,25 @@ export default class EppoClient {
     banditVariationConfigurationStore,
     banditModelConfigurationStore,
     configurationRequestParameters,
-  }: EppoClientParameters) {
+    overridesStore,
+  }: {
+    // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
+    // or bandit events). These events are application-specific and captures by EppoClient#track API.
+    eventDispatcher?: EventDispatcher;
+    flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
+    banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
+    banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
+    configurationRequestParameters?: FlagConfigurationRequestParameters;
+    isObfuscated?: boolean;
+    overridesStore?: IConfigurationStore<Variation>;
+  }) {
     this.eventDispatcher = eventDispatcher;
     this.flagConfigurationStore = flagConfigurationStore;
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
     this.banditModelConfigurationStore = banditModelConfigurationStore;
     this.configurationRequestParameters = configurationRequestParameters;
     this.isObfuscated = isObfuscated;
+    this.overridesStore = overridesStore;
   }
 
   setConfigurationRequestParameters(
@@ -190,6 +203,10 @@ export default class EppoClient {
   // noinspection JSUnusedGlobalSymbols
   setIsObfuscated(isObfuscated: boolean) {
     this.isObfuscated = isObfuscated;
+  }
+
+  setOverridesStore(store: IConfigurationStore<Variation>): void {
+    this.overridesStore = store;
   }
 
   async fetchFlagConfigurations() {
@@ -938,6 +955,34 @@ export default class EppoClient {
   ): FlagEvaluation {
     validateNotBlank(subjectKey, 'Invalid argument: subjectKey cannot be blank');
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
+
+    // Check for override early
+    const overrideVariation = this.overridesStore?.get(flagKey);
+    if (overrideVariation) {
+      const configFormat = this.overridesStore?.getFormat() ?? '';
+      const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
+      const flagEvaluationDetails = flagEvaluationDetailsBuilder
+        .setMatch(
+          0,
+          overrideVariation,
+          { key: overrideVariation.key, splits: [], doLog: false },
+          null,
+          undefined,
+        )
+        .build('MATCH', 'Flag override applied');
+
+      return {
+        flagKey,
+        subjectKey,
+        variation: overrideVariation,
+        subjectAttributes,
+        flagEvaluationDetails,
+        doLog: false,
+        format: configFormat,
+        allocationKey: 'override',
+        extraLogging: {},
+      };
+    }
 
     const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
     const configDetails = this.getConfigDetails();
