@@ -1,5 +1,5 @@
 import { Environment, FormatEnum, PrecomputedFlag } from './interfaces';
-import { generateSalt, obfuscatePrecomputedFlags, ISalt } from './obfuscation';
+import { generateSalt, obfuscatePrecomputedFlags } from './obfuscation';
 import { ContextAttributes } from './types';
 
 export interface IPrecomputedConfigurationResponse {
@@ -47,7 +47,6 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
 export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfiguration {
   readonly format = FormatEnum.PRECOMPUTED;
   readonly response: string;
-  private saltBase: ISalt;
 
   constructor(
     readonly subjectKey: string,
@@ -55,15 +54,15 @@ export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfigura
     readonly subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ) {
-    this.saltBase = generateSalt();
+    const salt = generateSalt();
 
     const precomputedResponse: IPrecomputedConfigurationResponse = {
       format: FormatEnum.PRECOMPUTED,
       obfuscated: true,
-      salt: this.saltBase.base64String,
+      salt,
       createdAt: new Date().toISOString(),
       environment,
-      flags: obfuscatePrecomputedFlags(this.saltBase.saltString, flags),
+      flags: obfuscatePrecomputedFlags(salt, flags),
     };
     this.response = JSON.stringify(precomputedResponse);
   }
