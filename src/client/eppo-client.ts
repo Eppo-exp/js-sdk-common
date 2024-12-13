@@ -927,42 +927,6 @@ export default class EppoClient {
   }
 
   /**
-   * Computes and returns assignments for a subject from all loaded flags.
-   *
-   * @param subjectKey an identifier of the experiment subject, for example a user ID.
-   * @param subjectAttributes optional attributes associated with the subject, for example name and email.
-   * @param obfuscated optional whether to obfuscate the results.
-   */
-  getPrecomputedAssignments(
-    subjectKey: string,
-    subjectAttributes: Attributes = {},
-    obfuscated = false,
-  ): string {
-    const configDetails = this.getConfigDetails();
-    const flags = this.getAllAssignments(subjectKey, subjectAttributes);
-    const bandits = {};
-
-    const precomputedConfig: IPrecomputedConfiguration = obfuscated
-      ? new ObfuscatedPrecomputedConfiguration(
-          subjectKey,
-          flags,
-          bandits,
-          subjectAttributes,
-          configDetails.configEnvironment,
-        )
-      : new PrecomputedConfiguration(
-          subjectKey,
-          flags,
-          bandits,
-          subjectAttributes,
-          configDetails.configEnvironment,
-        );
-
-    const configWire: IConfigurationWire = new ConfigurationWireV1(precomputedConfig);
-    return JSON.stringify(configWire);
-  }
-
-  /**
    * Computes and returns assignments and bandits for a subject from all loaded flags.
    *
    * @param subjectKey an identifier of the experiment subject, for example a user ID.
@@ -973,7 +937,7 @@ export default class EppoClient {
   getPrecomputedConfiguration(
     subjectKey: string,
     subjectAttributes: Attributes | ContextAttributes = {},
-    banditActions: Record<string, BanditActions>,
+    banditActions: Record<string, BanditActions> = {},
     obfuscated = false,
   ): string {
     const configDetails = this.getConfigDetails();
@@ -1331,7 +1295,7 @@ export default class EppoClient {
     Object.keys(banditActions).forEach((flagKey: string) => {
       // First, check how the flag evaluated.
       const flagVariation = flags[flagKey];
-      if (flagVariation !== null) {
+      if (flagVariation) {
         banditResults[flagKey] ??= {};
 
         // First case: flag resolved to a value, check if it's a bandit and if so, compute it.

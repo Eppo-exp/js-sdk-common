@@ -21,7 +21,7 @@ export interface IPrecomputedConfigurationResponse {
 }
 
 export interface IPrecomputedConfiguration {
-  // JSON encoded `PrecomputedConfigurationResponse`
+  // JSON encoded `IPrecomputedConfigurationResponse`
   readonly response: string;
   readonly subjectKey: string;
   // Optional in case server does not want to expose attributes to a client.
@@ -29,7 +29,6 @@ export interface IPrecomputedConfiguration {
 }
 
 export class PrecomputedConfiguration implements IPrecomputedConfiguration {
-  readonly format = FormatEnum.PRECOMPUTED;
   readonly response: string;
 
   constructor(
@@ -53,7 +52,6 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
 }
 
 export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfiguration {
-  readonly format = FormatEnum.PRECOMPUTED;
   readonly response: string;
   private saltBase: Salt;
 

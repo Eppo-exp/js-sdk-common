@@ -21,9 +21,34 @@ export function decodeBase64(input: string) {
 
 export function obfuscatedPrecomputedBandits(
   salt: string,
-  precomputedFlags: Record<string, IPrecomputedBandit>,
+  bandits: Record<string, IPrecomputedBandit>,
 ): Record<string, IPrecomputedBandit> {
-  return {};
+  const obfuscatedBandits: Record<string, IPrecomputedBandit> = {};
+
+  Object.entries(bandits).map((entry) => {
+    const [banditKey, banditResult] = entry;
+
+    // Encode metaData keys and values. ??
+    // const encodedMetaData = Object.fromEntries(
+    //   Object.entries(banditResult.metaData).map((kvArr) => kvArr.map(encodeBase64)),
+    // );
+    const encodedMetaData = banditResult.metaData;
+
+    const hashedKey = getMD5Hash(salt + banditKey); //flagKey, salt);
+    obfuscatedBandits[hashedKey] = {
+      action: banditResult.action ? encodeBase64(banditResult.action) : null,
+      variation: hashedKey,
+      actionProbability: banditResult.actionProbability,
+      optimalityGap: banditResult.optimalityGap,
+      modelVersion: encodeBase64(banditResult.modelVersion),
+      actionAttributes: {
+        categoricalAttributes: {},
+        numericAttributes: {},
+      },
+      metaData: encodedMetaData,
+    };
+  });
+  return obfuscatedBandits;
 }
 
 export function obfuscatePrecomputedFlags(

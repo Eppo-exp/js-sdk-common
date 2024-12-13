@@ -10,6 +10,11 @@ import ApiEndpoints from '../api-endpoints';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
+import {
+  IConfigurationWire,
+  IPrecomputedConfiguration,
+  IPrecomputedConfigurationResponse,
+} from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { Evaluator, FlagEvaluation } from '../evaluator';
@@ -19,7 +24,7 @@ import {
 } from '../flag-evaluation-details-builder';
 import FetchHttpClient from '../http-client';
 import { BanditVariation, BanditParameters, Flag } from '../interfaces';
-import { Attributes, ContextAttributes } from '../types';
+import { Attributes, BanditActions, ContextAttributes } from '../types';
 
 import EppoClient, { IAssignmentDetails } from './eppo-client';
 
@@ -80,11 +85,6 @@ describe('EppoClient Bandits E2E test', () => {
 
   afterAll(() => {
     jest.restoreAllMocks();
-  });
-
-  describe('precomputed bandits', ()=> {
-
-
   });
 
   describe('Shared test cases', () => {
@@ -195,15 +195,20 @@ describe('EppoClient Bandits E2E test', () => {
         matchedAllocation: {
           allocationEvaluationCode: AllocationEvaluationCode.MATCH,
           key: 'training',
-          orderPosition: 2,
+          orderPosition: 3,
         },
         matchedRule: null,
         unevaluatedAllocations: [],
         unmatchedAllocations: [
           {
+            allocationEvaluationCode: AllocationEvaluationCode.FAILING_RULE,
+            key: 'testing',
+            orderPosition: 1,
+          },
+          {
             allocationEvaluationCode: AllocationEvaluationCode.TRAFFIC_EXPOSURE_MISS,
             key: 'analysis',
-            orderPosition: 1,
+            orderPosition: 2,
           },
         ],
         variationKey: 'banner_bandit',
@@ -314,15 +319,20 @@ describe('EppoClient Bandits E2E test', () => {
           matchedAllocation: {
             allocationEvaluationCode: AllocationEvaluationCode.MATCH,
             key: 'training',
-            orderPosition: 2,
+            orderPosition: 3,
           },
           matchedRule: null,
           unevaluatedAllocations: [],
           unmatchedAllocations: [
             {
+              allocationEvaluationCode: AllocationEvaluationCode.FAILING_RULE,
+              key: 'testing',
+              orderPosition: 1,
+            },
+            {
               allocationEvaluationCode: AllocationEvaluationCode.TRAFFIC_EXPOSURE_MISS,
               key: 'analysis',
-              orderPosition: 1,
+              orderPosition: 2,
             },
           ],
           variationKey: 'banner_bandit',
@@ -559,6 +569,7 @@ describe('EppoClient Bandits E2E test', () => {
       afterAll(() => {
         mockEvaluateFlag.mockClear();
         mockEvaluateBandit.mockClear();
+        jest.restoreAllMocks();
       });
 
       it('handles bandit actions appropriately', async () => {
@@ -621,6 +632,182 @@ describe('EppoClient Bandits E2E test', () => {
         expect(secondNonBanditAssignment.action).toBeNull();
         expect(mockLogAssignment).toHaveBeenCalledTimes(3); // "new" variation assignment
         expect(mockLogBanditAction).toHaveBeenCalledTimes(3); // no bandit assignment
+      });
+    });
+  });
+
+  describe('precomputed bandits', () => {
+    const bob = 'bob';
+    const erica = 'erica';
+
+    const bobInfo: ContextAttributes = {
+      numericAttributes: { age: 30, account_age: 10 },
+      categoricalAttributes: { country: 'UK', gender_identity: 'male' },
+    };
+    const ericaInfo: ContextAttributes = {
+      numericAttributes: { age: 28, account_age: 30 },
+      categoricalAttributes: { country: 'USA', gender_identity: 'female' },
+    };
+
+    const bobActions: Record<string, BanditActions> = {
+      banner_bandit_flag: {
+        nike: {
+          numericAttributes: { brand_affinity: -2.5 },
+          categoricalAttributes: { loyalty_tier: 'bronze' },
+        },
+        adidas: {
+          numericAttributes: { brand_affinity: -2.5 },
+          categoricalAttributes: { loyalty_tier: 'bronze' },
+        },
+        reebok: {
+          numericAttributes: { brand_affinity: -2.5 },
+          categoricalAttributes: { loyalty_tier: 'bronze' },
+        },
+      },
+    };
+    const ericaActions = {
+      banner_bandit_flag: {
+        nike: {
+          numericAttributes: { brand_affinity: 1.2 },
+          categoricalAttributes: { loyalty_tier: 'platinum' },
+        },
+        adidas: {
+          numericAttributes: { brand_affinity: 1 },
+          categoricalAttributes: {},
+        },
+        reebok: {
+          numericAttributes: {},
+          categoricalAttributes: {},
+        },
+        puma: {
+          numericAttributes: {
+            brand_affinity: 1.0,
+            discount: 0.1,
+          },
+          categoricalAttributes: { color: 'red' },
+        },
+      },
+    };
+
+    function getPrecomputedResults(
+      client: EppoClient,
+      subjectKey: string,
+      subjectAttributes: ContextAttributes,
+      banditActions: Record<string, BanditActions>,
+    ): IPrecomputedConfiguration {
+      const precomputedResults = client.getPrecomputedConfiguration(
+        subjectKey,
+        subjectAttributes,
+        banditActions,
+        false,
+      );
+
+      const { precomputed } = JSON.parse(precomputedResults) as IConfigurationWire;
+      if (!precomputed) {
+        fail('precomputed result was not parsed');
+      }
+      return precomputed;
+    }
+
+    describe('unobfuscated results', () => {
+      it('returns subject information in the response', () => {
+        const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions);
+
+        expect(precomputed.subjectKey).toEqual('bob');
+        expect(Object.keys(precomputed.subjectAttributes?.categoricalAttributes ?? {})).toEqual([
+          'country',
+          'gender_identity',
+        ]);
+        expect(Object.keys(precomputed.subjectAttributes?.numericAttributes ?? {})).toEqual([
+          'age',
+          'account_age',
+        ]);
+      });
+
+      it('precomputes resolved bandits', () => {
+        const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions);
+
+        const response = JSON.parse(precomputed.response) as IPrecomputedConfigurationResponse;
+        const subjectBandits = response.bandits;
+
+        expect(subjectBandits).toBeTruthy();
+        // Check to ensure only one bandit is returned. Bob is allocated to `banner_bandit`
+        expect(Object.keys(subjectBandits['banner_bandit_flag'])).toHaveLength(1);
+
+        expect(subjectBandits['banner_bandit_flag']['banner_bandit']).toEqual({
+          variation: 'banner_bandit',
+          action: 'adidas',
+          actionAttributes: {
+            categoricalAttributes: {
+              loyalty_tier: 'bronze',
+            },
+            numericAttributes: {
+              brand_affinity: -2.5,
+            },
+          },
+          actionProbability: 0.10526315789473684,
+          metaData: {
+            obfuscated: false,
+            sdkLanguage: 'javascript',
+            sdkLibVersion: '4.7.0',
+          },
+
+          modelVersion: '123',
+          optimalityGap: 6.5,
+        });
+      });
+
+      it('precomputes all bandits for unmatched allocations', () => {
+        // Erica is not part of any allocation for `banner_bandit_flag`.
+        // When the client calls `getStringAllocation(`banner_bandit_flag`..., default)`, the default value will be
+        // returned. If the caller passes `banner_bandit` as the default value (or any other bandit under this flag),
+        // they can be bucketed in the bandit, so we must compute all bandits the flag can reach.
+        const precomputed = getPrecomputedResults(client, erica, ericaInfo, ericaActions);
+
+        const response = JSON.parse(precomputed.response) as IPrecomputedConfigurationResponse;
+        const subjectBandits = response.bandits;
+
+        expect(subjectBandits).toBeTruthy();
+
+        // This test won't fail when common-data-change #TBD and common-js #131 are merged.
+        expect(Object.keys(subjectBandits['banner_bandit_flag'])).toEqual([
+          'banner_bandit',
+          'car_bandit',
+        ]);
+
+        expect(subjectBandits['banner_bandit_flag']['banner_bandit']).toEqual({
+          variation: 'banner_bandit',
+          action: 'puma',
+          actionAttributes: {
+            categoricalAttributes: {
+              color: 'red',
+            },
+            numericAttributes: {
+              brand_affinity: 1,
+              discount: 0.1,
+            },
+          },
+          actionProbability: 0.06369426751592357,
+          metaData: {
+            obfuscated: false,
+            sdkLanguage: 'javascript',
+            sdkLibVersion: '4.7.0',
+          },
+
+          modelVersion: '123',
+          optimalityGap: 11.7,
+        });
+      });
+    });
+    describe('obfuscated results', () => {
+      it('obfuscates precomputed bandits', () => {
+        // const precomputedResults = client.getPrecomputedConfiguration(
+        //   subjectKey,
+        //   subjectAttributes,
+        //   actions,
+        //   true,
+        // );
+        // console.log(precomputedResults);
       });
     });
   });
