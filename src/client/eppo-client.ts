@@ -939,23 +939,26 @@ export default class EppoClient {
    */
   getPrecomputedAssignments(
     subjectKey: string,
-    subjectAttributes: Attributes = {},
+    subjectAttributes: Attributes | ContextAttributes = {},
     obfuscated = false,
   ): string {
     const configDetails = this.getConfigDetails();
-    const flags = this.getAllAssignments(subjectKey, subjectAttributes);
+
+    const subjectContextualAttributes = this.ensureContextualSubjectAttributes(subjectAttributes);
+    const subjectFlatAttributes = this.ensureNonContextualSubjectAttributes(subjectAttributes);
+    const flags = this.getAllAssignments(subjectKey, subjectFlatAttributes);
 
     const precomputedConfig: IPrecomputedConfiguration = obfuscated
       ? new ObfuscatedPrecomputedConfiguration(
           subjectKey,
           flags,
-          subjectAttributes,
+          subjectContextualAttributes,
           configDetails.configEnvironment,
         )
       : new PrecomputedConfiguration(
           subjectKey,
           flags,
-          subjectAttributes,
+          subjectContextualAttributes,
           configDetails.configEnvironment,
         );
 

@@ -1,7 +1,11 @@
 import { logger } from '../application-logger';
 
-import EventDelivery from './event-delivery';
-import { Event } from './event-dispatcher';
+import Event from './event';
+import { EventDeliveryResult } from './event-delivery';
+
+export type IEventDelivery = {
+  deliver(batch: Event[]): Promise<EventDeliveryResult>;
+};
 
 /**
  * Attempts to retry delivering a batch of events to the ingestionUrl up to `maxRetries` times
@@ -14,7 +18,7 @@ export default class BatchRetryManager {
    * @param config.maxRetries - The maximum number of retries
    */
   constructor(
-    private readonly delivery: EventDelivery,
+    private readonly delivery: IEventDelivery,
     private readonly config: {
       retryIntervalMs: number;
       maxRetryDelayMs: number;
@@ -22,26 +26,26 @@ export default class BatchRetryManager {
     },
   ) {}
 
-  /** Re-attempts delivery of the provided batch, returns whether the retry succeeded. */
-  async retry(batch: Event[], attempt = 0): Promise<boolean> {
+  /** Re-attempts delivery of the provided batch, returns the UUIDs of events that failed retry. */
+  async retry(batch: Event[], attempt = 0): Promise<Event[]> {
     const { retryIntervalMs, maxRetryDelayMs, maxRetries } = this.config;
     const delay = Math.min(retryIntervalMs * Math.pow(2, attempt), maxRetryDelayMs);
-    logger.info(`[BatchRetryManager] Retrying batch delivery in ${delay}ms...`);
+    logger.info(
+      `[BatchRetryManager] Retrying batch delivery of ${batch.length} events in ${delay}ms...`,
+    );
     await new Promise((resolve) => setTimeout(resolve, delay));
 
-    const success = await this.delivery.deliver(batch);
-    if (success) {
-      logger.info(`[BatchRetryManager] Batch delivery successfully after ${attempt} retries.`);
-      return true;
+    const { failedEvents } = await this.delivery.deliver(batch);
+    if (failedEvents.length === 0) {
+      logger.info(`[BatchRetryManager] Batch delivery successfully after ${attempt + 1} tries.`);
+      return [];
     }
     // attempts are zero-indexed while maxRetries is not
     if (attempt < maxRetries - 1) {
-      return this.retry(batch, attempt + 1);
+      return this.retry(failedEvents, attempt + 1);
     } else {
-      logger.warn(
-        `[BatchRetryManager] Failed to deliver batch after ${maxRetries} retries, bailing`,
-      );
-      return false;
+      logger.warn(`[BatchRetryManager] Failed to deliver batch after ${maxRetries} tries, bailing`);
+      return batch;
     }
   }
 }

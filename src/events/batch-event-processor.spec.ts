@@ -1,12 +1,16 @@
 import ArrayBackedNamedEventQueue from './array-backed-named-event-queue';
 import BatchEventProcessor from './batch-event-processor';
-import { Event } from './event-dispatcher';
+import Event from './event';
 
 describe('BatchEventProcessor', () => {
   describe('nextBatch', () => {
     it('should return a batch and remove items from the queue', () => {
       const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
       const processor = new BatchEventProcessor(eventQueue, 2);
+      // force batch size to 2 for testing
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      processor['batchSize'] = 2;
       expect(processor.isEmpty()).toBeTruthy();
       expect(processor.nextBatch()).toHaveLength(0);
       const timestamp = new Date().getTime();
@@ -22,6 +26,25 @@ describe('BatchEventProcessor', () => {
       expect(batch).toEqual([event1, event2]);
       expect(processor.nextBatch()).toEqual([event3]);
       expect(processor.isEmpty()).toBeTruthy();
+    });
+  });
+
+  describe('batchSize', () => {
+    const queue = new ArrayBackedNamedEventQueue<Event>('test-queue');
+
+    it('should clamp batch size to min', () => {
+      const processor = new BatchEventProcessor(queue, 2);
+      expect(processor['batchSize']).toBe(100);
+    });
+
+    it('should clamp batch size to max', () => {
+      const processor = new BatchEventProcessor(queue, 100_000_000);
+      expect(processor['batchSize']).toBe(10_000);
+    });
+
+    it('should set batch size if within bounds', () => {
+      const processor = new BatchEventProcessor(queue, 1_000);
+      expect(processor['batchSize']).toBe(1_000);
     });
   });
 });

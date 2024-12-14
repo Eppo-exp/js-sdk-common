@@ -2,8 +2,9 @@ import { logger } from '../application-logger';
 
 import BatchEventProcessor from './batch-event-processor';
 import BatchRetryManager from './batch-retry-manager';
+import Event from './event';
 import EventDelivery from './event-delivery';
-import EventDispatcher, { Event } from './event-dispatcher';
+import EventDispatcher from './event-dispatcher';
 import NamedEventQueue from './named-event-queue';
 import NetworkStatusListener from './network-status-listener';
 import NoOpEventDispatcher from './no-op-event-dispatcher';
@@ -24,9 +25,7 @@ export type EventDispatcherConfig = {
   maxRetries?: number;
 };
 
-// TODO: Have more realistic default batch size based on average event payload size once we have
-//  more concrete data.
-export const DEFAULT_EVENT_DISPATCHER_BATCH_SIZE = 100;
+export const DEFAULT_EVENT_DISPATCHER_BATCH_SIZE = 1_000;
 export const DEFAULT_EVENT_DISPATCHER_CONFIG: Omit<
   EventDispatcherConfig,
   'ingestionUrl' | 'sdkKey'
@@ -93,13 +92,13 @@ export default class DefaultEventDispatcher implements EventDispatcher {
       return;
     }
 
-    const success = await this.eventDelivery.deliver(batch);
-    if (!success) {
-      logger.warn('[EventDispatcher] Failed to deliver batch, retrying...');
-      const retrySucceeded = await this.retryManager.retry(batch);
-      if (!retrySucceeded) {
+    const { failedEvents } = await this.eventDelivery.deliver(batch);
+    if (failedEvents.length > 0) {
+      logger.warn('[EventDispatcher] Failed to deliver some events from batch, retrying...');
+      const failedRetry = await this.retryManager.retry(failedEvents);
+      if (failedRetry.length > 0) {
         // re-enqueue events that failed to retry
-        this.batchProcessor.push(...batch);
+        this.batchProcessor.push(...failedRetry);
       }
     }
     logger.debug(`[EventDispatcher] Delivered batch of ${batch.length} events.`);

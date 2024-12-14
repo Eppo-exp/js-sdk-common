@@ -3,12 +3,8 @@ import * as SparkMD5 from 'spark-md5';
 
 import { PrecomputedFlag } from './interfaces';
 
-export function getMD5Hash(input: string): string {
-  return SparkMD5.hash(input);
-}
-
-export function saltedHasher(salt: string) {
-  return (input: string) => getMD5Hash(salt + input);
+export function getMD5Hash(input: string, salt = ''): string {
+  return new SparkMD5().append(salt).append(input).end();
 }
 
 export function encodeBase64(input: string) {
@@ -24,7 +20,6 @@ export function obfuscatePrecomputedFlags(
   precomputedFlags: Record<string, PrecomputedFlag>,
 ): Record<string, PrecomputedFlag> {
   const response: Record<string, PrecomputedFlag> = {};
-  const hash = saltedHasher(salt);
 
   Object.keys(precomputedFlags).map((flagKey) => {
     const assignment = precomputedFlags[flagKey];
@@ -34,7 +29,7 @@ export function obfuscatePrecomputedFlags(
       Object.entries(assignment.extraLogging).map((kvArr) => kvArr.map(encodeBase64)),
     );
 
-    const hashedKey = hash(flagKey);
+    const hashedKey = getMD5Hash(flagKey, salt);
     response[hashedKey] = {
       flagKey: hashedKey,
       variationType: assignment.variationType,
@@ -48,30 +43,13 @@ export function obfuscatePrecomputedFlags(
   return response;
 }
 
-export interface Salt {
-  saltString: string;
-  base64String: string;
-  bytes: Uint8Array;
+let saltOverrideBytes: Uint8Array | null;
+export function setSaltOverrideForTests(salt: Uint8Array | null) {
+  saltOverrideBytes = salt ? salt : null;
 }
 
-let _saltOverride: Salt | null = null;
-export function setSaltOverrideForTests(salt: Salt | null) {
-  _saltOverride = salt;
-}
-
-export function generateSalt(length = 16): Salt {
-  if (_saltOverride) return _saltOverride;
-  const array = new Uint8Array(length);
-  crypto.getRandomValues(array);
-
-  const saltString = Array.from(array)
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-  const base64String = encodeBase64(String.fromCharCode(...array));
-
-  return {
-    saltString,
-    base64String,
-    bytes: array,
-  };
+export function generateSalt(length = 16): string {
+  return base64.fromUint8Array(
+    saltOverrideBytes ? saltOverrideBytes : crypto.getRandomValues(new Uint8Array(length)),
+  );
 }
