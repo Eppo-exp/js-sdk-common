@@ -17,7 +17,7 @@ import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
 import { PrecomputedFlag, VariationType } from '../interfaces';
-import { saltedHasher } from '../obfuscation';
+import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
 import { Attributes } from '../types';
@@ -283,7 +283,7 @@ export default class EppoPrecomputedClient {
 
   private getObfuscatedFlag(flagKey: string): PrecomputedFlag | null {
     const precomputedFlag: PrecomputedFlag | null = this.precomputedFlagStore.get(
-      saltedHasher(this.precomputedFlagKeySalt)(flagKey),
+      getMD5Hash(flagKey, this.precomputedFlagKeySalt),
     ) as PrecomputedFlag;
     return precomputedFlag ? decodePrecomputedFlag(precomputedFlag) : null;
   }
