@@ -53,7 +53,7 @@ export default class EppoPrecomputedClient {
   private precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters;
   private subjectKey?: string;
   private subjectAttributes?: Attributes;
-  private flagKeySalt = '';
+  private decodedFlagKeySalt = '';
 
   constructor(
     private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
@@ -64,8 +64,8 @@ export default class EppoPrecomputedClient {
     this.isObfuscated = isObfuscated;
   }
 
-  public setFlagKeySalt(salt: string) {
-    this.flagKeySalt = salt;
+  public setDecodedFlagKeySalt(salt: string) {
+    this.decodedFlagKeySalt = salt;
   }
   // Individual methods for single responsibility
   public setPrecomputedFlagsRequestParameters(parameters: PrecomputedFlagsRequestParameters) {
@@ -129,7 +129,7 @@ export default class EppoPrecomputedClient {
     // A callback to capture the salt and subject information
     precomputedRequestor.onPrecomputedResponse = (responseData) => {
       if (responseData.decodedSalt) {
-        this.setFlagKeySalt(responseData.decodedSalt);
+        this.setDecodedFlagKeySalt(responseData.decodedSalt);
       }
       if (responseData.subjectKey && responseData.subjectAttributes) {
         this.setSubjectData(responseData.subjectKey, responseData.subjectAttributes);
@@ -298,7 +298,7 @@ export default class EppoPrecomputedClient {
   }
 
   private getObfuscatedFlag(flagKey: string): DecodedPrecomputedFlag | null {
-    const saltedAndHashedFlagKey = getMD5Hash(flagKey, this.flagKeySalt);
+    const saltedAndHashedFlagKey = getMD5Hash(flagKey, this.decodedFlagKeySalt);
     const precomputedFlag: PrecomputedFlag | null = this.precomputedFlagStore.get(
       saltedAndHashedFlagKey,
     ) as PrecomputedFlag;

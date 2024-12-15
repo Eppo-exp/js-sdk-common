@@ -651,7 +651,7 @@ describe('EppoPrecomputedClient E2E test', () => {
       });
 
       const client = new EppoPrecomputedClient(storage, true);
-      client.setFlagKeySalt(salt);
+      client.setDecodedFlagKeySalt(salt);
 
       expect(client.getStringAssignment(precomputedFlagKey, 'default')).toBe(
         mockPrecomputedFlag.variationValue,
