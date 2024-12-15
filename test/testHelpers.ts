@@ -15,10 +15,10 @@ export const MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE = `bandit-flags-v1.json`;
 export const MOCK_BANDIT_MODELS_RESPONSE_FILE = `bandit-models-v1.json`;
 export const OBFUSCATED_MOCK_UFC_RESPONSE_FILE = `${MOCK_UFC_FILENAME}-obfuscated.json`;
 
-export const TEST_PRECOMPUTED_DATA_DIR = './test/data/configuration-wire/';
+const TEST_CONFIGURATION_WIRE_DATA_DIR = './test/data/configuration-wire/';
 const MOCK_PRECOMPUTED_FILENAME = 'precomputed-v1';
-export const MOCK_PRECOMPUTED_RESPONSE_FILE = `${MOCK_PRECOMPUTED_FILENAME}.json`;
-export const OBFUSCATED_MOCK_PRECOMPUTED_RESPONSE_FILE = `${MOCK_PRECOMPUTED_FILENAME}-obfuscated.json`;
+export const MOCK_PRECOMPUTED_WIRE_FILE = `${MOCK_PRECOMPUTED_FILENAME}.json`;
+export const MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE = `${MOCK_PRECOMPUTED_WIRE_FILE}-deobfuscated.json`;
 
 export interface SubjectTestCase {
   subjectKey: string;
@@ -57,8 +57,8 @@ export function readMockUFCResponse(
   return JSON.parse(fs.readFileSync(TEST_DATA_DIR + filename, 'utf-8'));
 }
 
-export function readMockPrecomputedResponse(filename: string): string {
-  return fs.readFileSync(TEST_PRECOMPUTED_DATA_DIR + filename, 'utf-8');
+export function readMockConfigurationWireResponse(filename: string): string {
+  return fs.readFileSync(TEST_CONFIGURATION_WIRE_DATA_DIR + filename, 'utf-8');
 }
 
 export function testCasesByFileName<T>(testDirectory: string): Record<string, T> {

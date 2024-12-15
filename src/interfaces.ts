@@ -143,14 +143,20 @@ export enum FormatEnum {
   PRECOMPUTED = 'PRECOMPUTED',
 }
 
-export interface PrecomputedFlag {
+export type BasePrecomputedFlag = {
   flagKey?: string;
   allocationKey: string;
   variationKey: string;
   variationType: VariationType;
-  variationValue: string;
   extraLogging: Record<string, string>;
   doLog: boolean;
+};
+
+export interface PrecomputedFlag extends BasePrecomputedFlag {
+  variationValue: string;
+}
+export interface DecodedPrecomputedFlag extends BasePrecomputedFlag {
+  variationValue: Variation['value'];
 }
 
 export interface PrecomputedFlagsDetails {

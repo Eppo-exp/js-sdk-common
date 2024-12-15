@@ -16,13 +16,15 @@ import {
 import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
-import { PrecomputedFlag, VariationType } from '../interfaces';
+import { DecodedPrecomputedFlag, PrecomputedFlag, VariationType } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
 import { Attributes } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
+
+import { checkTypeMatch } from './eppo-client';
 
 export type PrecomputedFlagsRequestParameters = {
   apiKey: string;
@@ -51,33 +53,36 @@ export default class EppoPrecomputedClient {
   private precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters;
   private subjectKey?: string;
   private subjectAttributes?: Attributes;
-  private precomputedFlagKeySalt = '';
+  private flagKeySalt = '';
 
   constructor(
     private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
     private isObfuscated = false,
   ) {}
 
-  public setPrecomputedFlagsRequestParameters(
-    precomputedFlagsRequestParameters: PrecomputedFlagsRequestParameters,
-  ) {
-    this.precomputedFlagsRequestParameters = precomputedFlagsRequestParameters;
-  }
-
-  public setSubjectAndPrecomputedFlagsRequestParameters(
-    precomputedFlagsRequestParameters: PrecomputedFlagsRequestParameters,
-  ) {
-    this.setPrecomputedFlagsRequestParameters(precomputedFlagsRequestParameters);
-    this.subjectKey = precomputedFlagsRequestParameters.precompute.subjectKey;
-    this.subjectAttributes = precomputedFlagsRequestParameters.precompute.subjectAttributes;
-  }
-
-  public setPrecomputedFlagStore(precomputedFlagStore: IConfigurationStore<PrecomputedFlag>) {
-    this.precomputedFlagStore = precomputedFlagStore;
-  }
-
   public setIsObfuscated(isObfuscated: boolean) {
     this.isObfuscated = isObfuscated;
+  }
+
+  public setFlagKeySalt(salt: string) {
+    this.flagKeySalt = salt;
+  }
+  // Individual methods for single responsibility
+  public setPrecomputedFlagsRequestParameters(parameters: PrecomputedFlagsRequestParameters) {
+    this.precomputedFlagsRequestParameters = parameters;
+  }
+
+  public setSubjectData(subjectKey: string, subjectAttributes: Attributes) {
+    this.subjectKey = subjectKey;
+    this.subjectAttributes = subjectAttributes;
+  }
+
+  // Convenience method that combines both since they are expected to be set together
+  public setSubjectAndPrecomputedFlagsRequestParameters(
+    parameters: PrecomputedFlagsRequestParameters,
+  ) {
+    this.setPrecomputedFlagsRequestParameters(parameters);
+    this.setSubjectData(parameters.precompute.subjectKey, parameters.precompute.subjectAttributes);
   }
 
   public async fetchPrecomputedFlags() {
@@ -121,6 +126,16 @@ export default class EppoPrecomputedClient {
       subjectAttributes,
     );
 
+    // A callback to capture the salt and subject information
+    precomputedRequestor.onPrecomputedResponse = (responseData) => {
+      if (responseData.decodedSalt) {
+        this.setFlagKeySalt(responseData.decodedSalt);
+      }
+      if (responseData.subjectKey && responseData.subjectAttributes) {
+        this.setSubjectData(responseData.subjectKey, responseData.subjectAttributes);
+      }
+    };
+
     const pollingCallback = async () => {
       if (await this.precomputedFlagStore.isExpired()) {
         return precomputedRequestor.fetchAndStorePrecomputedFlags();
@@ -145,17 +160,19 @@ export default class EppoPrecomputedClient {
     }
   }
 
+  public setPrecomputedFlagStore(store: IConfigurationStore<PrecomputedFlag>) {
+    this.requestPoller?.stop();
+    this.precomputedFlagStore = store;
+  }
+
+  // Convenience method that combines both since they are expected to be set together
   public setSubjectAndPrecomputedFlagStore(
     subjectKey: string,
     subjectAttributes: Attributes,
     precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
   ) {
-    // Save the new subject data and precomputed flag store together because they are related
-    // Stop any polling process if it exists from previous subject data to protect consistency
-    this.requestPoller?.stop();
     this.setPrecomputedFlagStore(precomputedFlagStore);
-    this.subjectKey = subjectKey;
-    this.subjectAttributes = subjectAttributes;
+    this.setSubjectData(subjectKey, subjectAttributes);
   }
 
   private getPrecomputedAssignment<T>(
@@ -173,11 +190,10 @@ export default class EppoPrecomputedClient {
       return defaultValue;
     }
 
-    // Check variation type
-    if (preComputedFlag.variationType !== expectedType) {
-      logger.error(
-        `[Eppo SDK] Type mismatch: expected ${expectedType} but flag ${flagKey} has type ${preComputedFlag.variationType}`,
-      );
+    // Add type checking before proceeding
+    if (!checkTypeMatch(expectedType, preComputedFlag.variationType)) {
+      const errorMessage = `[Eppo SDK] Type mismatch: expected ${expectedType} but flag ${flagKey} has type ${preComputedFlag.variationType}`;
+      logger.error(errorMessage);
       return defaultValue;
     }
 
@@ -275,15 +291,16 @@ export default class EppoPrecomputedClient {
     );
   }
 
-  private getPrecomputedFlag(flagKey: string): PrecomputedFlag | null {
+  private getPrecomputedFlag(flagKey: string): DecodedPrecomputedFlag | null {
     return this.isObfuscated
       ? this.getObfuscatedFlag(flagKey)
       : this.precomputedFlagStore.get(flagKey);
   }
 
-  private getObfuscatedFlag(flagKey: string): PrecomputedFlag | null {
+  private getObfuscatedFlag(flagKey: string): DecodedPrecomputedFlag | null {
+    const saltedAndHashedFlagKey = getMD5Hash(flagKey, this.flagKeySalt);
     const precomputedFlag: PrecomputedFlag | null = this.precomputedFlagStore.get(
-      getMD5Hash(flagKey, this.precomputedFlagKeySalt),
+      saltedAndHashedFlagKey,
     ) as PrecomputedFlag;
     return precomputedFlag ? decodePrecomputedFlag(precomputedFlag) : null;
   }
