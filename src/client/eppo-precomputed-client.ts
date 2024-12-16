@@ -197,16 +197,16 @@ export default class EppoPrecomputedClient {
   ): T {
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
 
-    const preComputedFlag = this.getPrecomputedFlag(flagKey);
+    const precomputedFlag = this.getPrecomputedFlag(flagKey);
 
-    if (preComputedFlag == null) {
+    if (precomputedFlag == null) {
       logger.warn(`[Eppo SDK] No assigned variation. Flag not found: ${flagKey}`);
       return defaultValue;
     }
 
     // Add type checking before proceeding
-    if (!checkTypeMatch(expectedType, preComputedFlag.variationType)) {
-      const errorMessage = `[Eppo SDK] Type mismatch: expected ${expectedType} but flag ${flagKey} has type ${preComputedFlag.variationType}`;
+    if (!checkTypeMatch(expectedType, precomputedFlag.variationType)) {
+      const errorMessage = `[Eppo SDK] Type mismatch: expected ${expectedType} but flag ${flagKey} has type ${precomputedFlag.variationType}`;
       logger.error(errorMessage);
       return defaultValue;
     }
@@ -217,12 +217,12 @@ export default class EppoPrecomputedClient {
       subjectKey: this.subjectKey ?? '',
       subjectAttributes: this.subjectAttributes ?? {},
       variation: {
-        key: preComputedFlag.variationKey,
-        value: preComputedFlag.variationValue,
+        key: precomputedFlag.variationKey,
+        value: precomputedFlag.variationValue,
       },
-      allocationKey: preComputedFlag.allocationKey,
-      extraLogging: preComputedFlag.extraLogging,
-      doLog: preComputedFlag.doLog,
+      allocationKey: precomputedFlag.allocationKey,
+      extraLogging: precomputedFlag.extraLogging,
+      doLog: precomputedFlag.doLog,
     };
 
     try {
