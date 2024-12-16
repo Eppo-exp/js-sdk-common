@@ -144,12 +144,8 @@ export default class EppoPrecomputedClient {
 
     // A callback to capture the salt and subject information
     precomputedRequestor.onPrecomputedResponse = (responseData) => {
-      if (responseData.salt) {
-        this.setDecodedFlagKeySalt(decodeBase64(responseData.salt));
-      }
-      if (responseData.subjectKey && responseData.subjectAttributes) {
-        this.setSubjectData(responseData.subjectKey, responseData.subjectAttributes);
-      }
+      this.setDecodedFlagKeySalt(decodeBase64(responseData.salt));
+      this.setSubjectData(responseData.subjectKey, responseData.subjectAttributes);
     };
 
     const pollingCallback = async () => {

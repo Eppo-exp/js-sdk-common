@@ -5,9 +5,9 @@ import { PrecomputedFlag, UNKNOWN_ENVIRONMENT_NAME } from './interfaces';
 import { Attributes } from './types';
 
 export interface PrecomputedResponseData {
-  salt?: string;
-  subjectKey?: string;
-  subjectAttributes?: Attributes;
+  salt: string;
+  subjectKey: string;
+  subjectAttributes: Attributes;
 }
 
 // Requests AND stores precomputed flags, reuses the configuration store
@@ -27,9 +27,9 @@ export default class PrecomputedFlagRequestor {
       subject_attributes: this.subjectAttributes,
     });
 
-    if (this.onPrecomputedResponse) {
+    if (this.onPrecomputedResponse && precomputedResponse) {
       this.onPrecomputedResponse({
-        salt: precomputedResponse?.salt,
+        salt: precomputedResponse.salt,
         subjectKey: this.subjectKey,
         subjectAttributes: this.subjectAttributes,
       });
