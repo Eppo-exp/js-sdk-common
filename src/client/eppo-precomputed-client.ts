@@ -67,7 +67,7 @@ export default class EppoPrecomputedClient {
   public setDecodedFlagKeySalt(salt: string) {
     this.decodedFlagKeySalt = salt;
   }
-  // Individual methods for single responsibility
+
   public setPrecomputedFlagsRequestParameters(parameters: PrecomputedFlagsRequestParameters) {
     this.precomputedFlagsRequestParameters = parameters;
   }

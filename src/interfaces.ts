@@ -155,6 +155,7 @@ export type BasePrecomputedFlag = {
 export interface PrecomputedFlag extends BasePrecomputedFlag {
   variationValue: string;
 }
+
 export interface DecodedPrecomputedFlag extends BasePrecomputedFlag {
   variationValue: Variation['value'];
 }
