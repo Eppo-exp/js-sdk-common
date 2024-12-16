@@ -2,7 +2,7 @@ import ApiEndpoints from './api-endpoints';
 import { IPrecomputedConfigurationResponse } from './configuration';
 import {
   BanditParameters,
-  BanditVariation,
+  BanditReference,
   Environment,
   Flag,
   FormatEnum,
@@ -35,7 +35,7 @@ export interface IUniversalFlagConfigResponse {
   format: FormatEnum;
   environment: Environment;
   flags: Record<string, Flag>;
-  bandits: Record<string, BanditVariation[]>;
+  banditReferences: Record<string, BanditReference>;
 }
 
 export interface IBanditParametersResponse {
