@@ -21,6 +21,7 @@ import EppoClient, {
   IContainerExperiment,
 } from './client/eppo-client';
 import EppoPrecomputedClient, {
+  convertContextAttributesToSubjectAttributes,
   PrecomputedFlagsRequestParameters,
 } from './client/eppo-precomputed-client';
 import { IConfigurationWire, IPrecomputedConfigurationResponse } from './configuration';
@@ -75,6 +76,7 @@ export {
   // Precomputed Client
   PrecomputedFlagsRequestParameters,
   EppoPrecomputedClient,
+  convertContextAttributesToSubjectAttributes,
 
   // Configuration store
   IConfigurationStore,

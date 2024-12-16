@@ -20,7 +20,7 @@ import { DecodedPrecomputedFlag, PrecomputedFlag, VariationType } from '../inter
 import { decodeBase64, getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
-import { Attributes } from '../types';
+import { Attributes, ContextAttributes } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
@@ -44,6 +44,15 @@ export type PrecomputedFlagsRequestParameters = {
   throwOnFailedInitialization?: boolean;
   skipInitialPoll?: boolean;
 };
+
+export function convertContextAttributesToSubjectAttributes(
+  contextAttributes: ContextAttributes,
+): Attributes {
+  return {
+    ...(contextAttributes.numericAttributes || {}),
+    ...(contextAttributes.categoricalAttributes || {}),
+  };
+}
 
 export default class EppoPrecomputedClient {
   private readonly queuedAssignmentEvents: IAssignmentEvent[] = [];
