@@ -54,6 +54,11 @@ export function convertContextAttributesToSubjectAttributes(
   };
 }
 
+interface EppoPrecomputedClientOptions {
+  precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+  isObfuscated?: boolean;
+}
+
 export default class EppoPrecomputedClient {
   private readonly queuedAssignmentEvents: IAssignmentEvent[] = [];
   private assignmentLogger?: IAssignmentLogger;
@@ -63,11 +68,13 @@ export default class EppoPrecomputedClient {
   private subjectKey?: string;
   private subjectAttributes?: Attributes;
   private decodedFlagKeySalt = '';
+  private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+  private isObfuscated: boolean;
 
-  constructor(
-    private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
-    private isObfuscated = true,
-  ) {}
+  constructor(options: EppoPrecomputedClientOptions) {
+    this.precomputedFlagStore = options.precomputedFlagStore;
+    this.isObfuscated = options.isObfuscated ?? true; // Default to true if not provided
+  }
 
   public setIsObfuscated(isObfuscated: boolean) {
     this.isObfuscated = isObfuscated;
