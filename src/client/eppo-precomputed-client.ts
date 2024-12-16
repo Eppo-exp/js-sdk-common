@@ -66,7 +66,7 @@ export default class EppoPrecomputedClient {
 
   constructor(
     private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
-    private isObfuscated = false,
+    private isObfuscated = true,
   ) {}
 
   public setIsObfuscated(isObfuscated: boolean) {
