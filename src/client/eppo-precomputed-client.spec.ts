@@ -651,7 +651,12 @@ describe('EppoPrecomputedClient E2E test', () => {
       });
 
       const client = new EppoPrecomputedClient(storage, true);
-      client.setDecodedFlagKeySalt(salt);
+      client.setSubjectSaltAndPrecomputedFlagStore(
+        'test-subject',
+        { attr1: 'value1' },
+        encodeBase64(salt),
+        storage,
+      );
 
       expect(client.getStringAssignment(precomputedFlagKey, 'default')).toBe(
         mockPrecomputedFlag.variationValue,
@@ -688,7 +693,12 @@ describe('EppoPrecomputedClient E2E test', () => {
     });
 
     it('returns default value and does not log when store is not initialized', () => {
-      client.setSubjectAndPrecomputedFlagStore('test-subject', {}, store);
+      client.setSubjectSaltAndPrecomputedFlagStore(
+        'test-subject',
+        {},
+        encodeBase64('sodium-chloride'),
+        store,
+      );
       expect(client.getStringAssignment('test-flag', 'default')).toBe('default');
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(0);
     });
@@ -708,7 +718,12 @@ describe('EppoPrecomputedClient E2E test', () => {
           extraLogging: {},
         },
       });
-      client.setSubjectAndPrecomputedFlagStore(subjectKey, subjectAttributes, store);
+      client.setSubjectSaltAndPrecomputedFlagStore(
+        subjectKey,
+        subjectAttributes,
+        encodeBase64('sodium-chloride'),
+        store,
+      );
       expect(client.getStringAssignment('test-flag', 'default')).toBe('test-value');
 
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);

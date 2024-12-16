@@ -2,11 +2,10 @@ import { IConfigurationStore } from './configuration-store/configuration-store';
 import { hydrateConfigurationStore } from './configuration-store/configuration-store-utils';
 import { IHttpClient } from './http-client';
 import { PrecomputedFlag, UNKNOWN_ENVIRONMENT_NAME } from './interfaces';
-import { decodeBase64 } from './obfuscation';
 import { Attributes } from './types';
 
 export interface PrecomputedResponseData {
-  decodedSalt?: string;
+  salt?: string;
   subjectKey?: string;
   subjectAttributes?: Attributes;
 }
@@ -30,7 +29,7 @@ export default class PrecomputedFlagRequestor {
 
     if (this.onPrecomputedResponse) {
       this.onPrecomputedResponse({
-        decodedSalt: precomputedResponse?.salt ? decodeBase64(precomputedResponse.salt) : undefined,
+        salt: precomputedResponse?.salt,
         subjectKey: this.subjectKey,
         subjectAttributes: this.subjectAttributes,
       });

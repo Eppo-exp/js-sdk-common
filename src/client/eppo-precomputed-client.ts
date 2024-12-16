@@ -17,7 +17,7 @@ import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
 import { DecodedPrecomputedFlag, PrecomputedFlag, VariationType } from '../interfaces';
-import { getMD5Hash } from '../obfuscation';
+import { decodeBase64, getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
 import { Attributes } from '../types';
@@ -64,20 +64,20 @@ export default class EppoPrecomputedClient {
     this.isObfuscated = isObfuscated;
   }
 
-  public setDecodedFlagKeySalt(salt: string) {
+  private setDecodedFlagKeySalt(salt: string) {
     this.decodedFlagKeySalt = salt;
   }
 
-  public setPrecomputedFlagsRequestParameters(parameters: PrecomputedFlagsRequestParameters) {
+  private setPrecomputedFlagsRequestParameters(parameters: PrecomputedFlagsRequestParameters) {
     this.precomputedFlagsRequestParameters = parameters;
   }
 
-  public setSubjectData(subjectKey: string, subjectAttributes: Attributes) {
+  private setSubjectData(subjectKey: string, subjectAttributes: Attributes) {
     this.subjectKey = subjectKey;
     this.subjectAttributes = subjectAttributes;
   }
 
-  // Convenience method that combines both since they are expected to be set together
+  // Convenience method that combines setters we need to make assignments work
   public setSubjectAndPrecomputedFlagsRequestParameters(
     parameters: PrecomputedFlagsRequestParameters,
   ) {
@@ -128,8 +128,8 @@ export default class EppoPrecomputedClient {
 
     // A callback to capture the salt and subject information
     precomputedRequestor.onPrecomputedResponse = (responseData) => {
-      if (responseData.decodedSalt) {
-        this.setDecodedFlagKeySalt(responseData.decodedSalt);
+      if (responseData.salt) {
+        this.setDecodedFlagKeySalt(decodeBase64(responseData.salt));
       }
       if (responseData.subjectKey && responseData.subjectAttributes) {
         this.setSubjectData(responseData.subjectKey, responseData.subjectAttributes);
@@ -160,19 +160,21 @@ export default class EppoPrecomputedClient {
     }
   }
 
-  public setPrecomputedFlagStore(store: IConfigurationStore<PrecomputedFlag>) {
+  private setPrecomputedFlagStore(store: IConfigurationStore<PrecomputedFlag>) {
     this.requestPoller?.stop();
     this.precomputedFlagStore = store;
   }
 
-  // Convenience method that combines both since they are expected to be set together
-  public setSubjectAndPrecomputedFlagStore(
+  // Convenience method that combines setters we need to make assignments work
+  public setSubjectSaltAndPrecomputedFlagStore(
     subjectKey: string,
     subjectAttributes: Attributes,
+    salt: string,
     precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
   ) {
     this.setPrecomputedFlagStore(precomputedFlagStore);
     this.setSubjectData(subjectKey, subjectAttributes);
+    this.setDecodedFlagKeySalt(decodeBase64(salt));
   }
 
   private getPrecomputedAssignment<T>(
