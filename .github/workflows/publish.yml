@@ -2,9 +2,6 @@ name: Publish to NPM
 on:
   release:
     types: [published]
-  push:
-    branches:
-      - tp/**
 
 jobs:
   publish:
@@ -15,17 +12,25 @@ jobs:
       - name: Parse version from tag
         id: version
         uses: release-kit/semver@v2
-        with:
-          source: latest-tag
-          fallback: 'v7.1.0-alpha.1'
-      - name: Display semver components
+
+      - name: Display Release Plan
+        if: ${{ !github.event.release.prerelease && !steps.version.outputs.prerelease }
         run: |
-          echo "${{ steps.version.outputs.major }}"
-          echo "${{ steps.version.outputs.minor }}"
-          echo "${{ steps.version.outputs.patch }}"
-          echo "${{ steps.version.outputs.prerelease }}"
-          echo "${{ steps.version.outputs.build }}"
-          echo "${{ steps.version.outputs.full }}"
+          echo "Publishing release ${{ steps.version.outputs.full }}"
+
+      - name: Display Pre-release Plan
+        if: ${{ github.event.release.prerelease && steps.version.outputs.prerelease }
+        run: |
+          echo "Publishing pre-relese ${{ steps.version.outputs.full }}"
+
+      # - name: Display semver components
+      #   run: |
+      #     echo "${{ steps.version.outputs.major }}"
+      #     echo "${{ steps.version.outputs.minor }}"
+      #     echo "${{ steps.version.outputs.patch }}"
+      #     echo "${{ steps.version.outputs.prerelease }}"
+      #     echo "${{ steps.version.outputs.build }}"
+      #     echo "${{ steps.version.outputs.full }}"
           
       - uses: actions/setup-node@v3
         with:
@@ -39,7 +44,6 @@ jobs:
         with:
           token: ${{ secrets.NPM_TOKEN }}
           access: public
-          dry-run: true
 
       - name: Publish Pre-release
         uses: JS-DevTools/npm-publish@v3
@@ -47,7 +51,6 @@ jobs:
         with:
           token: ${{ secrets.NPM_TOKEN }}
           access: public
-          dry-run: true
           tag: ${{ steps.version.outputs.prerelease }}
 
       - name: Upload npm debug log
