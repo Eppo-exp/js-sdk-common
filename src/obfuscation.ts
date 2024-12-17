@@ -4,7 +4,7 @@ import * as SparkMD5 from 'spark-md5';
 import { PrecomputedFlag } from './interfaces';
 
 export function getMD5Hash(input: string, salt = ''): string {
-  return new SparkMD5().appendBinary(salt).append(input).end();
+  return new SparkMD5().append(salt).append(input).end();
 }
 
 export function encodeBase64(input: string) {

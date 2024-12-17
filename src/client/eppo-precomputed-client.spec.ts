@@ -702,7 +702,7 @@ describe('EppoPrecomputedClient E2E test', () => {
       client.setSubjectSaltAndPrecomputedFlagStore(
         'test-subject',
         { attr1: 'value1' },
-        encodeBase64(salt),
+        salt,
         storage,
       );
 
@@ -750,7 +750,7 @@ describe('EppoPrecomputedClient E2E test', () => {
       client.setSubjectSaltAndPrecomputedFlagStore(
         'test-subject',
         {},
-        encodeBase64('sodium-chloride'),
+        'sodiumchloride',
         store,
       );
       expect(client.getStringAssignment('test-flag', 'default')).toBe('default');
