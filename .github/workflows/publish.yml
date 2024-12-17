@@ -14,24 +14,23 @@ jobs:
         uses: release-kit/semver@v2
 
       - name: Display Release Plan
-        if: ${{ !github.event.release.prerelease && !steps.version.outputs.prerelease }
+        if: ${{ !github.event.release.prerelease && !steps.version.outputs.prerelease }}
         run: |
           echo "Publishing release ${{ steps.version.outputs.full }}"
 
       - name: Display Pre-release Plan
-        if: ${{ github.event.release.prerelease && steps.version.outputs.prerelease }
+        if: ${{ github.event.release.prerelease && steps.version.outputs.prerelease }}
         run: |
           echo "Publishing pre-relese ${{ steps.version.outputs.full }}"
 
-      # - name: Display semver components
-      #   run: |
-      #     echo "${{ steps.version.outputs.major }}"
-      #     echo "${{ steps.version.outputs.minor }}"
-      #     echo "${{ steps.version.outputs.patch }}"
-      #     echo "${{ steps.version.outputs.prerelease }}"
-      #     echo "${{ steps.version.outputs.build }}"
-      #     echo "${{ steps.version.outputs.full }}"
-          
+      - name: Validate inputs
+        if: ${{ (github.event.release.prerelease && !steps.version.outputs.prerelease) || (!github.event.release.prerelease && steps.version.outputs.prerelease) }}
+        run: |
+          RED='\033[0;31m'
+          NC='\033[0m' # No Color
+          echo -e "${RED}Pre-release label in semver but GitHub release is not marked as pre-release or vice-versa${NC}"
+          exit 1;
+
       - uses: actions/setup-node@v3
         with:
           node-version: '18.x'
