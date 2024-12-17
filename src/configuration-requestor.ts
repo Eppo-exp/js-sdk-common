@@ -1,12 +1,7 @@
 import { IConfigurationStore } from './configuration-store/configuration-store';
 import { hydrateConfigurationStore } from './configuration-store/configuration-store-utils';
 import { IHttpClient } from './http-client';
-import {
-  BanditVariation,
-  BanditParameters,
-  Flag,
-  BanditReference,
-} from './interfaces';
+import { BanditVariation, BanditParameters, Flag, BanditReference } from './interfaces';
 
 type Entry = Flag | BanditVariation[] | BanditParameters;
 
@@ -63,7 +58,8 @@ export default class ConfigurationRequestor {
             entries: banditResponse.bandits,
             environment: configResponse.environment,
             createdAt: configResponse.createdAt,
-            format: configResponse.format,});
+            format: configResponse.format,
+          });
 
           this.banditModelVersions = this.getLoadedBanditModelVersionsFromStore(
             this.banditModelConfigurationStore,

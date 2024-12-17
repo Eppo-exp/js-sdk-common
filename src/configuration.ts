@@ -1,6 +1,7 @@
 import { Environment, FormatEnum, IPrecomputedBandit, PrecomputedFlag } from './interfaces';
 import {
   generateSalt,
+  getMD5Hash,
   obfuscatePrecomputedBandits,
   obfuscatePrecomputedFlags,
 } from './obfuscation';
@@ -16,7 +17,7 @@ export interface IPrecomputedConfigurationResponse {
   // Environment might be missing if configuration was absent during evaluation.
   readonly environment?: Environment;
   readonly flags: Record<string, PrecomputedFlag>;
-  bandits: Record<string, Record<string, IPrecomputedBandit>>;
+  readonly bandits: Record<string, Record<string, IPrecomputedBandit>>;
 }
 
 export interface IPrecomputedConfiguration {
@@ -64,7 +65,7 @@ export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfigura
 
     const obfuscatedBandits = Object.fromEntries(
       Object.entries(bandits).map((entry) => {
-        const flagKey = entry[0];
+        const flagKey = getMD5Hash(entry[0], salt);
         const bandits = entry[1];
         const obfuscatedBandits = obfuscatePrecomputedBandits(salt, bandits);
 

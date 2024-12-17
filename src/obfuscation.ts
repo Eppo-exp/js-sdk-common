@@ -21,15 +21,31 @@ export function obfuscatePrecomputedBandits(
 ): Record<string, IPrecomputedBandit> {
   const obfuscatedBandits: Record<string, IPrecomputedBandit> = {};
 
-  Object.entries(bandits).map((entry) => {
+  Object.entries(bandits).forEach((entry) => {
     const [banditKey, banditResult] = entry;
 
-    // Encode metaData keys and values. ??
-    // const encodedMetaData = Object.fromEntries(
-    //   Object.entries(banditResult.metaData).map((kvArr) => kvArr.map(encodeBase64)),
-    // );
-    const encodedMetaData = banditResult.metaData;
+    // Encode metaData keys and values.
+    const encodedMetaData = Object.fromEntries(
+      Object.entries(banditResult.metaData).map((kvArr) => [
+        encodeBase64(kvArr[0]),
+        typeof kvArr[1] === 'string' ? encodeBase64(kvArr[1]) : kvArr[1],
+      ]),
+    ) as Record<string, unknown>;
 
+    const encodedAttributes = {
+      categoricalAttributes: Object.fromEntries(
+        Object.entries(banditResult.actionAttributes.categoricalAttributes).map((kvArr) => [
+          encodeBase64(kvArr[0]),
+          typeof kvArr[1] === 'string' ? encodeBase64(kvArr[1]) : kvArr[1],
+        ]),
+      ),
+      numericAttributes: Object.fromEntries(
+        Object.entries(banditResult.actionAttributes.numericAttributes).map((kvArr) => [
+          encodeBase64(kvArr[0]),
+          kvArr[1], // Numeric data is not expected to be encoded
+        ]),
+      ),
+    };
     const hashedKey = getMD5Hash(salt + banditKey); //flagKey, salt);
     obfuscatedBandits[hashedKey] = {
       action: banditResult.action ? encodeBase64(banditResult.action) : null,
@@ -37,10 +53,7 @@ export function obfuscatePrecomputedBandits(
       actionProbability: banditResult.actionProbability,
       optimalityGap: banditResult.optimalityGap,
       modelVersion: encodeBase64(banditResult.modelVersion),
-      actionAttributes: {
-        categoricalAttributes: {},
-        numericAttributes: {},
-      },
+      actionAttributes: encodedAttributes,
       metaData: encodedMetaData,
     };
   });
@@ -53,7 +66,7 @@ export function obfuscatePrecomputedFlags(
 ): Record<string, PrecomputedFlag> {
   const response: Record<string, PrecomputedFlag> = {};
 
-  Object.keys(precomputedFlags).map((flagKey) => {
+  Object.keys(precomputedFlags).forEach((flagKey) => {
     const assignment = precomputedFlags[flagKey];
 
     // Encode extraLogging keys and values.

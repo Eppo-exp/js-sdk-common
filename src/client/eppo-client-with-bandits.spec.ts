@@ -24,6 +24,7 @@ import {
 } from '../flag-evaluation-details-builder';
 import FetchHttpClient from '../http-client';
 import { BanditVariation, BanditParameters, Flag } from '../interfaces';
+import { setSaltOverrideForTests } from '../obfuscation';
 import { Attributes, BanditActions, ContextAttributes } from '../types';
 
 import EppoClient, { IAssignmentDetails } from './eppo-client';
@@ -694,12 +695,13 @@ describe('EppoClient Bandits E2E test', () => {
       subjectKey: string,
       subjectAttributes: ContextAttributes,
       banditActions: Record<string, BanditActions>,
+      obfuscate = false,
     ): IPrecomputedConfiguration {
       const precomputedResults = client.getPrecomputedConfiguration(
         subjectKey,
         subjectAttributes,
         banditActions,
-        false,
+        obfuscate,
       );
 
       const { precomputed } = JSON.parse(precomputedResults) as IConfigurationWire;
@@ -800,14 +802,49 @@ describe('EppoClient Bandits E2E test', () => {
       });
     });
     describe('obfuscated results', () => {
+      beforeEach(() => {
+        setSaltOverrideForTests(new Uint8Array([101, 112, 112, 111])); // e p p o => "ZXBwbw=="
+      });
+
+      afterAll(() => {
+        setSaltOverrideForTests(null);
+      });
+
       it('obfuscates precomputed bandits', () => {
-        // const precomputedResults = client.getPrecomputedConfiguration(
-        //   subjectKey,
-        //   subjectAttributes,
-        //   actions,
-        //   true,
+        const bannerBanditFlagMd5 = '3ac89e06235484aa6f2aec8c33109a02';
+        const bannerBanditMd5 = 'ab3b803145eaf10eaceb8228224b6549';
+        const brandAffinityB64 = 'YnJhbmRfYWZmaW5pdHk=';
+        const loyaltyTierB64 = 'bG95YWx0eV90aWVy';
+        const bronzeB64 = 'YnJvbnpl';
+        const adidasB64 = 'YWRpZGFz';
+        const modelB64 = 'MTIz'; // 123
+
+        const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions, true);
+
+        const response = JSON.parse(precomputed.response) as IPrecomputedConfigurationResponse;
+        // console.log(response.bandits);
+        // console.log(response.bandits['banner_bandit_flag']['banner_bandit']['actionAttributes']);
+        console.log(response);
+        console.log(response.bandits);
+        console.log(response.bandits[bannerBanditFlagMd5]);
+        console.log(response.bandits[bannerBanditFlagMd5][bannerBanditMd5]);
+        console.log(response.bandits[bannerBanditFlagMd5][bannerBanditMd5]['metaData']);
+        // console.log(
+        //   response.bandits[bannerBanditFlagMd5][bannerBanditMd5]['actionAttributes']
+        //     .numericAttributes,
         // );
-        // console.log(precomputedResults);
+
+        const attributes =
+          response.bandits[bannerBanditFlagMd5][bannerBanditMd5]['actionAttributes'];
+        expect(response.bandits[bannerBanditFlagMd5][bannerBanditMd5]['variation']).toEqual(
+          bannerBanditMd5,
+        );
+        expect(response.bandits[bannerBanditFlagMd5][bannerBanditMd5]['action']).toEqual(adidasB64);
+        expect(response.bandits[bannerBanditFlagMd5][bannerBanditMd5]['modelVersion']).toEqual(
+          modelB64,
+        );
+        expect(attributes.categoricalAttributes[loyaltyTierB64]).toEqual(bronzeB64);
+        expect(attributes.numericAttributes[brandAffinityB64]).toEqual(-2.5);
       });
     });
   });
