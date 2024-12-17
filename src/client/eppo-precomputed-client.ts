@@ -17,7 +17,7 @@ import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
 import { DecodedPrecomputedFlag, PrecomputedFlag, VariationType } from '../interfaces';
-import { decodeBase64, getMD5Hash } from '../obfuscation';
+import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
 import { Attributes, ContextAttributes } from '../types';
