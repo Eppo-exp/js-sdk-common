@@ -17,8 +17,8 @@ jobs:
         uses: release-kit/semver@v2
         with:
           source: latest-tag
-          fallback: 'v7.1.0-alpha+1'
-      - name: Use parsed version
+          fallback: 'v7.1.0-alpha.1'
+      - name: Display semver components
         run: |
           echo "${{ steps.version.outputs.major }}"
           echo "${{ steps.version.outputs.minor }}"
@@ -41,9 +41,9 @@ jobs:
           access: public
           dry-run: true
 
-      - name: Publish Prelease
+      - name: Publish Pre-release
         uses: JS-DevTools/npm-publish@v3
-        if: ${{ steps.version.outputs.prerelease }}
+        if: ${{ github.event.release.prerelease && steps.version.outputs.prerelease }}
         with:
           token: ${{ secrets.NPM_TOKEN }}
           access: public
