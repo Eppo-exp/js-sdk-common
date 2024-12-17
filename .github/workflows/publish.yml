@@ -33,12 +33,22 @@ jobs:
       - run: yarn install
       - run: yarn test
 
-      - uses: JS-DevTools/npm-publish@v3
+      - name: Publish Latest
+        uses: JS-DevTools/npm-publish@v3
         if: ${{ !github.event.release.prerelease && !steps.version.outputs.prerelease }}
         with:
           token: ${{ secrets.NPM_TOKEN }}
           access: public
           dry-run: true
+
+      - name: Publish Prelease
+        uses: JS-DevTools/npm-publish@v3
+        if: ${{ steps.version.outputs.prerelease }}
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
+          access: public
+          dry-run: true
+          tag: ${{ steps.version.outputs.prerelease }}
 
       - name: Upload npm debug log
         if: failure()  # This step will run only if the previous steps failed
