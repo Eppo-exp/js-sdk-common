@@ -1,7 +1,7 @@
 import base64 = require('js-base64');
 import * as SparkMD5 from 'spark-md5';
 
-import { PrecomputedFlag } from './interfaces';
+import { IPrecomputedBandit, PrecomputedFlag } from './interfaces';
 
 export function getMD5Hash(input: string, salt = ''): string {
   return new SparkMD5().append(salt).append(input).end();
@@ -13,6 +13,38 @@ export function encodeBase64(input: string) {
 
 export function decodeBase64(input: string) {
   return base64.atobPolyfill(input);
+}
+
+export function obfuscatePrecomputedBandits(
+  salt: string,
+  bandits: Record<string, IPrecomputedBandit>,
+): Record<string, IPrecomputedBandit> {
+  const obfuscatedBandits: Record<string, IPrecomputedBandit> = {};
+
+  Object.entries(bandits).map((entry) => {
+    const [banditKey, banditResult] = entry;
+
+    // Encode metaData keys and values. ??
+    // const encodedMetaData = Object.fromEntries(
+    //   Object.entries(banditResult.metaData).map((kvArr) => kvArr.map(encodeBase64)),
+    // );
+    const encodedMetaData = banditResult.metaData;
+
+    const hashedKey = getMD5Hash(salt + banditKey); //flagKey, salt);
+    obfuscatedBandits[hashedKey] = {
+      action: banditResult.action ? encodeBase64(banditResult.action) : null,
+      variation: hashedKey,
+      actionProbability: banditResult.actionProbability,
+      optimalityGap: banditResult.optimalityGap,
+      modelVersion: encodeBase64(banditResult.modelVersion),
+      actionAttributes: {
+        categoricalAttributes: {},
+        numericAttributes: {},
+      },
+      metaData: encodedMetaData,
+    };
+  });
+  return obfuscatedBandits;
 }
 
 export function obfuscatePrecomputedFlags(

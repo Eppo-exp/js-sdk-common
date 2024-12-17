@@ -1,5 +1,5 @@
 import { Rule } from './rules';
-import { Attributes } from './types';
+import { Attributes, ContextAttributes } from './types';
 
 export enum VariationType {
   STRING = 'STRING',
@@ -156,6 +156,16 @@ export interface PrecomputedFlag {
   variationValue: string;
   extraLogging: Record<string, string>;
   doLog: boolean;
+}
+
+export interface IPrecomputedBandit {
+  action: string | null;
+  variation: string;
+  actionProbability: number;
+  optimalityGap: number;
+  modelVersion: string;
+  actionAttributes: ContextAttributes;
+  metaData: Record<string, unknown>;
 }
 
 export interface PrecomputedFlagsDetails {
