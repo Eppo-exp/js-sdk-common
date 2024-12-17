@@ -16,8 +16,17 @@ jobs:
         id: version
         uses: release-kit/semver@v2
         with:
+          source: latest-tag
           fallback: 'v7.1.0-alpha+1'
-
+      - name: Use parsed version
+        run: |
+          echo "${{ steps.version.outputs.major }}"
+          echo "${{ steps.version.outputs.minor }}"
+          echo "${{ steps.version.outputs.patch }}"
+          echo "${{ steps.version.outputs.prerelease }}"
+          echo "${{ steps.version.outputs.build }}"
+          echo "${{ steps.version.outputs.full }}"
+          
       - uses: actions/setup-node@v3
         with:
           node-version: '18.x'
