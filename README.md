@@ -32,3 +32,21 @@ It may be useful to install the local version of this package as you develop the
 This can be done in two steps:
 1. Open the directory with the client SDK you want to add this library to, and run `make prepare`
 2. Add the local version of this library to the SDK you are developing by running `yarn add --force file:../js-client-sdk-common` (this assumes both repositories were cloned into the same directory)
+
+### Publishing Releases
+
+When publishing releases, the following rules apply:
+
+- **Standard Release**: 
+  - Create a release with tag format `vX.Y.Z` (e.g., `v4.3.5`)
+  - Keep "Set as latest release" checked
+  - Package will be published to NPM with the `latest` tag
+
+- **Pre-release**:
+  - Create a release with tag format `vX.Y.Z-label.N` (e.g., `v4.3.5-alpha.1`)
+  - Check the "Set as pre-release" option
+  - Package will be published to NPM with the pre-release label as its tag (e.g., `alpha.1`)
+
+**Note**: The release will not be published if:
+- A pre-release is marked as "latest"
+- A pre-release label is used without checking "Set as pre-release"
