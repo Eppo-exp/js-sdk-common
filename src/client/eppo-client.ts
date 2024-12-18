@@ -956,11 +956,11 @@ export default class EppoClient {
     validateNotBlank(subjectKey, 'Invalid argument: subjectKey cannot be blank');
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
 
-    // Check for override early
+    const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
+
     const overrideVariation = this.overridesStore?.get(getMD5Hash(flagKey));
     if (overrideVariation) {
       const configFormat = this.overridesStore?.getFormat() ?? '';
-      const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
       const flagEvaluationDetails = flagEvaluationDetailsBuilder
         .setMatch(
           0,
@@ -984,7 +984,6 @@ export default class EppoClient {
       };
     }
 
-    const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
     const configDetails = this.getConfigDetails();
     const flag = this.getFlag(flagKey);
 
