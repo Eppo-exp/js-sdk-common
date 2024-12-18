@@ -942,8 +942,7 @@ export default class EppoClient {
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
 
     const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
-
-    const overrideVariation = this.overridesStore?.get(getMD5Hash(flagKey));
+    const overrideVariation = this.overridesStore?.get(flagKey);
     if (overrideVariation) {
       const configFormat = this.overridesStore?.getFormat() ?? '';
       const flagEvaluationDetails = flagEvaluationDetailsBuilder
