@@ -45,7 +45,7 @@ import EventDispatcher from './events/event-dispatcher';
 import NamedEventQueue from './events/named-event-queue';
 import NetworkStatusListener from './events/network-status-listener';
 import HttpClient from './http-client';
-import { PrecomputedFlag, Flag, ObfuscatedFlag, VariationType } from './interfaces';
+import { PrecomputedFlag, Flag, ObfuscatedFlag, Variation, VariationType } from './interfaces';
 import {
   AttributeType,
   Attributes,
@@ -99,6 +99,7 @@ export {
   FlagConfigurationRequestParameters,
   Flag,
   ObfuscatedFlag,
+  Variation,
   VariationType,
   AttributeType,
   Attributes,
