@@ -15,4 +15,3 @@ export const NULL_SENTINEL = 'EPPO_NULL';
 export const MAX_EVENT_QUEUE_SIZE = 100;
 export const BANDIT_ASSIGNMENT_SHARDS = 10000;
 export const DEFAULT_TLRU_TTL_MS = 600_000;
-export const OVERRIDES_KEY = 'eppo-overrides';
