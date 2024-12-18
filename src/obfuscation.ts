@@ -26,7 +26,7 @@ export function obfuscatePrecomputedFlags(
 
     // Encode extraLogging keys and values.
     const encodedExtraLogging = Object.fromEntries(
-      Object.entries(assignment.extraLogging).map((kvArr) => kvArr.map(encodeBase64)),
+      Object.entries(assignment.extraLogging ?? {}).map((kvArr) => kvArr.map(encodeBase64)),
     );
 
     const hashedKey = getMD5Hash(flagKey, salt);
@@ -35,8 +35,8 @@ export function obfuscatePrecomputedFlags(
       variationType: assignment.variationType,
       extraLogging: encodedExtraLogging,
       doLog: assignment.doLog,
-      allocationKey: encodeBase64(assignment.allocationKey),
-      variationKey: encodeBase64(assignment.variationKey),
+      allocationKey: encodeBase64(assignment.allocationKey ?? ''),
+      variationKey: encodeBase64(assignment.variationKey ?? ''),
       variationValue: encodeBase64(assignment.variationValue),
     };
   });

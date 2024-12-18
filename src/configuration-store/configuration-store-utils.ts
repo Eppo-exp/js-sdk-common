@@ -17,6 +17,7 @@ export async function hydrateConfigurationStore<T extends Entry>(
     environment: Environment;
     createdAt: string;
     format: string;
+    salt?: string;
   },
 ): Promise<void> {
   if (configurationStore) {
@@ -26,6 +27,7 @@ export async function hydrateConfigurationStore<T extends Entry>(
       configurationStore.setConfigFetchedAt(new Date().toISOString());
       configurationStore.setConfigPublishedAt(response.createdAt);
       configurationStore.setFormat(response.format);
+      configurationStore.salt = response.salt;
     }
   }
 }

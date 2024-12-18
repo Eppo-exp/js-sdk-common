@@ -1,4 +1,5 @@
 import ApiEndpoints from './api-endpoints';
+import { ensureContextualSubjectAttributes } from './attributes';
 import { IConfigurationStore } from './configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import FetchHttpClient, { IHttpClient } from './http-client';
@@ -52,9 +53,9 @@ describe('PrecomputedRequestor', () => {
       httpClient,
       precomputedFlagStore,
       'subject-key',
-      {
+      ensureContextualSubjectAttributes({
         'attribute-key': 'attribute-value',
-      },
+      }),
     );
 
     fetchSpy = jest.fn(() => {

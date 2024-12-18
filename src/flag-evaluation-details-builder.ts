@@ -11,7 +11,7 @@ export const flagEvaluationCodes = [
   'BANDIT_ERROR',
 ] as const;
 
-export type FlagEvaluationCode = typeof flagEvaluationCodes[number];
+export type FlagEvaluationCode = (typeof flagEvaluationCodes)[number];
 
 export enum AllocationEvaluationCode {
   UNEVALUATED = 'UNEVALUATED',

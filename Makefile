@@ -36,6 +36,7 @@ test-data:
 	mkdir -p $(tempDir)
 	git clone -b ${branchName} --depth 1 --single-branch ${githubRepoLink} ${gitDataDir}
 	cp -r ${gitDataDir}ufc ${testDataDir}
+	cp -r ${gitDataDir}configuration-wire ${testDataDir}
 	rm -rf ${tempDir}
 
 ## prepare
