@@ -82,9 +82,9 @@ export function decodeObject(obj: Record<string, string>): Record<string, string
 export function decodePrecomputedFlag(precomputedFlag: PrecomputedFlag): DecodedPrecomputedFlag {
   return {
     ...precomputedFlag,
-    allocationKey: decodeBase64(precomputedFlag.allocationKey),
-    variationKey: decodeBase64(precomputedFlag.variationKey),
+    allocationKey: decodeBase64(precomputedFlag.allocationKey ?? ''),
+    variationKey: decodeBase64(precomputedFlag.variationKey ?? ''),
     variationValue: decodeValue(precomputedFlag.variationValue, precomputedFlag.variationType),
-    extraLogging: decodeObject(precomputedFlag.extraLogging),
+    extraLogging: decodeObject(precomputedFlag.extraLogging ?? {}),
   };
 }

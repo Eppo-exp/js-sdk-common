@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 
-import { AttributeType, VariationType } from '../src';
+import { Attributes, AttributeType, VariationType } from '../src';
+import { ensureContextualSubjectAttributes } from '../src/attributes';
 import { IAssignmentDetails } from '../src/client/eppo-client';
 import { IFlagEvaluationDetails } from '../src/flag-evaluation-details-builder';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from '../src/http-client';
@@ -49,6 +50,13 @@ interface BanditTestCaseSubject {
 
 interface BanditTestCaseAction extends ContextAttributes {
   actionKey: string;
+}
+
+// An alias to make tests a little more readable.
+export function buildContextAttributes(
+  attributes: Attributes | ContextAttributes,
+): ContextAttributes {
+  return ensureContextualSubjectAttributes(attributes);
 }
 
 export function readMockUFCResponse(

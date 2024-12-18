@@ -1,6 +1,7 @@
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
+import { ensureNonContextualSubjectAttributes } from '../attributes';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
@@ -33,7 +34,7 @@ export type PrecomputedFlagsRequestParameters = {
   baseUrl?: string;
   precompute: {
     subjectKey: string;
-    subjectAttributes: Attributes;
+    subjectAttributes: ContextAttributes;
   };
   requestTimeoutMs?: number;
   pollingIntervalMs?: number;
@@ -56,7 +57,6 @@ export function convertContextAttributesToSubjectAttributes(
 
 interface EppoPrecomputedClientOptions {
   precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
-  isObfuscated?: boolean;
 }
 
 export default class EppoPrecomputedClient {
@@ -66,37 +66,34 @@ export default class EppoPrecomputedClient {
   private requestPoller?: IPoller;
   private precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters;
   private subjectKey?: string;
-  private subjectAttributes?: Attributes;
-  private flagKeySalt = '';
+  private subjectAttributes?: ContextAttributes;
   private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
-  private isObfuscated: boolean;
 
-  constructor(options: EppoPrecomputedClientOptions) {
+  public constructor(
+    options: EppoPrecomputedClientOptions,
+    precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters,
+  ) {
     this.precomputedFlagStore = options.precomputedFlagStore;
-    this.isObfuscated = options.isObfuscated ?? true; // Default to true if not provided
-  }
-
-  public setIsObfuscated(isObfuscated: boolean) {
-    this.isObfuscated = isObfuscated;
-  }
-
-  private setFlagKeySalt(salt: string) {
-    this.flagKeySalt = salt;
+    if (precomputedFlagsRequestParameters) {
+      this.setPrecomputedFlagsRequestParameters(precomputedFlagsRequestParameters);
+      this.setSubjectData(
+        precomputedFlagsRequestParameters.precompute.subjectKey,
+        precomputedFlagsRequestParameters.precompute.subjectAttributes,
+      );
+    }
   }
 
   private setPrecomputedFlagsRequestParameters(parameters: PrecomputedFlagsRequestParameters) {
     this.precomputedFlagsRequestParameters = parameters;
   }
 
-  private setSubjectData(subjectKey: string, subjectAttributes: Attributes) {
+  private setSubjectData(subjectKey: string, subjectAttributes: ContextAttributes) {
     this.subjectKey = subjectKey;
     this.subjectAttributes = subjectAttributes;
   }
 
   // Convenience method that combines setters we need to make assignments work
-  public setSubjectAndPrecomputedFlagsRequestParameters(
-    parameters: PrecomputedFlagsRequestParameters,
-  ) {
+  setSubjectAndPrecomputedFlagsRequestParameters(parameters: PrecomputedFlagsRequestParameters) {
     this.setPrecomputedFlagsRequestParameters(parameters);
     this.setSubjectData(parameters.precompute.subjectKey, parameters.precompute.subjectAttributes);
   }
@@ -142,12 +139,6 @@ export default class EppoPrecomputedClient {
       subjectAttributes,
     );
 
-    // A callback to capture the salt and subject information
-    precomputedRequestor.onPrecomputedResponse = (responseData) => {
-      this.setFlagKeySalt(responseData.salt);
-      this.setSubjectData(responseData.subjectKey, responseData.subjectAttributes);
-    };
-
     const pollingCallback = async () => {
       if (await this.precomputedFlagStore.isExpired()) {
         return precomputedRequestor.fetchAndStorePrecomputedFlags();
@@ -178,15 +169,14 @@ export default class EppoPrecomputedClient {
   }
 
   // Convenience method that combines setters we need to make assignments work
-  public setSubjectSaltAndPrecomputedFlagStore(
+  // TODO: remove this method
+  setSubjectAndPrecomputedFlagStore(
     subjectKey: string,
-    subjectAttributes: Attributes,
-    salt: string,
+    subjectAttributes: ContextAttributes,
     precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
   ) {
     this.setPrecomputedFlagStore(precomputedFlagStore);
     this.setSubjectData(subjectKey, subjectAttributes);
-    this.setFlagKeySalt(salt);
   }
 
   private getPrecomputedAssignment<T>(
@@ -215,13 +205,13 @@ export default class EppoPrecomputedClient {
       flagKey,
       format: this.precomputedFlagStore.getFormat() ?? '',
       subjectKey: this.subjectKey ?? '',
-      subjectAttributes: this.subjectAttributes ?? {},
+      subjectAttributes: ensureNonContextualSubjectAttributes(this.subjectAttributes ?? {}),
       variation: {
-        key: precomputedFlag.variationKey,
+        key: precomputedFlag.variationKey ?? '',
         value: precomputedFlag.variationValue,
       },
-      allocationKey: precomputedFlag.allocationKey,
-      extraLogging: precomputedFlag.extraLogging,
+      allocationKey: precomputedFlag.allocationKey ?? '',
+      extraLogging: precomputedFlag.extraLogging ?? {},
       doLog: precomputedFlag.doLog,
     };
 
@@ -306,13 +296,12 @@ export default class EppoPrecomputedClient {
   }
 
   private getPrecomputedFlag(flagKey: string): DecodedPrecomputedFlag | null {
-    return this.isObfuscated
-      ? this.getObfuscatedFlag(flagKey)
-      : this.precomputedFlagStore.get(flagKey);
+    return this.getObfuscatedFlag(flagKey);
   }
 
   private getObfuscatedFlag(flagKey: string): DecodedPrecomputedFlag | null {
-    const saltedAndHashedFlagKey = getMD5Hash(flagKey, this.flagKeySalt);
+    const salt = this.precomputedFlagStore.salt;
+    const saltedAndHashedFlagKey = getMD5Hash(flagKey, salt);
     const precomputedFlag: PrecomputedFlag | null = this.precomputedFlagStore.get(
       saltedAndHashedFlagKey,
     ) as PrecomputedFlag;
@@ -416,7 +405,7 @@ export default class EppoPrecomputedClient {
 
   private buildLoggerMetadata(): Record<string, unknown> {
     return {
-      obfuscated: this.isObfuscated,
+      obfuscated: true,
       sdkLanguage: 'javascript',
       sdkLibVersion: LIB_VERSION,
     };
