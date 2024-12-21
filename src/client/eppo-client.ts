@@ -209,6 +209,10 @@ export default class EppoClient {
     this.overridesStore = store;
   }
 
+  unsetOverridesStore(): void {
+    this.overridesStore = undefined;
+  }
+
   async fetchFlagConfigurations() {
     if (!this.configurationRequestParameters) {
       throw new Error(
