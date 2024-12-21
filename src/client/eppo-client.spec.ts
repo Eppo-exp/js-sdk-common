@@ -1134,5 +1134,19 @@ describe('EppoClient E2E test', () => {
       // Should log the normal assignment
       expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
     });
+
+    it('reverts to normal assignment after unsetting overrides store', () => {
+      overrideStore.setEntries({
+        [flagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+
+      client.unsetOverridesStore();
+
+      const normalAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+      expect(normalAssignment).toBe(variationA.value);
+    });
   });
 });
