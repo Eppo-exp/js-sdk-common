@@ -21,7 +21,7 @@ import {
   PrecomputedConfiguration,
 } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
-import { IConfigurationStore } from '../configuration-store/configuration-store';
+import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -124,7 +124,7 @@ export default class EppoClient {
   private isObfuscated: boolean;
   private requestPoller?: IPoller;
   private readonly evaluator = new Evaluator();
-  protected overridesStore?: IConfigurationStore<Variation>;
+  protected overridesStore?: ISyncStore<Variation>;
 
   constructor({
     eventDispatcher = new NoOpEventDispatcher(),
@@ -205,7 +205,7 @@ export default class EppoClient {
     this.isObfuscated = isObfuscated;
   }
 
-  setOverridesStore(store: IConfigurationStore<Variation>): void {
+  setOverridesStore(store: ISyncStore<Variation>): void {
     this.overridesStore = store;
   }
 
@@ -959,7 +959,6 @@ export default class EppoClient {
     const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
     const overrideVariation = this.overridesStore?.get(flagKey);
     if (overrideVariation) {
-      const configFormat = this.overridesStore?.getFormat() ?? '';
       const flagEvaluationDetails = flagEvaluationDetailsBuilder
         .setMatch(
           0,
@@ -977,7 +976,7 @@ export default class EppoClient {
         subjectAttributes,
         flagEvaluationDetails,
         doLog: false,
-        format: configFormat,
+        format: '',
         allocationKey: 'override',
         extraLogging: {},
       };
