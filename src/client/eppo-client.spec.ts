@@ -13,6 +13,7 @@ import {
   validateTestAssignments,
 } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
+import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { IConfigurationWire } from '../configuration';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
@@ -1020,6 +1021,11 @@ describe('EppoClient E2E test', () => {
     });
 
     it('does not update assignment cache when override is applied', () => {
+      const mockAssignmentCache = td.object<AssignmentCache>();
+      td.when(mockAssignmentCache.has(td.matchers.anything())).thenReturn(false);
+      td.when(mockAssignmentCache.set(td.matchers.anything())).thenReturn();
+      client.useCustomAssignmentCache(mockAssignmentCache);
+
       overrideStore.setEntries({
         [flagKey]: {
           key: 'override-variation',
@@ -1030,17 +1036,17 @@ describe('EppoClient E2E test', () => {
       // First call with override
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
 
+      // Verify cache was not used at all
+      expect(td.explain(mockAssignmentCache.set).callCount).toBe(0);
+
       // Remove override
       overrideStore.setEntries({});
 
-      // Second call without override should trigger logging since cache wasn't updated
+      // Second call without override
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
 
-      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
-      expect(td.explain(mockLogger.logAssignment).calls[0].args[0]).toMatchObject({
-        featureFlag: flagKey,
-        subject: 'subject-10',
-      });
+      // Now cache should be used
+      expect(td.explain(mockAssignmentCache.set).callCount).toBe(1);
     });
 
     it('uses normal assignment when no override exists for flag', () => {
@@ -1075,6 +1081,48 @@ describe('EppoClient E2E test', () => {
 
       // Should get the normal assignment value from mockFlag
       expect(result).toBe(variationA.value);
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+    });
+
+    it('respects override after initial assignment without override', () => {
+      // First call without override
+      const initialAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+      expect(initialAssignment).toBe(variationA.value);
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+
+      // Set override and make second call
+      overrideStore.setEntries({
+        [flagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+
+      const overriddenAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+      expect(overriddenAssignment).toBe('override-value');
+      // No additional logging should occur when using override
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+    });
+
+    it('reverts to normal assignment after removing override', () => {
+      // Set initial override
+      overrideStore.setEntries({
+        [flagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+
+      const overriddenAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+      expect(overriddenAssignment).toBe('override-value');
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(0);
+
+      // Remove override and make second call
+      overrideStore.setEntries({});
+
+      const normalAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+      expect(normalAssignment).toBe(variationA.value);
+      // Should log the normal assignment
       expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
     });
   });
