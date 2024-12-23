@@ -98,6 +98,7 @@ export default class EppoClient {
   private configurationRequestParameters?: FlagConfigurationRequestParameters;
   private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
   private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
+  private overridesStore?: ISyncStore<Variation>;
   private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
@@ -106,7 +107,6 @@ export default class EppoClient {
   private isObfuscated: boolean;
   private requestPoller?: IPoller;
   private readonly evaluator = new Evaluator();
-  protected overridesStore?: ISyncStore<Variation>;
 
   constructor({
     eventDispatcher = new NoOpEventDispatcher(),
@@ -114,8 +114,8 @@ export default class EppoClient {
     flagConfigurationStore,
     banditVariationConfigurationStore,
     banditModelConfigurationStore,
-    configurationRequestParameters,
     overridesStore,
+    configurationRequestParameters,
   }: {
     // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
     // or bandit events). These events are application-specific and captures by EppoClient#track API.
