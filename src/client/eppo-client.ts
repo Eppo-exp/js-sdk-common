@@ -948,11 +948,12 @@ export default class EppoClient {
     const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
     const overrideVariation = this.overridesStore?.get(flagKey);
     if (overrideVariation) {
+      const overrideAllocationKey = 'override-' + overrideVariation.key;
       const flagEvaluationDetails = flagEvaluationDetailsBuilder
         .setMatch(
           0,
           overrideVariation,
-          { key: overrideVariation.key, splits: [], doLog: false },
+          { key: overrideAllocationKey, splits: [], doLog: false },
           null,
           undefined,
         )
