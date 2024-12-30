@@ -1,5 +1,5 @@
 import base64 = require('js-base64');
-import SparkMD5 from 'spark-md5';
+import * as SparkMD5 from 'spark-md5';
 
 import { PrecomputedFlag } from './interfaces';
 
