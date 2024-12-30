@@ -1,5 +1,5 @@
 import base64 = require('js-base64');
-import * as SparkMD5 from 'spark-md5';
+import SparkMD5 from 'spark-md5';
 
 import { PrecomputedFlag } from './interfaces';
 
@@ -8,11 +8,11 @@ export function getMD5Hash(input: string, salt = ''): string {
 }
 
 export function encodeBase64(input: string) {
-  return base64.btoaPolyfill(input);
+  return base64.encode(input);
 }
 
 export function decodeBase64(input: string) {
-  return base64.atobPolyfill(input);
+  return base64.decode(input);
 }
 
 export function obfuscatePrecomputedFlags(
