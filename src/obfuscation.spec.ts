@@ -18,12 +18,14 @@ describe('obfuscation', () => {
   });
 
   it('encodes/decodes special characters', () => {
-    const strings = ['kümmert', 'заботится', '照顾', '🤗🌸'];
+    const strings = ['kümmert', 'піклуватися', '照顾', '🤗🌸'];
 
     strings.forEach((string) => {
       expect(decodeBase64(encodeBase64(string))).toEqual(string);
       expect(decodeBase64(encodeBase64(string))).toEqual(string);
     });
+
+    expect(decodeBase64('a8O8bW1lcnQ=')).toEqual('kümmert');
   });
 
   describe('salt', () => {
