@@ -1,11 +1,10 @@
 import * as fs from 'fs';
 
-import { AttributeType, VariationType } from '../src';
-import { IAssignmentDetails } from '../src/client/eppo-client';
+import { isEqual } from 'lodash';
+
+import { AttributeType, ContextAttributes, IAssignmentDetails, VariationType } from '../src';
 import { IFlagEvaluationDetails } from '../src/flag-evaluation-details-builder';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from '../src/http-client';
-import { ContextAttributes } from '../src/types';
-import { isEqual } from 'lodash';
 
 export const TEST_DATA_DIR = './test/data/ufc/';
 export const ASSIGNMENT_TEST_DATA_DIR = TEST_DATA_DIR + 'tests/';
