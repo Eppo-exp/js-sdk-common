@@ -1,4 +1,4 @@
-# Common library for Eppo's JavasScript SDK
+# Common library for Eppo's JavaScript SDK
 [![Test and lint SDK](https://github.com/Eppo-exp/js-sdk-common/actions/workflows/lint-test-sdk.yml/badge.svg)](https://github.com/Eppo-exp/js-sdk-common/actions/workflows/lint-test-sdk.yml)
 [![](https://img.shields.io/npm/v/@eppo/js-client-sdk-common)](https://www.npmjs.com/package/@eppo/js-client-sdk-common)
 [![](https://img.shields.io/static/v1?label=GitHub+Pages&message=API+reference&color=00add8)](https://eppo-exp.github.io/js-client-sdk/js-client-sdk-common.html)
