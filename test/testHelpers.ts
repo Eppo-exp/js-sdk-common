@@ -1,11 +1,17 @@
 import * as fs from 'fs';
 
-import { Attributes, AttributeType, VariationType } from '../src';
+import { isEqual } from 'lodash';
+
+import {
+  Attributes,
+  AttributeType,
+  ContextAttributes,
+  IAssignmentDetails,
+  VariationType,
+} from '../src';
 import { ensureContextualSubjectAttributes } from '../src/attributes';
-import { IAssignmentDetails } from '../src/client/eppo-client';
 import { IFlagEvaluationDetails } from '../src/flag-evaluation-details-builder';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from '../src/http-client';
-import { ContextAttributes } from '../src/types';
 
 export const TEST_DATA_DIR = './test/data/ufc/';
 export const ASSIGNMENT_TEST_DATA_DIR = TEST_DATA_DIR + 'tests/';
@@ -143,16 +149,17 @@ export function validateTestAssignments(
   flag: string,
 ) {
   for (const { subject, assignment } of assignments) {
-    if (typeof assignment !== 'object') {
-      // the expect works well for objects, but this comparison does not
-      if (assignment !== subject.assignment) {
-        throw new Error(
-          `subject ${
-            subject.subjectKey
-          } was assigned ${assignment?.toString()} when expected ${subject.assignment?.toString()} for flag ${flag}`,
-        );
-      }
+    if (!isEqual(assignment, subject.assignment)) {
+      // More friendly error message
+      console.error(
+        `subject ${subject.subjectKey} was assigned ${JSON.stringify(
+          assignment,
+          undefined,
+          2,
+        )} when expected ${JSON.stringify(subject.assignment, undefined, 2)} for flag ${flag}`,
+      );
     }
-    expect(subject.assignment).toEqual(assignment);
+
+    expect(assignment).toEqual(subject.assignment);
   }
 }

@@ -12,6 +12,7 @@ global.fetch = jest.fn();
 
 const mockNetworkStatusListener = {
   isOffline: () => false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onNetworkStatusChange: (_: (_: boolean) => void) => null as unknown as void,
 };
 
@@ -154,6 +155,7 @@ describe('DefaultEventDispatcher', () => {
   describe('offline handling', () => {
     it('skips delivery when offline', async () => {
       let isOffline = false;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       let cb = (_: boolean) => null as unknown as void;
       const networkStatusListener = {
         isOffline: () => isOffline,
@@ -188,6 +190,7 @@ describe('DefaultEventDispatcher', () => {
 
     it('resumes delivery when back online', async () => {
       let isOffline = true;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       let cb = (_: boolean) => null as unknown as void;
       const networkStatusListener = {
         isOffline: () => isOffline,
