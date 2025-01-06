@@ -17,7 +17,7 @@ import {
   PrecomputedConfiguration,
 } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
-import { IConfigurationStore } from '../configuration-store/configuration-store';
+import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -98,6 +98,7 @@ export default class EppoClient {
   private configurationRequestParameters?: FlagConfigurationRequestParameters;
   private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
   private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
+  private overridesStore?: ISyncStore<Variation>;
   private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
@@ -113,6 +114,7 @@ export default class EppoClient {
     flagConfigurationStore,
     banditVariationConfigurationStore,
     banditModelConfigurationStore,
+    overridesStore,
     configurationRequestParameters,
   }: {
     // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
@@ -123,6 +125,7 @@ export default class EppoClient {
     banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
     configurationRequestParameters?: FlagConfigurationRequestParameters;
     isObfuscated?: boolean;
+    overridesStore?: IConfigurationStore<Variation>;
   }) {
     this.eventDispatcher = eventDispatcher;
     this.flagConfigurationStore = flagConfigurationStore;
@@ -130,6 +133,7 @@ export default class EppoClient {
     this.banditModelConfigurationStore = banditModelConfigurationStore;
     this.configurationRequestParameters = configurationRequestParameters;
     this.isObfuscated = isObfuscated;
+    this.overridesStore = overridesStore;
   }
 
   setConfigurationRequestParameters(
@@ -166,6 +170,14 @@ export default class EppoClient {
   // noinspection JSUnusedGlobalSymbols
   setIsObfuscated(isObfuscated: boolean) {
     this.isObfuscated = isObfuscated;
+  }
+
+  setOverridesStore(store: ISyncStore<Variation>): void {
+    this.overridesStore = store;
+  }
+
+  unsetOverridesStore(): void {
+    this.overridesStore = undefined;
   }
 
   async fetchFlagConfigurations() {
@@ -988,6 +1000,32 @@ export default class EppoClient {
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
 
     const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
+    const overrideVariation = this.overridesStore?.get(flagKey);
+    if (overrideVariation) {
+      const overrideAllocationKey = 'override-' + overrideVariation.key;
+      const flagEvaluationDetails = flagEvaluationDetailsBuilder
+        .setMatch(
+          0,
+          overrideVariation,
+          { key: overrideAllocationKey, splits: [], doLog: false },
+          null,
+          undefined,
+        )
+        .build('MATCH', 'Flag override applied');
+
+      return {
+        flagKey,
+        subjectKey,
+        variation: overrideVariation,
+        subjectAttributes,
+        flagEvaluationDetails,
+        doLog: false,
+        format: '',
+        allocationKey: 'override',
+        extraLogging: {},
+      };
+    }
+
     const configDetails = this.getConfigDetails();
     const flag = this.getFlag(flagKey);
 
