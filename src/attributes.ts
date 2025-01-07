@@ -1,10 +1,4 @@
-import {
-  Attributes,
-  AttributeType,
-  BanditActions,
-  BanditSubjectAttributes,
-  ContextAttributes,
-} from './types';
+import { Attributes, BanditActions, BanditSubjectAttributes, ContextAttributes } from './types';
 
 export function isInstanceOfContextualAttributes(attributes: unknown): boolean {
   return Boolean(
@@ -48,11 +42,11 @@ export function deduceAttributeContext(attributes: Attributes): ContextAttribute
     categoricalAttributes: {},
   };
   Object.entries(attributes).forEach(([attribute, value]) => {
-    const isNumeric = typeof value === 'number' && isFinite(value);
+    const isNumeric = typeof value === 'number';
     if (isNumeric) {
       contextualAttributes.numericAttributes[attribute] = value;
     } else {
-      contextualAttributes.categoricalAttributes[attribute] = value as AttributeType;
+      contextualAttributes.categoricalAttributes[attribute] = value;
     }
   });
   return contextualAttributes;
