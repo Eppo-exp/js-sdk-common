@@ -17,6 +17,17 @@ describe('obfuscation', () => {
     });
   });
 
+  it('encodes/decodes special characters', () => {
+    const strings = ['kümmert', 'піклуватися', '照顾', '🤗🌸'];
+
+    strings.forEach((string) => {
+      expect(decodeBase64(encodeBase64(string))).toEqual(string);
+      expect(decodeBase64(encodeBase64(string))).toEqual(string);
+    });
+
+    expect(decodeBase64('a8O8bW1lcnQ=')).toEqual('kümmert');
+  });
+
   describe('salt', () => {
     it('converts from bytes to base64 string', () => {
       const chars = new Uint8Array([101, 112, 112, 111]); // eppo

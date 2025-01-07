@@ -8,15 +8,50 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Parse version from tag
+        id: version
+        uses: release-kit/semver@v2
+
+      - name: Display Release Plan
+        if: ${{ !github.event.release.prerelease && !steps.version.outputs.prerelease }}
+        run: |
+          echo "Publishing release ${{ steps.version.outputs.full }}"
+
+      - name: Display Pre-release Plan
+        if: ${{ github.event.release.prerelease && steps.version.outputs.prerelease }}
+        run: |
+          echo "Publishing pre-relese ${{ steps.version.outputs.full }}"
+
+      - name: Validate inputs
+        if: ${{ (github.event.release.prerelease && !steps.version.outputs.prerelease) || (!github.event.release.prerelease && steps.version.outputs.prerelease) }}
+        run: |
+          RED='\033[0;31m'
+          NC='\033[0m' # No Color
+          echo -e "${RED}Pre-release label in semver but GitHub release is not marked as pre-release or vice-versa${NC}"
+          exit 1;
+
       - uses: actions/setup-node@v3
         with:
           node-version: '18.x'
       - run: yarn install
       - run: yarn test
-      - uses: JS-DevTools/npm-publish@v3
+
+      - name: Publish Latest
+        uses: JS-DevTools/npm-publish@v3
+        if: ${{ !github.event.release.prerelease && !steps.version.outputs.prerelease }}
         with:
           token: ${{ secrets.NPM_TOKEN }}
           access: public
+
+      - name: Publish Pre-release
+        uses: JS-DevTools/npm-publish@v3
+        if: ${{ github.event.release.prerelease && steps.version.outputs.prerelease }}
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
+          access: public
+          tag: ${{ steps.version.outputs.prerelease }}
+
       - name: Upload npm debug log
         if: failure()  # This step will run only if the previous steps failed
         uses: actions/upload-artifact@v4
