@@ -1,6 +1,6 @@
 import { Attributes, BanditActions, BanditSubjectAttributes, ContextAttributes } from './types';
 
-export function isInstanceOfContextualAttributes(attributes: unknown): boolean {
+export function isInstanceOfContextualAttributes(attributes: unknown): attributes is ContextAttributes {
   return Boolean(
     typeof attributes === 'object' &&
       attributes && // exclude null
