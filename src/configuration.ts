@@ -22,7 +22,6 @@ interface IBasePrecomputedConfigurationResponse {
 
 export interface IPrecomputedConfigurationResponse extends IBasePrecomputedConfigurationResponse {
   readonly obfuscated: false; // Always false
-  readonly salt?: string; // Salt used for hashing md5-encoded strings
   readonly flags: Record<string, PrecomputedFlag>;
   readonly bandits: Record<string, IPrecomputedBandit>;
 }
@@ -30,6 +29,7 @@ export interface IPrecomputedConfigurationResponse extends IBasePrecomputedConfi
 export interface IObfuscatedPrecomputedConfigurationResponse
   extends IBasePrecomputedConfigurationResponse {
   readonly obfuscated: true; // Always true
+  readonly salt: string; // Salt used for hashing md5-encoded strings
 
   // PrecomputedFlag ships values as string and uses ValueType to cast back on the client.
   // Values are obfuscated as strings, so a separate Obfuscated interface is not needed for flags.
