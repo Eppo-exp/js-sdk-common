@@ -1,7 +1,10 @@
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
-import { ensureNonContextualSubjectAttributes } from '../attributes';
+import {
+  ensureContextualSubjectAttributes,
+  ensureNonContextualSubjectAttributes,
+} from '../attributes';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
@@ -21,7 +24,7 @@ import { DecodedPrecomputedFlag, PrecomputedFlag, VariationType } from '../inter
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
-import { ContextAttributes } from '../types';
+import { Attributes, ContextAttributes } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
@@ -29,7 +32,7 @@ import { checkTypeMatch } from './eppo-client';
 
 export interface Subject {
   subjectKey: string;
-  subjectAttributes: ContextAttributes;
+  subjectAttributes: Attributes | ContextAttributes;
 }
 
 export type PrecomputedFlagsRequestParameters = {
@@ -59,12 +62,19 @@ export default class EppoPrecomputedClient {
   private assignmentCache?: AssignmentCache;
   private requestPoller?: IPoller;
   private requestParameters?: PrecomputedFlagsRequestParameters;
-  private subject: Subject;
+  private subject: {
+    subjectKey: string;
+    subjectAttributes: ContextAttributes;
+  };
   private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
 
   public constructor(options: EppoPrecomputedClientOptions) {
     this.precomputedFlagStore = options.precomputedFlagStore;
-    this.subject = options.subject;
+    const { subjectKey, subjectAttributes } = options.subject;
+    this.subject = {
+      subjectKey,
+      subjectAttributes: ensureContextualSubjectAttributes(subjectAttributes),
+    };
     if (options.requestParameters) {
       // Online-mode
       this.requestParameters = options.requestParameters;

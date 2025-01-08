@@ -2,7 +2,6 @@ import ApiEndpoints from './api-endpoints';
 import { logger as applicationLogger } from './application-logger';
 import { IAssignmentHooks } from './assignment-hooks';
 import { IAssignmentLogger, IAssignmentEvent } from './assignment-logger';
-import { ensureContextualSubjectAttributes } from './attributes';
 import { IBanditLogger, IBanditEvent } from './bandit-logger';
 import {
   AbstractAssignmentCache,
@@ -23,6 +22,7 @@ import EppoClient, {
 } from './client/eppo-client';
 import EppoPrecomputedClient, {
   PrecomputedFlagsRequestParameters,
+  Subject,
 } from './client/eppo-precomputed-client';
 import { IConfigurationWire, IPrecomputedConfigurationResponse } from './configuration';
 import FlagConfigRequestor from './configuration-requestor';
@@ -46,7 +46,7 @@ import EventDispatcher from './events/event-dispatcher';
 import NamedEventQueue from './events/named-event-queue';
 import NetworkStatusListener from './events/network-status-listener';
 import HttpClient from './http-client';
-import { PrecomputedFlag, Flag, ObfuscatedFlag, VariationType } from './interfaces';
+import { PrecomputedFlag, Flag, ObfuscatedFlag, VariationType, FormatEnum } from './interfaces';
 import {
   AttributeType,
   Attributes,
@@ -74,9 +74,8 @@ export {
   validation,
 
   // Precomputed Client
-  PrecomputedFlagsRequestParameters,
   EppoPrecomputedClient,
-  ensureContextualSubjectAttributes,
+  PrecomputedFlagsRequestParameters,
 
   // Configuration store
   IConfigurationStore,
@@ -107,6 +106,8 @@ export {
   ContextAttributes,
   BanditSubjectAttributes,
   BanditActions,
+  Subject,
+  FormatEnum,
 
   // event dispatcher types
   NamedEventQueue,
