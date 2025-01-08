@@ -774,7 +774,7 @@ describe('EppoPrecomputedClient E2E test', () => {
       mockLogger = td.object<IAssignmentLogger>();
     });
 
-    it('client can be initialized with a store that is not initialized and without requestParameters', () => {
+    it('prints errors if initialized with a store that is not initialized and without requestParameters', () => {
       const loggerErrorSpy = jest.spyOn(logger, 'error');
       expect(() => {
         client = new EppoPrecomputedClient({
@@ -782,8 +782,39 @@ describe('EppoPrecomputedClient E2E test', () => {
           subject,
         });
       }).not.toThrow();
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(2);
       expect(loggerErrorSpy).toHaveBeenCalledWith(
-        'EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+        '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+      );
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+      );
+      loggerErrorSpy.mockRestore();
+      expect(client.getStringAssignment('string-flag', 'default')).toBe('default');
+    });
+
+    it('prints only one error if initialized with a store without a salt and without requestParameters', async () => {
+      const loggerErrorSpy = jest.spyOn(logger, 'error');
+      await store.setEntries({
+        'test-flag': {
+          flagKey: 'test-flag',
+          variationType: VariationType.STRING,
+          variationKey: encodeBase64('control'),
+          variationValue: encodeBase64('test-value'),
+          allocationKey: encodeBase64('allocation-1'),
+          doLog: true,
+          extraLogging: {},
+        },
+      });
+      expect(() => {
+        client = new EppoPrecomputedClient({
+          precomputedFlagStore: store,
+          subject,
+        });
+      }).not.toThrow();
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(1);
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
       );
       loggerErrorSpy.mockRestore();
       expect(client.getStringAssignment('string-flag', 'default')).toBe('default');
@@ -792,7 +823,8 @@ describe('EppoPrecomputedClient E2E test', () => {
     it('returns assignment and logs subject data after store is initialized with flags', async () => {
       const subjectKey = 'test-subject';
       const subjectAttributes = buildContextAttributes({ attr1: 'value1' });
-      const hashedFlagKey = getMD5Hash('test-flag');
+      store.salt = 'test-salt';
+      const hashedFlagKey = getMD5Hash('test-flag', store.salt);
 
       await store.setEntries({
         [hashedFlagKey]: {
@@ -805,7 +837,6 @@ describe('EppoPrecomputedClient E2E test', () => {
           extraLogging: {},
         },
       });
-      store.salt = '';
 
       client = new EppoPrecomputedClient({
         precomputedFlagStore: store,

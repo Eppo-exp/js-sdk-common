@@ -82,7 +82,12 @@ export default class EppoPrecomputedClient {
       // Offline-mode
       if (!this.precomputedFlagStore.isInitialized()) {
         logger.error(
-          'EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+          '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+        );
+      }
+      if (!this.precomputedFlagStore.salt) {
+        logger.error(
+          '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
         );
       }
     }
