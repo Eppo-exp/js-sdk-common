@@ -2,6 +2,7 @@ import ApiEndpoints from './api-endpoints';
 import { logger as applicationLogger } from './application-logger';
 import { IAssignmentHooks } from './assignment-hooks';
 import { IAssignmentLogger, IAssignmentEvent } from './assignment-logger';
+import { ensureContextualSubjectAttributes } from './attributes';
 import { IBanditLogger, IBanditEvent } from './bandit-logger';
 import {
   AbstractAssignmentCache,
@@ -21,7 +22,6 @@ import EppoClient, {
   IContainerExperiment,
 } from './client/eppo-client';
 import EppoPrecomputedClient, {
-  convertContextAttributesToSubjectAttributes,
   PrecomputedFlagsRequestParameters,
 } from './client/eppo-precomputed-client';
 import { IConfigurationWire, IPrecomputedConfigurationResponse } from './configuration';
@@ -76,7 +76,7 @@ export {
   // Precomputed Client
   PrecomputedFlagsRequestParameters,
   EppoPrecomputedClient,
-  convertContextAttributesToSubjectAttributes,
+  ensureContextualSubjectAttributes,
 
   // Configuration store
   IConfigurationStore,

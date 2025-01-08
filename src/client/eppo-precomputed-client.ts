@@ -21,7 +21,7 @@ import { DecodedPrecomputedFlag, PrecomputedFlag, VariationType } from '../inter
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
-import { Attributes, ContextAttributes } from '../types';
+import { ContextAttributes } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
@@ -47,15 +47,6 @@ export type PrecomputedFlagsRequestParameters = {
   skipInitialPoll?: boolean;
 };
 
-export function convertContextAttributesToSubjectAttributes(
-  contextAttributes: ContextAttributes,
-): Attributes {
-  return {
-    ...(contextAttributes.numericAttributes || {}),
-    ...(contextAttributes.categoricalAttributes || {}),
-  };
-}
-
 interface EppoPrecomputedClientOptions {
   precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   subject: Subject;
@@ -76,7 +67,7 @@ export default class EppoPrecomputedClient {
     this.subject = options.subject;
     if (options.requestParameters) {
       // Online-mode
-      this.setRequestParameters(options.requestParameters);
+      this.requestParameters = options.requestParameters;
     } else {
       // Offline-mode
       if (!this.precomputedFlagStore.isInitialized()) {
@@ -85,14 +76,6 @@ export default class EppoPrecomputedClient {
         );
       }
     }
-  }
-
-  private setRequestParameters(requestParameters: PrecomputedFlagsRequestParameters) {
-    this.requestParameters = requestParameters;
-  }
-
-  private setSubject(subject: Subject) {
-    this.subject = subject;
   }
 
   public async fetchPrecomputedFlags() {
