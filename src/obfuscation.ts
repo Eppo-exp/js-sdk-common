@@ -27,8 +27,8 @@ export function obfuscatePrecomputedBanditMap(
   bandits: Record<string, IPrecomputedBandit>,
 ): Record<MD5String, IObfuscatedPrecomputedBandit> {
   return Object.fromEntries(
-    Object.entries(bandits).map(([banditKey, bandit]) => {
-      const hashedKey = getMD5Hash(banditKey, salt);
+    Object.entries(bandits).map(([variationValue, bandit]) => {
+      const hashedKey = getMD5Hash(variationValue, salt);
       return [hashedKey, obfuscatePrecomputedBandit(salt, bandit)];
     }),
   );
