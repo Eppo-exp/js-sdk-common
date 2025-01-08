@@ -1,14 +1,16 @@
 import * as td from 'testdouble';
 
 import {
-  buildContextAttributes,
   MOCK_PRECOMPUTED_WIRE_FILE,
   readMockConfigurationWireResponse,
 } from '../../test/testHelpers';
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
 import { IAssignmentLogger } from '../assignment-logger';
-import { ensureNonContextualSubjectAttributes } from '../attributes';
+import {
+  ensureContextualSubjectAttributes,
+  ensureNonContextualSubjectAttributes,
+} from '../attributes';
 import { IPrecomputedConfigurationResponse } from '../configuration';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
@@ -42,7 +44,7 @@ describe('EppoPrecomputedClient E2E test', () => {
   let storage = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
   const subject: Subject = {
     subjectKey: 'test-subject',
-    subjectAttributes: buildContextAttributes({ attr1: 'value1' }),
+    subjectAttributes: { attr1: 'value1' },
   };
   beforeEach(async () => {
     storage = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
@@ -63,7 +65,7 @@ describe('EppoPrecomputedClient E2E test', () => {
       httpClient,
       storage,
       'subject-key',
-      buildContextAttributes({
+      ensureContextualSubjectAttributes({
         'attribute-key': 'attribute-value',
       }),
     );
@@ -110,7 +112,7 @@ describe('EppoPrecomputedClient E2E test', () => {
       flagStorage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
       subject = {
         subjectKey: 'test-subject',
-        subjectAttributes: buildContextAttributes({ attr1: 'value1' }),
+        subjectAttributes: { attr1: 'value1' },
       };
     });
 
@@ -410,7 +412,7 @@ describe('EppoPrecomputedClient E2E test', () => {
 
       subject = {
         subjectKey: 'test-subject',
-        subjectAttributes: buildContextAttributes({ attr1: 'value1' }),
+        subjectAttributes: { attr1: 'value1' },
       };
 
       precomputedFlagStore = new MemoryOnlyConfigurationStore();
@@ -822,7 +824,7 @@ describe('EppoPrecomputedClient E2E test', () => {
 
     it('returns assignment and logs subject data after store is initialized with flags', async () => {
       const subjectKey = 'test-subject';
-      const subjectAttributes = buildContextAttributes({ attr1: 'value1' });
+      const subjectAttributes = ensureContextualSubjectAttributes({ attr1: 'value1' });
       store.salt = 'test-salt';
       const hashedFlagKey = getMD5Hash('test-flag', store.salt);
 
