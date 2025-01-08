@@ -1,6 +1,8 @@
 import { Attributes, BanditActions, BanditSubjectAttributes, ContextAttributes } from './types';
 
-export function isInstanceOfContextualAttributes(attributes: unknown): attributes is ContextAttributes {
+export function isInstanceOfContextualAttributes(
+  attributes: unknown,
+): attributes is ContextAttributes {
   return Boolean(
     typeof attributes === 'object' &&
       attributes && // exclude null
@@ -14,7 +16,7 @@ export function ensureNonContextualSubjectAttributes(
 ): Attributes {
   let result: Attributes;
   if (isInstanceOfContextualAttributes(subjectAttributes)) {
-    const contextualSubjectAttributes = subjectAttributes as ContextAttributes;
+    const contextualSubjectAttributes = subjectAttributes;
     result = {
       ...contextualSubjectAttributes.numericAttributes,
       ...contextualSubjectAttributes.categoricalAttributes,
@@ -30,7 +32,7 @@ export function ensureContextualSubjectAttributes(
   subjectAttributes: BanditSubjectAttributes,
 ): ContextAttributes {
   if (isInstanceOfContextualAttributes(subjectAttributes)) {
-    return subjectAttributes as ContextAttributes;
+    return subjectAttributes;
   } else {
     return deduceAttributeContext(subjectAttributes as Attributes);
   }
