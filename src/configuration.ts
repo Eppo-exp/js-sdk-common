@@ -99,7 +99,7 @@ export class PrecomputedConfigurationResponse implements IPrecomputedConfigurati
     public readonly subjectAttributes?: ContextAttributes,
     public readonly environment?: Environment,
   ) {
-    this.createdAt = '';
+    this.createdAt = new Date().toISOString();
   }
 }
 
@@ -120,11 +120,10 @@ export class ObfuscatedPrecomputedConfigurationResponse
     readonly subjectAttributes?: ContextAttributes,
     readonly environment?: Environment,
   ) {
+    this.createdAt = new Date().toISOString();
+
     this.salt = generateSalt();
-    this.createdAt = '';
-
     this.bandits = obfuscatePrecomputedBanditMap(this.salt, bandits);
-
     this.flags = obfuscatePrecomputedFlags(this.salt, flags);
   }
 }

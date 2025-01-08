@@ -1,3 +1,5 @@
+import { omit } from 'lodash';
+
 import {
   readMockUFCResponse,
   MOCK_BANDIT_MODELS_RESPONSE_FILE,
@@ -678,15 +680,19 @@ describe('EppoClient Bandits E2E test', () => {
       it('returns subject information in the response', () => {
         const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions);
 
-        expect(precomputed.subjectKey).toEqual('bob');
-        expect(Object.keys(precomputed.subjectAttributes?.categoricalAttributes ?? {})).toEqual([
-          'country',
-          'gender_identity',
-        ]);
-        expect(Object.keys(precomputed.subjectAttributes?.numericAttributes ?? {})).toEqual([
-          'age',
-          'account_age',
-        ]);
+        expect(omit(precomputed, ['response'])).toEqual({
+          subjectAttributes: {
+            categoricalAttributes: {
+              country: 'UK',
+              gender_identity: 'male',
+            },
+            numericAttributes: {
+              account_age: 10,
+              age: 30,
+            },
+          },
+          subjectKey: 'bob',
+        });
       });
 
       it('precomputes resolved bandits', () => {
@@ -694,6 +700,8 @@ describe('EppoClient Bandits E2E test', () => {
 
         const response = JSON.parse(precomputed.response) as IPrecomputedConfigurationResponse;
         const subjectBandits = response.bandits;
+
+        expect(response.createdAt).toBeTruthy();
 
         expect(subjectBandits).toBeTruthy();
         // Check to ensure only one bandit is returned. Bob is allocated to `banner_bandit`
