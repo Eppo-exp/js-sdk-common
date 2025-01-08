@@ -23,7 +23,7 @@ import EppoClient, {
 import EppoPrecomputedClient, {
   PrecomputedFlagsRequestParameters,
 } from './client/eppo-precomputed-client';
-import { IConfigurationWire, IPrecomputedConfigurationResponse } from './configuration';
+import { IConfigurationWire, IPrecomputedConfiguration } from './configuration';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -120,6 +120,6 @@ export {
 
   // Configuration interchange.
   IConfigurationWire,
-  IPrecomputedConfigurationResponse,
+  IPrecomputedConfiguration,
   PrecomputedFlag,
 };

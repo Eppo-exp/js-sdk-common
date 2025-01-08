@@ -12,9 +12,8 @@ import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-
 import {
   IConfigurationWire,
   ConfigurationWireV1,
-  IPrecomputedConfiguration,
-  ObfuscatedPrecomputedConfiguration,
-  PrecomputedConfiguration,
+  IPrecomputedResponse,
+  PrecomputedResponse,
 } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
@@ -953,15 +952,15 @@ export default class EppoClient {
       flags,
     );
 
-    const precomputedConfig: IPrecomputedConfiguration = obfuscated
-      ? new ObfuscatedPrecomputedConfiguration(
+    const precomputedConfig: IPrecomputedResponse = obfuscated
+      ? PrecomputedResponse.obfuscated(
           subjectKey,
           flags,
           bandits,
           subjectContextualAttributes,
           configDetails.configEnvironment,
         )
-      : new PrecomputedConfiguration(
+      : PrecomputedResponse.deobfuscated(
           subjectKey,
           flags,
           bandits,
@@ -1285,20 +1284,14 @@ export default class EppoClient {
     subjectAttributes: ContextAttributes,
     banditActions: Record<string, BanditActions>,
     flags: Record<string, PrecomputedFlag>,
-  ): Record<string, Record<string, IPrecomputedBandit>> {
-    const banditResults: Record<string, Record<string, IPrecomputedBandit>> = {};
+  ): Record<string, IPrecomputedBandit> {
+    const banditResults: Record<string, IPrecomputedBandit> = {};
 
-    // Computing Bandits
-    // The first case is easy: a flag resolves to a bandit-key for this subject; compute that bandit.
-    // The second case is more involved: the flag resolves to null. On the client side, the user can now enter a bandit
-    // key as the `default` variation, so we need have every bandit referenced by this flag computed and available.
     Object.keys(banditActions).forEach((flagKey: string) => {
       // First, check how the flag evaluated.
       const flagVariation = flags[flagKey];
       if (flagVariation) {
-        banditResults[flagKey] ??= {};
-
-        // First case: flag resolved to a value, check if it's a bandit and if so, compute it.
+        // Precompute a bandit, if there is one matching this variation.
         const precomputedResult = this.getPrecomputedBandit(
           flagKey,
           flagVariation.variationValue,
@@ -1307,29 +1300,8 @@ export default class EppoClient {
           banditActions[flagKey],
         );
         if (precomputedResult) {
-          banditResults[flagKey][flagVariation.variationValue] = precomputedResult;
+          banditResults[flagKey] = precomputedResult;
         }
-      } else {
-        // Second case; compute all the bandits referenced by this flag.
-        const banditVariations = this.banditVariationConfigurationStore?.get(flagKey);
-        if (!banditVariations) {
-          return;
-        }
-        banditResults[flagKey] = {};
-
-        banditVariations.forEach((banditVariation: BanditVariation) => {
-          const precomputedResult = this.getPrecomputedBandit(
-            flagKey,
-            banditVariation.variationValue,
-            subjectKey,
-            subjectAttributes,
-            banditActions[flagKey],
-          );
-
-          if (precomputedResult) {
-            banditResults[flagKey][banditVariation.variationValue] = precomputedResult;
-          }
-        });
       }
     });
     return banditResults;
@@ -1366,13 +1338,12 @@ export default class EppoClient {
       );
       if (result) {
         return {
+          banditKey: bandit.banditKey,
           action: result.actionKey,
           actionAttributes: result.actionAttributes,
           actionProbability: result.actionWeight,
-          metaData: this.buildLoggerMetadata(),
           modelVersion: bandit.modelVersion,
           optimalityGap: result.optimalityGap,
-          variation: variationValue,
         };
       }
     }

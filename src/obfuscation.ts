@@ -1,7 +1,8 @@
 import base64 = require('js-base64');
 import * as SparkMD5 from 'spark-md5';
 
-import { IPrecomputedBandit, PrecomputedFlag } from './interfaces';
+import { IObfuscatedPrecomputedBandit, IPrecomputedBandit, PrecomputedFlag } from './interfaces';
+import { Attributes, AttributeType, Base64String, MD5String } from './types';
 
 export function getMD5Hash(input: string, salt = ''): string {
   return new SparkMD5().append(salt).append(input).end();
@@ -10,60 +11,59 @@ export function getMD5Hash(input: string, salt = ''): string {
 export function encodeBase64(input: string) {
   return base64.encode(input);
 }
+export function attributeEncodeBase64(input: AttributeType) {
+  if (typeof input !== 'string') {
+    return encodeBase64(String(input));
+  }
+  return encodeBase64(input);
+}
 
 export function decodeBase64(input: string) {
   return base64.decode(input);
 }
 
-export function obfuscatePrecomputedBandits(
+export function obfuscatePrecomputedBanditMap(
   salt: string,
   bandits: Record<string, IPrecomputedBandit>,
-): Record<string, IPrecomputedBandit> {
-  const obfuscatedBandits: Record<string, IPrecomputedBandit> = {};
+): Record<MD5String, IObfuscatedPrecomputedBandit> {
+  return Object.fromEntries(
+    Object.entries(bandits).map(([banditKey, bandit]) => {
+      const hashedKey = getMD5Hash(banditKey, salt);
+      return [hashedKey, obfuscatePrecomputedBandit(salt, bandit)];
+    }),
+  );
+}
 
-  Object.entries(bandits).forEach((entry) => {
-    const [banditKey, banditResult] = entry;
+function obfuscatePrecomputedBandit(
+  salt: string,
+  banditResult: IPrecomputedBandit,
+): IObfuscatedPrecomputedBandit {
+  return {
+    banditKey: getMD5Hash(banditResult.banditKey, salt),
+    action: encodeBase64(banditResult.action),
+    actionProbability: banditResult.actionProbability,
+    optimalityGap: banditResult.optimalityGap,
+    modelVersion: encodeBase64(banditResult.modelVersion),
+    actionNumericAttributes: encodeAttributes(banditResult.actionAttributes.numericAttributes),
+    actionCategoricalAttributes: encodeAttributes(
+      banditResult.actionAttributes.categoricalAttributes,
+    ),
+  };
+}
 
-    // Encode metaData keys and values.
-    const encodedMetaData = Object.fromEntries(
-      Object.entries(banditResult.metaData).map((kvArr) => [
-        encodeBase64(kvArr[0]),
-        typeof kvArr[1] === 'string' ? encodeBase64(kvArr[1]) : kvArr[1],
-      ]),
-    ) as Record<string, unknown>;
-
-    const encodedAttributes = {
-      categoricalAttributes: Object.fromEntries(
-        Object.entries(banditResult.actionAttributes.categoricalAttributes).map((kvArr) => [
-          encodeBase64(kvArr[0]),
-          typeof kvArr[1] === 'string' ? encodeBase64(kvArr[1]) : kvArr[1],
-        ]),
-      ),
-      numericAttributes: Object.fromEntries(
-        Object.entries(banditResult.actionAttributes.numericAttributes).map((kvArr) => [
-          encodeBase64(kvArr[0]),
-          kvArr[1], // Numeric data is not expected to be encoded
-        ]),
-      ),
-    };
-    const hashedKey = getMD5Hash(salt + banditKey); //flagKey, salt);
-    obfuscatedBandits[hashedKey] = {
-      action: banditResult.action ? encodeBase64(banditResult.action) : null,
-      variation: hashedKey,
-      actionProbability: banditResult.actionProbability,
-      optimalityGap: banditResult.optimalityGap,
-      modelVersion: encodeBase64(banditResult.modelVersion),
-      actionAttributes: encodedAttributes,
-      metaData: encodedMetaData,
-    };
-  });
-  return obfuscatedBandits;
+function encodeAttributes(attributes: Attributes): Record<Base64String, Base64String> {
+  return Object.fromEntries(
+    Object.entries(attributes).map(([attributeKey, attributeValue]) => [
+      encodeBase64(attributeKey),
+      attributeEncodeBase64(attributeValue),
+    ]),
+  );
 }
 
 export function obfuscatePrecomputedFlags(
   salt: string,
   precomputedFlags: Record<string, PrecomputedFlag>,
-): Record<string, PrecomputedFlag> {
+): Record<MD5String, PrecomputedFlag> {
   const response: Record<string, PrecomputedFlag> = {};
 
   Object.keys(precomputedFlags).forEach((flagKey) => {
