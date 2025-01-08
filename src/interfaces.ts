@@ -1,5 +1,5 @@
 import { Rule } from './rules';
-import { Attributes } from './types';
+import { ContextAttributes } from './types';
 
 export enum VariationType {
   STRING = 'STRING',
@@ -49,6 +49,7 @@ export interface ConfigDetails {
   configPublishedAt: string;
   configEnvironment: Environment;
   configFormat: string;
+  salt?: string;
 }
 
 export interface Flag {
@@ -148,14 +149,23 @@ export enum FormatEnum {
   PRECOMPUTED = 'PRECOMPUTED',
 }
 
-export interface PrecomputedFlag {
+export type BasePrecomputedFlag = {
   flagKey?: string;
-  allocationKey: string;
-  variationKey: string;
+  allocationKey?: string;
+  variationKey?: string;
   variationType: VariationType;
-  variationValue: string;
-  extraLogging: Record<string, string>;
+  extraLogging?: Record<string, string>;
   doLog: boolean;
+};
+
+type Base64 = string;
+
+export interface PrecomputedFlag extends BasePrecomputedFlag {
+  variationValue: Base64;
+}
+
+export interface DecodedPrecomputedFlag extends BasePrecomputedFlag {
+  variationValue: Variation['value'];
 }
 
 export interface PrecomputedFlagsDetails {
@@ -166,5 +176,5 @@ export interface PrecomputedFlagsDetails {
 
 export interface PrecomputedFlagsPayload {
   subject_key: string;
-  subject_attributes: Attributes;
+  subject_attributes: ContextAttributes;
 }

@@ -1,78 +1,55 @@
 import * as td from 'testdouble';
 
+import {
+  MOCK_PRECOMPUTED_WIRE_FILE,
+  readMockConfigurationWireResponse,
+} from '../../test/testHelpers';
 import ApiEndpoints from '../api-endpoints';
+import { logger } from '../application-logger';
 import { IAssignmentLogger } from '../assignment-logger';
+import {
+  ensureContextualSubjectAttributes,
+  ensureNonContextualSubjectAttributes,
+} from '../attributes';
+import { IPrecomputedConfigurationResponse } from '../configuration';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { DEFAULT_POLL_INTERVAL_MS, MAX_EVENT_QUEUE_SIZE, POLL_JITTER_PCT } from '../constants';
 import FetchHttpClient from '../http-client';
 import { FormatEnum, PrecomputedFlag, VariationType } from '../interfaces';
-import { encodeBase64, getMD5Hash } from '../obfuscation';
+import { decodeBase64, encodeBase64, getMD5Hash } from '../obfuscation';
 import PrecomputedRequestor from '../precomputed-requestor';
 
 import EppoPrecomputedClient, {
   PrecomputedFlagsRequestParameters,
+  Subject,
 } from './eppo-precomputed-client';
 
 describe('EppoPrecomputedClient E2E test', () => {
-  const precomputedFlags = {
-    createdAt: '2024-11-18T14:23:39.456Z',
-    format: 'PRECOMPUTED',
-    environment: {
-      name: 'Test',
-    },
-    flags: {
-      'string-flag': {
-        allocationKey: 'allocation-123',
-        variationKey: 'variation-123',
-        variationType: 'STRING',
-        variationValue: 'red',
-        extraLogging: {},
-        doLog: true,
-      },
-      'boolean-flag': {
-        allocationKey: 'allocation-124',
-        variationKey: 'variation-124',
-        variationType: 'BOOLEAN',
-        variationValue: true,
-        extraLogging: {},
-        doLog: true,
-      },
-      'integer-flag': {
-        allocationKey: 'allocation-125',
-        variationKey: 'variation-125',
-        variationType: 'INTEGER',
-        variationValue: 42,
-        extraLogging: {},
-        doLog: true,
-      },
-      'numeric-flag': {
-        allocationKey: 'allocation-126',
-        variationKey: 'variation-126',
-        variationType: 'NUMERIC',
-        variationValue: 3.14,
-        extraLogging: {},
-        doLog: true,
-      },
-      'json-flag': {
-        allocationKey: 'allocation-127',
-        variationKey: 'variation-127',
-        variationType: 'JSON',
-        variationValue: '{"key": "value", "number": 123}',
-        extraLogging: {},
-        doLog: true,
-      },
-    },
-  }; // TODO: readMockPrecomputedFlagsResponse(MOCK_PRECOMPUTED_FLAGS_RESPONSE_FILE);
+  const precomputedConfigurationWire = readMockConfigurationWireResponse(
+    MOCK_PRECOMPUTED_WIRE_FILE,
+  );
+  const unparsedPrecomputedResponse = JSON.parse(precomputedConfigurationWire).precomputed.response;
+  const precomputedResponse: IPrecomputedConfigurationResponse = JSON.parse(
+    unparsedPrecomputedResponse,
+  );
 
   global.fetch = jest.fn(() => {
     return Promise.resolve({
       ok: true,
       status: 200,
-      json: () => Promise.resolve(precomputedFlags),
+      json: () => Promise.resolve(precomputedResponse),
     });
   }) as jest.Mock;
-  const storage = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+  let storage = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+  const subject: Subject = {
+    subjectKey: 'test-subject',
+    subjectAttributes: { attr1: 'value1' },
+  };
+  beforeEach(async () => {
+    storage = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+    storage.setFormat(FormatEnum.PRECOMPUTED);
+  });
 
   beforeAll(async () => {
     const apiEndpoints = new ApiEndpoints({
@@ -84,18 +61,27 @@ describe('EppoPrecomputedClient E2E test', () => {
       },
     });
     const httpClient = new FetchHttpClient(apiEndpoints, 1000);
-    const precomputedFlagRequestor = new PrecomputedRequestor(httpClient, storage, 'subject-key', {
-      'attribute-key': 'attribute-value',
-    });
+    const precomputedFlagRequestor = new PrecomputedRequestor(
+      httpClient,
+      storage,
+      'subject-key',
+      ensureContextualSubjectAttributes({
+        'attribute-key': 'attribute-value',
+      }),
+    );
     await precomputedFlagRequestor.fetchAndStorePrecomputedFlags();
   });
 
   const precomputedFlagKey = 'mock-flag';
+  const hashedPrecomputedFlagKey = getMD5Hash(precomputedFlagKey);
+  const hashedFlag2 = getMD5Hash('flag-2');
+  const hashedFlag3 = getMD5Hash('flag-3');
+
   const mockPrecomputedFlag: PrecomputedFlag = {
-    flagKey: precomputedFlagKey,
-    variationKey: 'a',
-    variationValue: 'variation-a',
-    allocationKey: 'allocation-a',
+    flagKey: hashedPrecomputedFlagKey,
+    variationKey: encodeBase64('a'),
+    variationValue: encodeBase64('variation-a'),
+    allocationKey: encodeBase64('allocation-a'),
     doLog: true,
     variationType: VariationType.STRING,
     extraLogging: {},
@@ -105,8 +91,8 @@ describe('EppoPrecomputedClient E2E test', () => {
     let client: EppoPrecomputedClient;
 
     beforeAll(() => {
-      storage.setEntries({ [precomputedFlagKey]: mockPrecomputedFlag });
-      client = new EppoPrecomputedClient(storage);
+      storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+      client = new EppoPrecomputedClient({ precomputedFlagStore: storage, subject });
     });
 
     afterAll(() => {
@@ -119,26 +105,37 @@ describe('EppoPrecomputedClient E2E test', () => {
   });
 
   describe('setLogger', () => {
+    let flagStorage: IConfigurationStore<PrecomputedFlag>;
+    let subject: Subject;
     beforeAll(() => {
-      storage.setEntries({ [precomputedFlagKey]: mockPrecomputedFlag });
+      flagStorage = new MemoryOnlyConfigurationStore();
+      flagStorage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+      subject = {
+        subjectKey: 'test-subject',
+        subjectAttributes: { attr1: 'value1' },
+      };
     });
 
     it('Invokes logger for queued events', () => {
       const mockLogger = td.object<IAssignmentLogger>();
 
-      const client = new EppoPrecomputedClient(storage);
+      const client = new EppoPrecomputedClient({
+        precomputedFlagStore: flagStorage,
+        subject,
+      });
       client.getStringAssignment(precomputedFlagKey, 'default-value');
       client.setAssignmentLogger(mockLogger);
 
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
-      // Subject not available because PrecomputedFlagsRequestParameters were not provided
-      expect(td.explain(mockLogger.logAssignment).calls[0].args[0].subject).toEqual('');
     });
 
     it('Does not log same queued event twice', () => {
       const mockLogger = td.object<IAssignmentLogger>();
 
-      const client = new EppoPrecomputedClient(storage);
+      const client = new EppoPrecomputedClient({
+        precomputedFlagStore: flagStorage,
+        subject,
+      });
 
       client.getStringAssignment(precomputedFlagKey, 'default-value');
       client.setAssignmentLogger(mockLogger);
@@ -149,7 +146,10 @@ describe('EppoPrecomputedClient E2E test', () => {
 
     it('Does not invoke logger for events that exceed queue size', () => {
       const mockLogger = td.object<IAssignmentLogger>();
-      const client = new EppoPrecomputedClient(storage);
+      const client = new EppoPrecomputedClient({
+        precomputedFlagStore: flagStorage,
+        subject,
+      });
 
       for (let i = 0; i < MAX_EVENT_QUEUE_SIZE + 100; i++) {
         client.getStringAssignment(precomputedFlagKey, 'default-value');
@@ -160,7 +160,10 @@ describe('EppoPrecomputedClient E2E test', () => {
   });
 
   it('returns null if getStringAssignment was called for the subject before any precomputed flags were loaded', () => {
-    const localClient = new EppoPrecomputedClient(new MemoryOnlyConfigurationStore());
+    const localClient = new EppoPrecomputedClient({
+      precomputedFlagStore: new MemoryOnlyConfigurationStore(),
+      subject,
+    });
     expect(localClient.getStringAssignment(precomputedFlagKey, 'hello world')).toEqual(
       'hello world',
     );
@@ -168,15 +171,21 @@ describe('EppoPrecomputedClient E2E test', () => {
   });
 
   it('returns default value when key does not exist', async () => {
-    const client = new EppoPrecomputedClient(storage);
+    const client = new EppoPrecomputedClient({
+      precomputedFlagStore: storage,
+      subject,
+    });
     const nonExistentFlag = 'non-existent-flag';
     expect(client.getStringAssignment(nonExistentFlag, 'default')).toBe('default');
   });
 
   it('logs variation assignment with correct metadata', () => {
     const mockLogger = td.object<IAssignmentLogger>();
-    storage.setEntries({ [precomputedFlagKey]: mockPrecomputedFlag });
-    const client = new EppoPrecomputedClient(storage);
+    storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+    const client = new EppoPrecomputedClient({
+      precomputedFlagStore: storage,
+      subject,
+    });
     client.setAssignmentLogger(mockLogger);
 
     client.getStringAssignment(precomputedFlagKey, 'default');
@@ -185,10 +194,10 @@ describe('EppoPrecomputedClient E2E test', () => {
     const loggedEvent = td.explain(mockLogger.logAssignment).calls[0].args[0];
 
     expect(loggedEvent.featureFlag).toEqual(precomputedFlagKey);
-    expect(loggedEvent.variation).toEqual(mockPrecomputedFlag.variationKey);
-    expect(loggedEvent.allocation).toEqual(mockPrecomputedFlag.allocationKey);
+    expect(loggedEvent.variation).toEqual(decodeBase64(mockPrecomputedFlag.variationKey ?? ''));
+    expect(loggedEvent.allocation).toEqual(decodeBase64(mockPrecomputedFlag.allocationKey ?? ''));
     expect(loggedEvent.experiment).toEqual(
-      `${precomputedFlagKey}-${mockPrecomputedFlag.allocationKey}`,
+      `${precomputedFlagKey}-${decodeBase64(mockPrecomputedFlag.allocationKey ?? '')}`,
     );
   });
 
@@ -196,8 +205,11 @@ describe('EppoPrecomputedClient E2E test', () => {
     const mockLogger = td.object<IAssignmentLogger>();
     td.when(mockLogger.logAssignment(td.matchers.anything())).thenThrow(new Error('logging error'));
 
-    storage.setEntries({ [precomputedFlagKey]: mockPrecomputedFlag });
-    const client = new EppoPrecomputedClient(storage);
+    storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+    const client = new EppoPrecomputedClient({
+      precomputedFlagStore: storage,
+      subject,
+    });
     client.setAssignmentLogger(mockLogger);
 
     const assignment = client.getStringAssignment(precomputedFlagKey, 'default');
@@ -211,8 +223,11 @@ describe('EppoPrecomputedClient E2E test', () => {
 
     beforeEach(() => {
       mockLogger = td.object<IAssignmentLogger>();
-      storage.setEntries({ [precomputedFlagKey]: mockPrecomputedFlag });
-      client = new EppoPrecomputedClient(storage);
+      storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+      client = new EppoPrecomputedClient({
+        precomputedFlagStore: storage,
+        subject,
+      });
       client.setAssignmentLogger(mockLogger);
     });
 
@@ -236,14 +251,14 @@ describe('EppoPrecomputedClient E2E test', () => {
 
     it('logs assignment again after the lru cache is full', async () => {
       await storage.setEntries({
-        [precomputedFlagKey]: mockPrecomputedFlag,
-        'flag-2': {
+        [hashedPrecomputedFlagKey]: mockPrecomputedFlag,
+        [hashedFlag2]: {
           ...mockPrecomputedFlag,
-          variationKey: 'b',
+          variationKey: encodeBase64('b'),
         },
-        'flag-3': {
+        [hashedFlag3]: {
           ...mockPrecomputedFlag,
-          variationKey: 'c',
+          variationKey: encodeBase64('c'),
         },
       });
 
@@ -279,9 +294,9 @@ describe('EppoPrecomputedClient E2E test', () => {
 
     it('logs for each unique flag', async () => {
       await storage.setEntries({
-        [precomputedFlagKey]: mockPrecomputedFlag,
-        'flag-2': mockPrecomputedFlag,
-        'flag-3': mockPrecomputedFlag,
+        [hashedPrecomputedFlagKey]: mockPrecomputedFlag,
+        [hashedFlag2]: mockPrecomputedFlag,
+        [hashedFlag3]: mockPrecomputedFlag,
       });
 
       client.useNonExpiringInMemoryAssignmentCache();
@@ -303,19 +318,19 @@ describe('EppoPrecomputedClient E2E test', () => {
       client.useNonExpiringInMemoryAssignmentCache();
 
       storage.setEntries({
-        [precomputedFlagKey]: {
+        [hashedPrecomputedFlagKey]: {
           ...mockPrecomputedFlag,
-          variationKey: 'a',
-          variationValue: 'variation-a',
+          variationKey: encodeBase64('a'),
+          variationValue: encodeBase64('variation-a'),
         },
       });
       client.getStringAssignment(precomputedFlagKey, 'default');
 
       storage.setEntries({
-        [precomputedFlagKey]: {
+        [hashedPrecomputedFlagKey]: {
           ...mockPrecomputedFlag,
-          variationKey: 'b',
-          variationValue: 'variation-b',
+          variationKey: encodeBase64('b'),
+          variationValue: encodeBase64('variation-b'),
         },
       });
       client.getStringAssignment(precomputedFlagKey, 'default');
@@ -326,18 +341,18 @@ describe('EppoPrecomputedClient E2E test', () => {
       client.useNonExpiringInMemoryAssignmentCache();
 
       // original configuration version
-      storage.setEntries({ [precomputedFlagKey]: mockPrecomputedFlag });
+      storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
 
       client.getStringAssignment(precomputedFlagKey, 'default'); // log this assignment
       client.getStringAssignment(precomputedFlagKey, 'default'); // cache hit, don't log
 
       // change the variation
       storage.setEntries({
-        [precomputedFlagKey]: {
+        [hashedPrecomputedFlagKey]: {
           ...mockPrecomputedFlag,
-          allocationKey: 'allocation-a', // same allocation key
-          variationKey: 'b', // but different variation
-          variationValue: 'variation-b', // but different variation
+          allocationKey: encodeBase64('allocation-a'), // same allocation key
+          variationKey: encodeBase64('b'), // but different variation
+          variationValue: encodeBase64('variation-b'), // but different variation
         },
       });
 
@@ -345,18 +360,18 @@ describe('EppoPrecomputedClient E2E test', () => {
       client.getStringAssignment(precomputedFlagKey, 'default'); // cache hit, don't log
 
       // change the flag again, back to the original
-      storage.setEntries({ [precomputedFlagKey]: mockPrecomputedFlag });
+      storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
 
       client.getStringAssignment(precomputedFlagKey, 'default'); // important: log this assignment
       client.getStringAssignment(precomputedFlagKey, 'default'); // cache hit, don't log
 
       // change the allocation
       storage.setEntries({
-        [precomputedFlagKey]: {
+        [hashedPrecomputedFlagKey]: {
           ...mockPrecomputedFlag,
-          allocationKey: 'allocation-b', // different allocation key
-          variationKey: 'b', // but same variation
-          variationValue: 'variation-b', // but same variation
+          allocationKey: encodeBase64('allocation-b'), // different allocation key
+          variationKey: encodeBase64('b'), // but same variation
+          variationValue: encodeBase64('variation-b'), // but same variation
         },
       });
 
@@ -370,6 +385,7 @@ describe('EppoPrecomputedClient E2E test', () => {
   describe('Eppo Precomputed Client constructed with configuration request parameters', () => {
     let client: EppoPrecomputedClient;
     let precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+    let subject: Subject;
     let requestParameters: PrecomputedFlagsRequestParameters;
 
     const precomputedFlagKey = 'string-flag';
@@ -382,7 +398,7 @@ describe('EppoPrecomputedClient E2E test', () => {
         return Promise.resolve({
           ok: true,
           status: 200,
-          json: () => Promise.resolve(precomputedFlags),
+          json: () => Promise.resolve(precomputedResponse),
         });
       }) as jest.Mock;
     });
@@ -392,10 +408,11 @@ describe('EppoPrecomputedClient E2E test', () => {
         apiKey: 'dummy-key',
         sdkName: 'js-client-sdk-common',
         sdkVersion: '1.0.0',
-        precompute: {
-          subjectKey: 'test-subject',
-          subjectAttributes: { attr1: 'value1' },
-        },
+      };
+
+      subject = {
+        subjectKey: 'test-subject',
+        subjectAttributes: { attr1: 'value1' },
       };
 
       precomputedFlagStore = new MemoryOnlyConfigurationStore();
@@ -431,8 +448,11 @@ describe('EppoPrecomputedClient E2E test', () => {
     });
 
     it('Fetches initial configuration with parameters in constructor', async () => {
-      client = new EppoPrecomputedClient(precomputedFlagStore);
-      client.setSubjectAndPrecomputedFlagsRequestParameters(requestParameters);
+      client = new EppoPrecomputedClient({
+        precomputedFlagStore,
+        subject,
+        requestParameters,
+      });
       // no configuration loaded
       let variation = client.getStringAssignment(precomputedFlagKey, 'default');
       expect(variation).toBe('default');
@@ -443,8 +463,11 @@ describe('EppoPrecomputedClient E2E test', () => {
     });
 
     it('Fetches initial configuration with parameters provided later', async () => {
-      client = new EppoPrecomputedClient(precomputedFlagStore);
-      client.setSubjectAndPrecomputedFlagsRequestParameters(requestParameters);
+      client = new EppoPrecomputedClient({
+        precomputedFlagStore,
+        subject,
+        requestParameters,
+      });
       // no configuration loaded
       let variation = client.getStringAssignment(precomputedFlagKey, 'default');
       expect(variation).toBe('default');
@@ -464,10 +487,13 @@ describe('EppoPrecomputedClient E2E test', () => {
           }
         }
 
-        client = new EppoPrecomputedClient(new MockStore());
-        client.setSubjectAndPrecomputedFlagsRequestParameters({
-          ...requestParameters,
-          pollAfterSuccessfulInitialization: true,
+        client = new EppoPrecomputedClient({
+          precomputedFlagStore: new MockStore(),
+          subject,
+          requestParameters: {
+            ...requestParameters,
+            pollAfterSuccessfulInitialization: true,
+          },
         });
         // no configuration loaded
         let variation = client.getStringAssignment(precomputedFlagKey, 'default');
@@ -493,9 +519,11 @@ describe('EppoPrecomputedClient E2E test', () => {
           return false;
         }
       }
-
-      client = new EppoPrecomputedClient(new MockStore());
-      client.setSubjectAndPrecomputedFlagsRequestParameters(requestParameters);
+      client = new EppoPrecomputedClient({
+        precomputedFlagStore: new MockStore(),
+        subject,
+        requestParameters,
+      });
       // no configuration loaded
       let variation = client.getStringAssignment(precomputedFlagKey, 'default');
       expect(variation).toBe('default');
@@ -509,8 +537,11 @@ describe('EppoPrecomputedClient E2E test', () => {
       let client: EppoPrecomputedClient;
 
       beforeEach(async () => {
-        client = new EppoPrecomputedClient(storage);
-        client.setSubjectAndPrecomputedFlagsRequestParameters(requestParameters);
+        client = new EppoPrecomputedClient({
+          precomputedFlagStore: storage,
+          subject,
+          requestParameters,
+        });
         await client.fetchPrecomputedFlags();
       });
 
@@ -570,7 +601,7 @@ describe('EppoPrecomputedClient E2E test', () => {
             ok: true,
             status: 200,
             json: () => {
-              return precomputedFlags;
+              return precomputedResponse;
             },
           });
         }
@@ -581,8 +612,11 @@ describe('EppoPrecomputedClient E2E test', () => {
         ...requestParameters,
         pollAfterSuccessfulInitialization,
       };
-      client = new EppoPrecomputedClient(precomputedFlagStore);
-      client.setSubjectAndPrecomputedFlagsRequestParameters(requestParameters);
+      client = new EppoPrecomputedClient({
+        precomputedFlagStore: precomputedFlagStore,
+        requestParameters,
+        subject,
+      });
       // no configuration loaded
       let variation = client.getStringAssignment(precomputedFlagKey, 'default');
       expect(variation).toBe('default');
@@ -629,7 +663,7 @@ describe('EppoPrecomputedClient E2E test', () => {
           return Promise.resolve({
             ok: true,
             status: 200,
-            json: () => Promise.resolve(precomputedFlags),
+            json: () => Promise.resolve(precomputedResponse),
           } as Response);
         }
       });
@@ -646,8 +680,11 @@ describe('EppoPrecomputedClient E2E test', () => {
         throwOnFailedInitialization,
         pollAfterFailedInitialization,
       };
-      client = new EppoPrecomputedClient(precomputedFlagStore);
-      client.setSubjectAndPrecomputedFlagsRequestParameters(requestParameters);
+      client = new EppoPrecomputedClient({
+        precomputedFlagStore: precomputedFlagStore,
+        subject,
+        requestParameters,
+      });
       // no configuration loaded
       expect(client.getStringAssignment(precomputedFlagKey, 'default')).toBe('default');
 
@@ -673,36 +710,52 @@ describe('EppoPrecomputedClient E2E test', () => {
   });
 
   describe('Obfuscated precomputed flags', () => {
-    let client: EppoPrecomputedClient;
+    let precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+    beforeEach(() => {
+      precomputedFlagStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+    });
 
-    beforeAll(() => {
-      storage.setEntries({
-        [getMD5Hash(precomputedFlagKey)]: {
+    it('returns decoded variation value', () => {
+      const salt = 'NaCl';
+      const saltedAndHashedFlagKey = getMD5Hash(precomputedFlagKey, salt);
+
+      precomputedFlagStore.setEntries({
+        [saltedAndHashedFlagKey]: {
           ...mockPrecomputedFlag,
-          allocationKey: encodeBase64(mockPrecomputedFlag.allocationKey),
-          variationKey: encodeBase64(mockPrecomputedFlag.variationKey),
+          allocationKey: encodeBase64(mockPrecomputedFlag.allocationKey ?? ''),
+          variationKey: encodeBase64(mockPrecomputedFlag.variationKey ?? ''),
           variationValue: encodeBase64(mockPrecomputedFlag.variationValue),
           extraLogging: {},
         },
       });
-      client = new EppoPrecomputedClient(storage, true);
-    });
+      precomputedFlagStore.salt = salt;
 
-    afterAll(() => {
-      td.reset();
-    });
+      const requestParameters: PrecomputedFlagsRequestParameters = {
+        apiKey: 'DUMMY_API_KEY',
+        sdkName: 'js-precomputed-test',
+        sdkVersion: '100.0.1',
+      };
 
-    it('returns decoded variation value', () => {
+      const client = new EppoPrecomputedClient({
+        precomputedFlagStore,
+        subject,
+      });
+
       expect(client.getStringAssignment(precomputedFlagKey, 'default')).toBe(
         mockPrecomputedFlag.variationValue,
       );
+
+      td.reset();
     });
   });
 
   it('logs variation assignment with format from precomputed flags response', () => {
     const mockLogger = td.object<IAssignmentLogger>();
-    storage.setEntries({ [precomputedFlagKey]: mockPrecomputedFlag });
-    const client = new EppoPrecomputedClient(storage);
+    storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+    const client = new EppoPrecomputedClient({
+      precomputedFlagStore: storage,
+      subject,
+    });
     client.setAssignmentLogger(mockLogger);
 
     client.getStringAssignment(precomputedFlagKey, 'default');
@@ -721,43 +774,88 @@ describe('EppoPrecomputedClient E2E test', () => {
     beforeEach(() => {
       store = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
       mockLogger = td.object<IAssignmentLogger>();
-      client = new EppoPrecomputedClient(store);
-      client.setAssignmentLogger(mockLogger);
     });
 
-    it('returns default value and does not log when store is not initialized', () => {
-      client.setSubjectAndPrecomputedFlagStore('test-subject', {}, store);
-      expect(client.getStringAssignment('test-flag', 'default')).toBe('default');
-      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(0);
+    it('prints errors if initialized with a store that is not initialized and without requestParameters', () => {
+      const loggerErrorSpy = jest.spyOn(logger, 'error');
+      expect(() => {
+        client = new EppoPrecomputedClient({
+          precomputedFlagStore: store,
+          subject,
+        });
+      }).not.toThrow();
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(2);
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+      );
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+      );
+      loggerErrorSpy.mockRestore();
+      expect(client.getStringAssignment('string-flag', 'default')).toBe('default');
     });
 
-    it('returns assignment and logs subject data after store is initialized with flags', async () => {
-      const subjectKey = 'test-subject';
-      const subjectAttributes = { attr1: 'value1' };
-
+    it('prints only one error if initialized with a store without a salt and without requestParameters', async () => {
+      const loggerErrorSpy = jest.spyOn(logger, 'error');
       await store.setEntries({
         'test-flag': {
-          flagKey: precomputedFlagKey,
+          flagKey: 'test-flag',
           variationType: VariationType.STRING,
-          variationKey: 'control',
-          variationValue: 'test-value',
-          allocationKey: 'allocation-1',
+          variationKey: encodeBase64('control'),
+          variationValue: encodeBase64('test-value'),
+          allocationKey: encodeBase64('allocation-1'),
           doLog: true,
           extraLogging: {},
         },
       });
-      client.setSubjectAndPrecomputedFlagStore(subjectKey, subjectAttributes, store);
+      expect(() => {
+        client = new EppoPrecomputedClient({
+          precomputedFlagStore: store,
+          subject,
+        });
+      }).not.toThrow();
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(1);
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+      );
+      loggerErrorSpy.mockRestore();
+      expect(client.getStringAssignment('string-flag', 'default')).toBe('default');
+    });
+
+    it('returns assignment and logs subject data after store is initialized with flags', async () => {
+      const subjectKey = 'test-subject';
+      const subjectAttributes = ensureContextualSubjectAttributes({ attr1: 'value1' });
+      store.salt = 'test-salt';
+      const hashedFlagKey = getMD5Hash('test-flag', store.salt);
+
+      await store.setEntries({
+        [hashedFlagKey]: {
+          flagKey: hashedFlagKey,
+          variationType: VariationType.STRING,
+          variationKey: encodeBase64('control'),
+          variationValue: encodeBase64('test-value'),
+          allocationKey: encodeBase64('allocation-1'),
+          doLog: true,
+          extraLogging: {},
+        },
+      });
+
+      client = new EppoPrecomputedClient({
+        precomputedFlagStore: store,
+        subject,
+      });
+      client.setAssignmentLogger(mockLogger);
+
       expect(client.getStringAssignment('test-flag', 'default')).toBe('test-value');
 
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
       const loggedEvent = td.explain(mockLogger.logAssignment).calls[0].args[0];
       expect(loggedEvent.subject).toEqual(subjectKey);
-      expect(loggedEvent.subjectAttributes).toEqual(subjectAttributes);
-    });
 
-    it('returns default value and does not log when subject data is not set', () => {
-      expect(client.getStringAssignment('test-flag', 'default')).toBe('default');
-      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(0);
+      // Convert the ContextAttributes to a flat attribute map
+      expect(loggedEvent.subjectAttributes).toEqual(
+        ensureNonContextualSubjectAttributes(subjectAttributes),
+      );
     });
   });
 });
