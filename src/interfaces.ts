@@ -158,8 +158,10 @@ export type BasePrecomputedFlag = {
   doLog: boolean;
 };
 
+type Base64 = string;
+
 export interface PrecomputedFlag extends BasePrecomputedFlag {
-  variationValue: string;
+  variationValue: Base64;
 }
 
 export interface DecodedPrecomputedFlag extends BasePrecomputedFlag {
