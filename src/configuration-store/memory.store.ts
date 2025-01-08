@@ -35,6 +35,8 @@ export class MemoryOnlyConfigurationStore<T> implements IConfigurationStore<T> {
   private configPublishedAt: string | null = null;
   private environment: Environment | null = null;
   private format: FormatEnum | null = null;
+  salt?: string;
+
   init(): Promise<void> {
     this.initialized = true;
     return Promise.resolve();

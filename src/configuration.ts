@@ -22,13 +22,14 @@ interface IBasePrecomputedConfigurationResponse {
 
 export interface IPrecomputedConfigurationResponse extends IBasePrecomputedConfigurationResponse {
   readonly obfuscated: false; // Always false
+  readonly salt?: string; // Salt used for hashing md5-encoded strings
   readonly flags: Record<string, PrecomputedFlag>;
   readonly bandits: Record<string, IPrecomputedBandit>;
 }
 
-export interface IObfuscatedPrecomputedConfigurationResponse extends IBasePrecomputedConfigurationResponse {
+export interface IObfuscatedPrecomputedConfigurationResponse
+  extends IBasePrecomputedConfigurationResponse {
   readonly obfuscated: true; // Always true
-  readonly salt: string; // Salt used for hashing md5-encoded strings
 
   // PrecomputedFlag ships values as string and uses ValueType to cast back on the client.
   // Values are obfuscated as strings, so a separate Obfuscated interface is not needed for flags.
@@ -36,13 +37,12 @@ export interface IObfuscatedPrecomputedConfigurationResponse extends IBasePrecom
   readonly bandits: Record<MD5String, IObfuscatedPrecomputedBandit>;
 }
 
-export interface IPrecomputedConfiguration  {
+export interface IPrecomputedConfiguration {
   // JSON encoded configuration response (obfuscated or unobfuscated)
   readonly response: string;
   readonly subjectKey: string;
   readonly subjectAttributes?: ContextAttributes;
 }
-
 
 // Base class for configuration responses with common fields
 abstract class BasePrecomputedConfigurationResponse {

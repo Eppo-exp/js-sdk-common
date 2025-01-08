@@ -1,6 +1,10 @@
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
+import {
+  ensureContextualSubjectAttributes,
+  ensureNonContextualSubjectAttributes,
+} from '../attributes';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
@@ -16,23 +20,26 @@ import {
 import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
-import { PrecomputedFlag, VariationType } from '../interfaces';
+import { DecodedPrecomputedFlag, PrecomputedFlag, VariationType } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
-import { Attributes } from '../types';
+import { Attributes, ContextAttributes } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
+
+import { checkTypeMatch } from './eppo-client';
+
+export interface Subject {
+  subjectKey: string;
+  subjectAttributes: Attributes | ContextAttributes;
+}
 
 export type PrecomputedFlagsRequestParameters = {
   apiKey: string;
   sdkVersion: string;
   sdkName: string;
   baseUrl?: string;
-  precompute: {
-    subjectKey: string;
-    subjectAttributes: Attributes;
-  };
   requestTimeoutMs?: number;
   pollingIntervalMs?: number;
   numInitialRequestRetries?: number;
@@ -43,44 +50,51 @@ export type PrecomputedFlagsRequestParameters = {
   skipInitialPoll?: boolean;
 };
 
+interface EppoPrecomputedClientOptions {
+  precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+  subject: Subject;
+  requestParameters?: PrecomputedFlagsRequestParameters;
+}
+
 export default class EppoPrecomputedClient {
   private readonly queuedAssignmentEvents: IAssignmentEvent[] = [];
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
   private requestPoller?: IPoller;
-  private precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters;
-  private subjectKey?: string;
-  private subjectAttributes?: Attributes;
+  private requestParameters?: PrecomputedFlagsRequestParameters;
+  private subject: {
+    subjectKey: string;
+    subjectAttributes: ContextAttributes;
+  };
+  private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
 
-  constructor(
-    private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
-    private isObfuscated = false,
-  ) {}
-
-  public setPrecomputedFlagsRequestParameters(
-    precomputedFlagsRequestParameters: PrecomputedFlagsRequestParameters,
-  ) {
-    this.precomputedFlagsRequestParameters = precomputedFlagsRequestParameters;
-  }
-
-  public setSubjectAndPrecomputedFlagsRequestParameters(
-    precomputedFlagsRequestParameters: PrecomputedFlagsRequestParameters,
-  ) {
-    this.setPrecomputedFlagsRequestParameters(precomputedFlagsRequestParameters);
-    this.subjectKey = precomputedFlagsRequestParameters.precompute.subjectKey;
-    this.subjectAttributes = precomputedFlagsRequestParameters.precompute.subjectAttributes;
-  }
-
-  public setPrecomputedFlagStore(precomputedFlagStore: IConfigurationStore<PrecomputedFlag>) {
-    this.precomputedFlagStore = precomputedFlagStore;
-  }
-
-  public setIsObfuscated(isObfuscated: boolean) {
-    this.isObfuscated = isObfuscated;
+  public constructor(options: EppoPrecomputedClientOptions) {
+    this.precomputedFlagStore = options.precomputedFlagStore;
+    const { subjectKey, subjectAttributes } = options.subject;
+    this.subject = {
+      subjectKey,
+      subjectAttributes: ensureContextualSubjectAttributes(subjectAttributes),
+    };
+    if (options.requestParameters) {
+      // Online-mode
+      this.requestParameters = options.requestParameters;
+    } else {
+      // Offline-mode
+      if (!this.precomputedFlagStore.isInitialized()) {
+        logger.error(
+          '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+        );
+      }
+      if (!this.precomputedFlagStore.salt) {
+        logger.error(
+          '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+        );
+      }
+    }
   }
 
   public async fetchPrecomputedFlags() {
-    if (!this.precomputedFlagsRequestParameters) {
+    if (!this.requestParameters) {
       throw new Error('Eppo SDK unable to fetch precomputed flags without the request parameters');
     }
     // if fetchFlagConfigurations() was previously called, stop any polling process from that call
@@ -91,7 +105,6 @@ export default class EppoPrecomputedClient {
       sdkName,
       sdkVersion,
       baseUrl, // Default is set before passing to ApiEndpoints constructor if undefined
-      precompute: { subjectKey, subjectAttributes },
       requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
       numInitialRequestRetries = DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
       numPollRequestRetries = DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -99,9 +112,10 @@ export default class EppoPrecomputedClient {
       pollAfterFailedInitialization = false,
       throwOnFailedInitialization = false,
       skipInitialPoll = false,
-    } = this.precomputedFlagsRequestParameters;
+    } = this.requestParameters;
+    const { subjectKey, subjectAttributes } = this.subject;
 
-    let { pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS } = this.precomputedFlagsRequestParameters;
+    let { pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS } = this.requestParameters;
     if (pollingIntervalMs <= 0) {
       logger.error('pollingIntervalMs must be greater than 0. Using default');
       pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS;
@@ -144,19 +158,6 @@ export default class EppoPrecomputedClient {
     }
   }
 
-  public setSubjectAndPrecomputedFlagStore(
-    subjectKey: string,
-    subjectAttributes: Attributes,
-    precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
-  ) {
-    // Save the new subject data and precomputed flag store together because they are related
-    // Stop any polling process if it exists from previous subject data to protect consistency
-    this.requestPoller?.stop();
-    this.setPrecomputedFlagStore(precomputedFlagStore);
-    this.subjectKey = subjectKey;
-    this.subjectAttributes = subjectAttributes;
-  }
-
   private getPrecomputedAssignment<T>(
     flagKey: string,
     defaultValue: T,
@@ -165,33 +166,32 @@ export default class EppoPrecomputedClient {
   ): T {
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
 
-    const preComputedFlag = this.getPrecomputedFlag(flagKey);
+    const precomputedFlag = this.getPrecomputedFlag(flagKey);
 
-    if (preComputedFlag == null) {
+    if (precomputedFlag == null) {
       logger.warn(`[Eppo SDK] No assigned variation. Flag not found: ${flagKey}`);
       return defaultValue;
     }
 
-    // Check variation type
-    if (preComputedFlag.variationType !== expectedType) {
-      logger.error(
-        `[Eppo SDK] Type mismatch: expected ${expectedType} but flag ${flagKey} has type ${preComputedFlag.variationType}`,
-      );
+    // Add type checking before proceeding
+    if (!checkTypeMatch(expectedType, precomputedFlag.variationType)) {
+      const errorMessage = `[Eppo SDK] Type mismatch: expected ${expectedType} but flag ${flagKey} has type ${precomputedFlag.variationType}`;
+      logger.error(errorMessage);
       return defaultValue;
     }
 
     const result: FlagEvaluationWithoutDetails = {
       flagKey,
       format: this.precomputedFlagStore.getFormat() ?? '',
-      subjectKey: this.subjectKey ?? '',
-      subjectAttributes: this.subjectAttributes ?? {},
+      subjectKey: this.subject.subjectKey ?? '',
+      subjectAttributes: ensureNonContextualSubjectAttributes(this.subject.subjectAttributes ?? {}),
       variation: {
-        key: preComputedFlag.variationKey,
-        value: preComputedFlag.variationValue,
+        key: precomputedFlag.variationKey ?? '',
+        value: precomputedFlag.variationValue,
       },
-      allocationKey: preComputedFlag.allocationKey,
-      extraLogging: preComputedFlag.extraLogging,
-      doLog: preComputedFlag.doLog,
+      allocationKey: precomputedFlag.allocationKey ?? '',
+      extraLogging: precomputedFlag.extraLogging ?? {},
+      doLog: precomputedFlag.doLog,
     };
 
     try {
@@ -274,15 +274,15 @@ export default class EppoPrecomputedClient {
     );
   }
 
-  private getPrecomputedFlag(flagKey: string): PrecomputedFlag | null {
-    return this.isObfuscated
-      ? this.getObfuscatedFlag(flagKey)
-      : this.precomputedFlagStore.get(flagKey);
+  private getPrecomputedFlag(flagKey: string): DecodedPrecomputedFlag | null {
+    return this.getObfuscatedFlag(flagKey);
   }
 
-  private getObfuscatedFlag(flagKey: string): PrecomputedFlag | null {
+  private getObfuscatedFlag(flagKey: string): DecodedPrecomputedFlag | null {
+    const salt = this.precomputedFlagStore.salt;
+    const saltedAndHashedFlagKey = getMD5Hash(flagKey, salt);
     const precomputedFlag: PrecomputedFlag | null = this.precomputedFlagStore.get(
-      getMD5Hash(flagKey),
+      saltedAndHashedFlagKey,
     ) as PrecomputedFlag;
     return precomputedFlag ? decodePrecomputedFlag(precomputedFlag) : null;
   }
@@ -384,7 +384,7 @@ export default class EppoPrecomputedClient {
 
   private buildLoggerMetadata(): Record<string, unknown> {
     return {
-      obfuscated: this.isObfuscated,
+      obfuscated: true,
       sdkLanguage: 'javascript',
       sdkLibVersion: LIB_VERSION,
     };
