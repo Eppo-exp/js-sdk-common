@@ -27,15 +27,16 @@ import { LIB_VERSION } from '../version';
 
 import { checkTypeMatch } from './eppo-client';
 
+export interface Subject {
+  subjectKey: string;
+  subjectAttributes: ContextAttributes;
+}
+
 export type PrecomputedFlagsRequestParameters = {
   apiKey: string;
   sdkVersion: string;
   sdkName: string;
   baseUrl?: string;
-  precompute: {
-    subjectKey: string;
-    subjectAttributes: ContextAttributes;
-  };
   requestTimeoutMs?: number;
   pollingIntervalMs?: number;
   numInitialRequestRetries?: number;
@@ -57,6 +58,8 @@ export function convertContextAttributesToSubjectAttributes(
 
 interface EppoPrecomputedClientOptions {
   precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+  subject: Subject;
+  requestParameters?: PrecomputedFlagsRequestParameters;
 }
 
 export default class EppoPrecomputedClient {
@@ -64,42 +67,36 @@ export default class EppoPrecomputedClient {
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
   private requestPoller?: IPoller;
-  private precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters;
-  private subjectKey?: string;
-  private subjectAttributes?: ContextAttributes;
+  private requestParameters?: PrecomputedFlagsRequestParameters;
+  private subject: Subject;
   private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
 
-  public constructor(
-    options: EppoPrecomputedClientOptions,
-    precomputedFlagsRequestParameters?: PrecomputedFlagsRequestParameters,
-  ) {
+  public constructor(options: EppoPrecomputedClientOptions) {
     this.precomputedFlagStore = options.precomputedFlagStore;
-    if (precomputedFlagsRequestParameters) {
-      this.setPrecomputedFlagsRequestParameters(precomputedFlagsRequestParameters);
-      this.setSubjectData(
-        precomputedFlagsRequestParameters.precompute.subjectKey,
-        precomputedFlagsRequestParameters.precompute.subjectAttributes,
-      );
+    this.subject = options.subject;
+    if (options.requestParameters) {
+      // Online-mode
+      this.setRequestParameters(options.requestParameters);
+    } else {
+      // Offline-mode
+      if (!this.precomputedFlagStore.isInitialized()) {
+        logger.error(
+          'EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+        );
+      }
     }
   }
 
-  private setPrecomputedFlagsRequestParameters(parameters: PrecomputedFlagsRequestParameters) {
-    this.precomputedFlagsRequestParameters = parameters;
+  private setRequestParameters(requestParameters: PrecomputedFlagsRequestParameters) {
+    this.requestParameters = requestParameters;
   }
 
-  private setSubjectData(subjectKey: string, subjectAttributes: ContextAttributes) {
-    this.subjectKey = subjectKey;
-    this.subjectAttributes = subjectAttributes;
-  }
-
-  // Convenience method that combines setters we need to make assignments work
-  setSubjectAndPrecomputedFlagsRequestParameters(parameters: PrecomputedFlagsRequestParameters) {
-    this.setPrecomputedFlagsRequestParameters(parameters);
-    this.setSubjectData(parameters.precompute.subjectKey, parameters.precompute.subjectAttributes);
+  private setSubject(subject: Subject) {
+    this.subject = subject;
   }
 
   public async fetchPrecomputedFlags() {
-    if (!this.precomputedFlagsRequestParameters) {
+    if (!this.requestParameters) {
       throw new Error('Eppo SDK unable to fetch precomputed flags without the request parameters');
     }
     // if fetchFlagConfigurations() was previously called, stop any polling process from that call
@@ -110,7 +107,6 @@ export default class EppoPrecomputedClient {
       sdkName,
       sdkVersion,
       baseUrl, // Default is set before passing to ApiEndpoints constructor if undefined
-      precompute: { subjectKey, subjectAttributes },
       requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
       numInitialRequestRetries = DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
       numPollRequestRetries = DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -118,9 +114,10 @@ export default class EppoPrecomputedClient {
       pollAfterFailedInitialization = false,
       throwOnFailedInitialization = false,
       skipInitialPoll = false,
-    } = this.precomputedFlagsRequestParameters;
+    } = this.requestParameters;
+    const { subjectKey, subjectAttributes } = this.subject;
 
-    let { pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS } = this.precomputedFlagsRequestParameters;
+    let { pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS } = this.requestParameters;
     if (pollingIntervalMs <= 0) {
       logger.error('pollingIntervalMs must be greater than 0. Using default');
       pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS;
@@ -163,22 +160,6 @@ export default class EppoPrecomputedClient {
     }
   }
 
-  private setPrecomputedFlagStore(store: IConfigurationStore<PrecomputedFlag>) {
-    this.requestPoller?.stop();
-    this.precomputedFlagStore = store;
-  }
-
-  // Convenience method that combines setters we need to make assignments work
-  // TODO: remove this method
-  setSubjectAndPrecomputedFlagStore(
-    subjectKey: string,
-    subjectAttributes: ContextAttributes,
-    precomputedFlagStore: IConfigurationStore<PrecomputedFlag>,
-  ) {
-    this.setPrecomputedFlagStore(precomputedFlagStore);
-    this.setSubjectData(subjectKey, subjectAttributes);
-  }
-
   private getPrecomputedAssignment<T>(
     flagKey: string,
     defaultValue: T,
@@ -204,8 +185,8 @@ export default class EppoPrecomputedClient {
     const result: FlagEvaluationWithoutDetails = {
       flagKey,
       format: this.precomputedFlagStore.getFormat() ?? '',
-      subjectKey: this.subjectKey ?? '',
-      subjectAttributes: ensureNonContextualSubjectAttributes(this.subjectAttributes ?? {}),
+      subjectKey: this.subject.subjectKey ?? '',
+      subjectAttributes: ensureNonContextualSubjectAttributes(this.subject.subjectAttributes ?? {}),
       variation: {
         key: precomputedFlag.variationKey ?? '',
         value: precomputedFlag.variationValue,
