@@ -3,8 +3,6 @@ import { hydrateConfigurationStore } from './configuration-store/configuration-s
 import { IHttpClient } from './http-client';
 import { BanditVariation, BanditParameters, Flag, BanditReference } from './interfaces';
 
-type Entry = Flag | BanditVariation[] | BanditParameters;
-
 // Requests AND stores flag configurations
 export default class ConfigurationRequestor {
   private banditModelVersions: string[] = [];

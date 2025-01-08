@@ -44,10 +44,8 @@ function obfuscatePrecomputedBandit(
     actionProbability: banditResult.actionProbability,
     optimalityGap: banditResult.optimalityGap,
     modelVersion: encodeBase64(banditResult.modelVersion),
-    actionNumericAttributes: encodeAttributes(banditResult.actionAttributes.numericAttributes),
-    actionCategoricalAttributes: encodeAttributes(
-      banditResult.actionAttributes.categoricalAttributes,
-    ),
+    actionNumericAttributes: encodeAttributes(banditResult.actionNumericAttributes),
+    actionCategoricalAttributes: encodeAttributes(banditResult.actionCategoricalAttributes),
   };
 }
 

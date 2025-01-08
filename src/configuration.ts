@@ -12,7 +12,7 @@ import {
 } from './obfuscation';
 import { ContextAttributes, MD5String } from './types';
 
-export interface IPrecomputedConfiguration {
+export interface IPrecomputedConfigurationResponse {
   // `format` is always `PRECOMPUTED`
   readonly format: FormatEnum;
   readonly obfuscated: boolean; // Always false.
@@ -23,7 +23,7 @@ export interface IPrecomputedConfiguration {
   readonly bandits: Record<string, IPrecomputedBandit>;
 }
 
-export interface IObfuscatedPrecomputedConfiguration {
+export interface IObfuscatedPrecomputedConfigurationResponse {
   // `format` is always `PRECOMPUTED`
   readonly format: FormatEnum;
   readonly obfuscated: boolean; // Always true.
@@ -36,15 +36,14 @@ export interface IObfuscatedPrecomputedConfiguration {
   readonly bandits: Record<MD5String, IObfuscatedPrecomputedBandit>;
 }
 
-export interface IPrecomputedResponse {
-  // JSON encoded `IObfuscatedPrecomputedConfiguration` (but could be `IPrecomputedConfiguration` in the future)
+export interface IPrecomputedConfiguration {
+  // JSON encoded `IObfuscatedPrecomputedConfigurationResponse` (but could be `IPrecomputedConfigurationResponse` in the future)
   readonly response: string;
   readonly subjectKey: string;
-  // Optional in case server does not want to expose attributes to a client.
   readonly subjectAttributes?: ContextAttributes;
 }
 
-export class PrecomputedResponse implements IPrecomputedResponse {
+export class PrecomputedConfiguration implements IPrecomputedConfiguration {
   private constructor(
     public readonly response: string,
     public readonly subjectKey: string,
@@ -57,8 +56,8 @@ export class PrecomputedResponse implements IPrecomputedResponse {
     bandits: Record<string, IPrecomputedBandit>,
     subjectAttributes?: ContextAttributes,
     environment?: Environment,
-  ): IPrecomputedResponse {
-    const response = new ObfuscatedPrecomputedConfiguration(
+  ): IPrecomputedConfiguration {
+    const response = new ObfuscatedPrecomputedConfigurationResponse(
       subjectKey,
       flags,
       bandits,
@@ -66,17 +65,17 @@ export class PrecomputedResponse implements IPrecomputedResponse {
       environment,
     );
 
-    return new PrecomputedResponse(JSON.stringify(response), subjectKey, subjectAttributes);
+    return new PrecomputedConfiguration(JSON.stringify(response), subjectKey, subjectAttributes);
   }
 
-  public static deobfuscated(
+  public static unobfuscated(
     subjectKey: string,
     flags: Record<string, PrecomputedFlag>,
     bandits: Record<string, IPrecomputedBandit>,
     subjectAttributes?: ContextAttributes,
     environment?: Environment,
-  ): IPrecomputedResponse {
-    const response = new PrecomputedConfiguration(
+  ): IPrecomputedConfiguration {
+    const response = new PrecomputedConfigurationResponse(
       subjectKey,
       flags,
       bandits,
@@ -84,11 +83,11 @@ export class PrecomputedResponse implements IPrecomputedResponse {
       environment,
     );
 
-    return new PrecomputedResponse(JSON.stringify(response), subjectKey, subjectAttributes);
+    return new PrecomputedConfiguration(JSON.stringify(response), subjectKey, subjectAttributes);
   }
 }
 
-export class PrecomputedConfiguration implements IPrecomputedConfiguration {
+export class PrecomputedConfigurationResponse implements IPrecomputedConfigurationResponse {
   readonly createdAt: string;
   readonly format = FormatEnum.PRECOMPUTED;
   readonly obfuscated = false;
@@ -104,7 +103,9 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
   }
 }
 
-export class ObfuscatedPrecomputedConfiguration implements IObfuscatedPrecomputedConfiguration {
+export class ObfuscatedPrecomputedConfigurationResponse
+  implements IObfuscatedPrecomputedConfigurationResponse
+{
   readonly bandits: Record<MD5String, IObfuscatedPrecomputedBandit>;
   readonly createdAt: string;
   readonly flags: Record<string, PrecomputedFlag>;
@@ -138,10 +139,10 @@ export interface IConfigurationWire {
   readonly version: number;
 
   // TODO: Add flags and bandits for offline/non-precomputed initialization
-  readonly precomputed?: IPrecomputedResponse;
+  readonly precomputed?: IPrecomputedConfiguration;
 }
 
 export class ConfigurationWireV1 implements IConfigurationWire {
   public readonly version = 1;
-  constructor(readonly precomputed?: IPrecomputedResponse) {}
+  constructor(readonly precomputed?: IPrecomputedConfiguration) {}
 }

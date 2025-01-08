@@ -1,5 +1,5 @@
 import { Rule } from './rules';
-import { Attributes, Base64String, ContextAttributes } from './types';
+import { Attributes, Base64String } from './types';
 
 export enum VariationType {
   STRING = 'STRING',
@@ -164,7 +164,8 @@ export interface IPrecomputedBandit {
   actionProbability: number;
   optimalityGap: number;
   modelVersion: string;
-  actionAttributes: ContextAttributes;
+  actionNumericAttributes: Attributes;
+  actionCategoricalAttributes: Attributes;
 }
 
 export interface IObfuscatedPrecomputedBandit {

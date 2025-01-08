@@ -12,9 +12,9 @@ import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
 import {
   IConfigurationWire,
-  IPrecomputedResponse,
   IPrecomputedConfiguration,
-  IObfuscatedPrecomputedConfiguration,
+  IPrecomputedConfigurationResponse,
+  IObfuscatedPrecomputedConfigurationResponse,
 } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
@@ -630,15 +630,10 @@ describe('EppoClient Bandits E2E test', () => {
 
   describe('precomputed bandits', () => {
     const bob = 'bob';
-    const erica = 'erica';
 
     const bobInfo: ContextAttributes = {
       numericAttributes: { age: 30, account_age: 10 },
       categoricalAttributes: { country: 'UK', gender_identity: 'male' },
-    };
-    const ericaInfo: ContextAttributes = {
-      numericAttributes: { age: 28, account_age: 30 },
-      categoricalAttributes: { country: 'USA', gender_identity: 'female' },
     };
 
     const bobActions: Record<string, BanditActions> = {
@@ -657,29 +652,6 @@ describe('EppoClient Bandits E2E test', () => {
         },
       },
     };
-    const ericaActions = {
-      banner_bandit_flag: {
-        nike: {
-          numericAttributes: { brand_affinity: 1.2 },
-          categoricalAttributes: { loyalty_tier: 'platinum' },
-        },
-        adidas: {
-          numericAttributes: { brand_affinity: 1 },
-          categoricalAttributes: {},
-        },
-        reebok: {
-          numericAttributes: {},
-          categoricalAttributes: {},
-        },
-        puma: {
-          numericAttributes: {
-            brand_affinity: 1.0,
-            discount: 0.1,
-          },
-          categoricalAttributes: { color: 'red' },
-        },
-      },
-    };
 
     function getPrecomputedResults(
       client: EppoClient,
@@ -687,7 +659,7 @@ describe('EppoClient Bandits E2E test', () => {
       subjectAttributes: ContextAttributes,
       banditActions: Record<string, BanditActions>,
       obfuscate = false,
-    ): IPrecomputedResponse {
+    ): IPrecomputedConfiguration {
       const precomputedResults = client.getPrecomputedConfiguration(
         subjectKey,
         subjectAttributes,
@@ -720,7 +692,7 @@ describe('EppoClient Bandits E2E test', () => {
       it('precomputes resolved bandits', () => {
         const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions);
 
-        const response = JSON.parse(precomputed.response) as IPrecomputedConfiguration;
+        const response = JSON.parse(precomputed.response) as IPrecomputedConfigurationResponse;
         const subjectBandits = response.bandits;
 
         expect(subjectBandits).toBeTruthy();
@@ -730,13 +702,11 @@ describe('EppoClient Bandits E2E test', () => {
         expect(subjectBandits['banner_bandit_flag']).toEqual({
           banditKey: 'banner_bandit',
           action: 'adidas',
-          actionAttributes: {
-            categoricalAttributes: {
-              loyalty_tier: 'bronze',
-            },
-            numericAttributes: {
-              brand_affinity: -2.5,
-            },
+          actionCategoricalAttributes: {
+            loyalty_tier: 'bronze',
+          },
+          actionNumericAttributes: {
+            brand_affinity: -2.5,
           },
           actionProbability: 0.10526315789473684,
           modelVersion: '123',
@@ -763,7 +733,9 @@ describe('EppoClient Bandits E2E test', () => {
 
         const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions, true);
 
-        const response = JSON.parse(precomputed.response) as IObfuscatedPrecomputedConfiguration;
+        const response = JSON.parse(
+          precomputed.response,
+        ) as IObfuscatedPrecomputedConfigurationResponse;
 
         const numericAttrs = response.bandits[bannerBanditFlagMd5]['actionNumericAttributes'];
         const categoricalAttrs =

@@ -12,8 +12,8 @@ import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-
 import {
   IConfigurationWire,
   ConfigurationWireV1,
-  IPrecomputedResponse,
-  PrecomputedResponse,
+  IPrecomputedConfiguration,
+  PrecomputedConfiguration,
 } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
@@ -952,15 +952,15 @@ export default class EppoClient {
       flags,
     );
 
-    const precomputedConfig: IPrecomputedResponse = obfuscated
-      ? PrecomputedResponse.obfuscated(
+    const precomputedConfig: IPrecomputedConfiguration = obfuscated
+      ? PrecomputedConfiguration.obfuscated(
           subjectKey,
           flags,
           bandits,
           subjectContextualAttributes,
           configDetails.configEnvironment,
         )
-      : PrecomputedResponse.deobfuscated(
+      : PrecomputedConfiguration.unobfuscated(
           subjectKey,
           flags,
           bandits,
@@ -1340,7 +1340,8 @@ export default class EppoClient {
         return {
           banditKey: bandit.banditKey,
           action: result.actionKey,
-          actionAttributes: result.actionAttributes,
+          actionNumericAttributes: result.actionAttributes.numericAttributes,
+          actionCategoricalAttributes: result.actionAttributes.categoricalAttributes,
           actionProbability: result.actionWeight,
           modelVersion: bandit.modelVersion,
           optimalityGap: result.optimalityGap,
