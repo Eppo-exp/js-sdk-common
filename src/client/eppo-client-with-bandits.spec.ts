@@ -1,5 +1,3 @@
-import { omit } from 'lodash';
-
 import {
   readMockUFCResponse,
   MOCK_BANDIT_MODELS_RESPONSE_FILE,
@@ -15,7 +13,6 @@ import { IBanditEvent, IBanditLogger } from '../bandit-logger';
 import {
   IConfigurationWire,
   IPrecomputedConfiguration,
-  IPrecomputedConfigurationResponse,
   IObfuscatedPrecomputedConfigurationResponse,
 } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
@@ -660,13 +657,11 @@ describe('EppoClient Bandits E2E test', () => {
       subjectKey: string,
       subjectAttributes: ContextAttributes,
       banditActions: Record<string, BanditActions>,
-      obfuscate = false,
     ): IPrecomputedConfiguration {
       const precomputedResults = client.getPrecomputedConfiguration(
         subjectKey,
         subjectAttributes,
         banditActions,
-        obfuscate,
       );
 
       const { precomputed } = JSON.parse(precomputedResults) as IConfigurationWire;
@@ -676,52 +671,6 @@ describe('EppoClient Bandits E2E test', () => {
       return precomputed;
     }
 
-    describe('unobfuscated results', () => {
-      it('returns subject information in the response', () => {
-        const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions);
-
-        expect(omit(precomputed, ['response'])).toEqual({
-          subjectAttributes: {
-            categoricalAttributes: {
-              country: 'UK',
-              gender_identity: 'male',
-            },
-            numericAttributes: {
-              account_age: 10,
-              age: 30,
-            },
-          },
-          subjectKey: 'bob',
-        });
-      });
-
-      it('precomputes resolved bandits', () => {
-        const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions);
-
-        const response = JSON.parse(precomputed.response) as IPrecomputedConfigurationResponse;
-        const subjectBandits = response.bandits;
-
-        expect(response.createdAt).toBeTruthy();
-
-        expect(subjectBandits).toBeTruthy();
-        // Check to ensure only one bandit is returned. Bob is allocated to `banner_bandit`
-        expect(Object.keys(subjectBandits)).toHaveLength(1);
-
-        expect(subjectBandits['banner_bandit_flag']).toEqual({
-          banditKey: 'banner_bandit',
-          action: 'adidas',
-          actionCategoricalAttributes: {
-            loyalty_tier: 'bronze',
-          },
-          actionNumericAttributes: {
-            brand_affinity: -2.5,
-          },
-          actionProbability: 0.10526315789473684,
-          modelVersion: '123',
-          optimalityGap: 6.5,
-        });
-      });
-    });
     describe('obfuscated results', () => {
       beforeEach(() => {
         setSaltOverrideForTests(new Uint8Array([101, 112, 112, 111])); // e p p o => "ZXBwbw=="
@@ -739,7 +688,7 @@ describe('EppoClient Bandits E2E test', () => {
         const adidasB64 = 'YWRpZGFz';
         const modelB64 = 'MTIz'; // 123
 
-        const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions, true);
+        const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions);
 
         const response = JSON.parse(
           precomputed.response,

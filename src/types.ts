@@ -13,3 +13,5 @@ export type BanditActions =
   | Record<string, ContextAttributes>;
 export type Base64String = string;
 export type MD5String = string;
+export type FlagKey = string;
+export type HashedFlagKey = FlagKey;

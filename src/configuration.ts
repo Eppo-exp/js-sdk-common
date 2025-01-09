@@ -10,7 +10,7 @@ import {
   obfuscatePrecomputedBanditMap,
   obfuscatePrecomputedFlags,
 } from './obfuscation';
-import { ContextAttributes, MD5String } from './types';
+import { ContextAttributes, FlagKey, HashedFlagKey } from './types';
 
 // Base interface for all configuration responses
 interface IBasePrecomputedConfigurationResponse {
@@ -22,8 +22,8 @@ interface IBasePrecomputedConfigurationResponse {
 
 export interface IPrecomputedConfigurationResponse extends IBasePrecomputedConfigurationResponse {
   readonly obfuscated: false; // Always false
-  readonly flags: Record<string, PrecomputedFlag>;
-  readonly bandits: Record<string, IPrecomputedBandit>;
+  readonly flags: Record<FlagKey, PrecomputedFlag>;
+  readonly bandits: Record<FlagKey, IPrecomputedBandit>;
 }
 
 export interface IObfuscatedPrecomputedConfigurationResponse
@@ -33,8 +33,8 @@ export interface IObfuscatedPrecomputedConfigurationResponse
 
   // PrecomputedFlag ships values as string and uses ValueType to cast back on the client.
   // Values are obfuscated as strings, so a separate Obfuscated interface is not needed for flags.
-  readonly flags: Record<MD5String, PrecomputedFlag>;
-  readonly bandits: Record<MD5String, IObfuscatedPrecomputedBandit>;
+  readonly flags: Record<HashedFlagKey, PrecomputedFlag>;
+  readonly bandits: Record<HashedFlagKey, IObfuscatedPrecomputedBandit>;
 }
 
 export interface IPrecomputedConfiguration {
@@ -67,8 +67,8 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
 
   public static obfuscated(
     subjectKey: string,
-    flags: Record<string, PrecomputedFlag>,
-    bandits: Record<string, IPrecomputedBandit>,
+    flags: Record<FlagKey, PrecomputedFlag>,
+    bandits: Record<FlagKey, IPrecomputedBandit>,
     subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ): IPrecomputedConfiguration {
@@ -85,8 +85,8 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
 
   public static unobfuscated(
     subjectKey: string,
-    flags: Record<string, PrecomputedFlag>,
-    bandits: Record<string, IPrecomputedBandit>,
+    flags: Record<FlagKey, PrecomputedFlag>,
+    bandits: Record<FlagKey, IPrecomputedBandit>,
     subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ): IPrecomputedConfiguration {
@@ -110,8 +110,8 @@ export class PrecomputedConfigurationResponse
 
   constructor(
     subjectKey: string,
-    public readonly flags: Record<string, PrecomputedFlag>,
-    public readonly bandits: Record<string, IPrecomputedBandit>,
+    public readonly flags: Record<FlagKey, PrecomputedFlag>,
+    public readonly bandits: Record<FlagKey, IPrecomputedBandit>,
     subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ) {
@@ -123,15 +123,15 @@ export class ObfuscatedPrecomputedConfigurationResponse
   extends BasePrecomputedConfigurationResponse
   implements IObfuscatedPrecomputedConfigurationResponse
 {
-  readonly bandits: Record<MD5String, IObfuscatedPrecomputedBandit>;
-  readonly flags: Record<string, PrecomputedFlag>;
+  readonly bandits: Record<HashedFlagKey, IObfuscatedPrecomputedBandit>;
+  readonly flags: Record<HashedFlagKey, PrecomputedFlag>;
   readonly obfuscated = true;
   readonly salt: string;
 
   constructor(
     subjectKey: string,
-    flags: Record<string, PrecomputedFlag>,
-    bandits: Record<string, IPrecomputedBandit>,
+    flags: Record<FlagKey, PrecomputedFlag>,
+    bandits: Record<FlagKey, IPrecomputedBandit>,
     subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ) {
