@@ -17,7 +17,7 @@ if (typeof window !== 'undefined' && window.crypto) {
       return;
     })
     .catch((error) => {
-      logger.error('Failed to load crypto module:', error);
+      logger.error('[Eppo SDK] Failed to load crypto module:', error);
     });
 }
 
