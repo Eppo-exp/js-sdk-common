@@ -9,9 +9,11 @@
     "outDir": "dist",
     "noImplicitAny": true,
     "strict": true,
-    "strictPropertyInitialization": true
+    "strictPropertyInitialization": true,
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",
