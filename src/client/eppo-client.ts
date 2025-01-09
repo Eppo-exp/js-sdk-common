@@ -871,7 +871,7 @@ export default class EppoClient {
   getPrecomputedAssignments(
     subjectKey: string,
     subjectAttributes: Attributes | ContextAttributes = {},
-    obfuscated = false,
+    obfuscated = true,
   ): string {
     const configDetails = this.getConfigDetails();
 

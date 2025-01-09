@@ -1,7 +1,32 @@
 import base64 = require('js-base64');
 import * as SparkMD5 from 'spark-md5';
 
+import { logger } from './application-logger';
 import { PrecomputedFlag } from './interfaces';
+
+// Import randomBytes according to the environment
+let getRandomValues: (length: number) => Uint8Array;
+if (typeof window !== 'undefined' && window.crypto) {
+  // Browser environment
+  getRandomValues = (length: number) => window.crypto.getRandomValues(new Uint8Array(length));
+} else if (typeof navigator !== 'undefined' && navigator.product === 'ReactNative') {
+  // React Native environment
+  require('react-native-get-random-values');
+  getRandomValues = (length: number) => {
+    const array = new Uint8Array(length);
+    return window.crypto.getRandomValues(array);
+  };
+} else {
+  // Node.js environment
+  import('crypto')
+    .then((crypto) => {
+      getRandomValues = (length: number) => new Uint8Array(crypto.randomBytes(length));
+      return;
+    })
+    .catch((error) => {
+      logger.error('[Eppo SDK] Failed to load crypto module:', error);
+    });
+}
 
 export function getMD5Hash(input: string, salt = ''): string {
   return new SparkMD5().append(salt).append(input).end();
@@ -49,7 +74,5 @@ export function setSaltOverrideForTests(salt: Uint8Array | null) {
 }
 
 export function generateSalt(length = 16): string {
-  return base64.fromUint8Array(
-    saltOverrideBytes ? saltOverrideBytes : crypto.getRandomValues(new Uint8Array(length)),
-  );
+  return base64.fromUint8Array(saltOverrideBytes ? saltOverrideBytes : getRandomValues(length));
 }
