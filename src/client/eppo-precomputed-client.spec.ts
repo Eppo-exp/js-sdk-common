@@ -11,12 +11,18 @@ import {
   ensureContextualSubjectAttributes,
   ensureNonContextualSubjectAttributes,
 } from '../attributes';
+import { IBanditLogger } from '../bandit-logger';
 import { IPrecomputedConfigurationResponse } from '../configuration';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { DEFAULT_POLL_INTERVAL_MS, MAX_EVENT_QUEUE_SIZE, POLL_JITTER_PCT } from '../constants';
 import FetchHttpClient from '../http-client';
-import { FormatEnum, PrecomputedFlag, VariationType } from '../interfaces';
+import {
+  FormatEnum,
+  IObfuscatedPrecomputedBandit,
+  PrecomputedFlag,
+  VariationType,
+} from '../interfaces';
 import { decodeBase64, encodeBase64, getMD5Hash } from '../obfuscation';
 import PrecomputedRequestor from '../precomputed-requestor';
 
@@ -87,7 +93,7 @@ describe('EppoPrecomputedClient E2E test', () => {
     extraLogging: {},
   };
 
-  describe('error encountered', () => {
+  describe('getting assignment for non-existent flag', () => {
     let client: EppoPrecomputedClient;
 
     beforeAll(() => {
@@ -103,6 +109,286 @@ describe('EppoPrecomputedClient E2E test', () => {
       expect(client.getStringAssignment('non-existent-flag', 'default')).toBe('default');
     });
   });
+
+  describe('Precomputed Assignments', () => {
+    it('returns null if getStringAssignment was called for the subject before any precomputed flags were loaded', () => {
+      const localClient = new EppoPrecomputedClient({
+        precomputedFlagStore: new MemoryOnlyConfigurationStore(),
+        subject,
+      });
+      expect(localClient.getStringAssignment(precomputedFlagKey, 'hello world')).toEqual(
+        'hello world',
+      );
+      expect(localClient.isInitialized()).toBe(false);
+    });
+
+    it('returns default value when key does not exist', async () => {
+      const client = new EppoPrecomputedClient({
+        precomputedFlagStore: storage,
+        subject,
+      });
+      const nonExistentFlag = 'non-existent-flag';
+      expect(client.getStringAssignment(nonExistentFlag, 'default')).toBe('default');
+    });
+
+    it('logs variation assignment with correct metadata', () => {
+      const mockLogger = td.object<IAssignmentLogger>();
+      storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+      const client = new EppoPrecomputedClient({
+        precomputedFlagStore: storage,
+        subject,
+      });
+      client.setAssignmentLogger(mockLogger);
+
+      client.getStringAssignment(precomputedFlagKey, 'default');
+
+      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
+      const loggedEvent = td.explain(mockLogger.logAssignment).calls[0].args[0];
+
+      expect(loggedEvent.featureFlag).toEqual(precomputedFlagKey);
+      expect(loggedEvent.variation).toEqual(decodeBase64(mockPrecomputedFlag.variationKey ?? ''));
+      expect(loggedEvent.allocation).toEqual(decodeBase64(mockPrecomputedFlag.allocationKey ?? ''));
+      expect(loggedEvent.experiment).toEqual(
+        `${precomputedFlagKey}-${decodeBase64(mockPrecomputedFlag.allocationKey ?? '')}`,
+      );
+    });
+
+    it('handles logging exception', () => {
+      const mockLogger = td.object<IAssignmentLogger>();
+      td.when(mockLogger.logAssignment(td.matchers.anything())).thenThrow(
+        new Error('logging error'),
+      );
+
+      storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+      const client = new EppoPrecomputedClient({
+        precomputedFlagStore: storage,
+        subject,
+      });
+      client.setAssignmentLogger(mockLogger);
+
+      const assignment = client.getStringAssignment(precomputedFlagKey, 'default');
+
+      expect(assignment).toEqual('variation-a');
+    });
+
+    describe('assignment logging deduplication', () => {
+      let client: EppoPrecomputedClient;
+      let mockLogger: IAssignmentLogger;
+
+      beforeEach(() => {
+        mockLogger = td.object<IAssignmentLogger>();
+        storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+        client = new EppoPrecomputedClient({
+          precomputedFlagStore: storage,
+          subject,
+        });
+        client.setAssignmentLogger(mockLogger);
+      });
+
+      it('logs duplicate assignments without an assignment cache', async () => {
+        client.disableAssignmentCache();
+
+        client.getStringAssignment(precomputedFlagKey, 'default');
+        client.getStringAssignment(precomputedFlagKey, 'default');
+
+        // call count should be 2 because there is no cache.
+        expect(td.explain(mockLogger.logAssignment).callCount).toEqual(2);
+      });
+
+      it('does not log duplicate assignments', async () => {
+        client.useNonExpiringInMemoryAssignmentCache();
+        client.getStringAssignment(precomputedFlagKey, 'default');
+        client.getStringAssignment(precomputedFlagKey, 'default');
+        // call count should be 1 because the second call is a cache hit and not logged.
+        expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
+      });
+
+      it('logs assignment again after the lru cache is full', async () => {
+        await storage.setEntries({
+          [hashedPrecomputedFlagKey]: mockPrecomputedFlag,
+          [hashedFlag2]: {
+            ...mockPrecomputedFlag,
+            variationKey: encodeBase64('b'),
+          },
+          [hashedFlag3]: {
+            ...mockPrecomputedFlag,
+            variationKey: encodeBase64('c'),
+          },
+        });
+
+        client.useLRUInMemoryAssignmentCache(2);
+
+        client.getStringAssignment(precomputedFlagKey, 'default'); // logged
+        client.getStringAssignment(precomputedFlagKey, 'default'); // cached
+        client.getStringAssignment('flag-2', 'default'); // logged
+        client.getStringAssignment('flag-2', 'default'); // cached
+        client.getStringAssignment('flag-3', 'default'); // logged
+        client.getStringAssignment('flag-3', 'default'); // cached
+        client.getStringAssignment(precomputedFlagKey, 'default'); // logged
+        client.getStringAssignment('flag-2', 'default'); // logged
+        client.getStringAssignment('flag-3', 'default'); // logged
+
+        expect(td.explain(mockLogger.logAssignment).callCount).toEqual(6);
+      });
+
+      it('does not cache assignments if the logger had an exception', () => {
+        td.when(mockLogger.logAssignment(td.matchers.anything())).thenThrow(
+          new Error('logging error'),
+        );
+
+        client.setAssignmentLogger(mockLogger);
+
+        client.getStringAssignment(precomputedFlagKey, 'default');
+        client.getStringAssignment(precomputedFlagKey, 'default');
+
+        // call count should be 2 because the first call had an exception
+        // therefore we are not sure the logger was successful and try again.
+        expect(td.explain(mockLogger.logAssignment).callCount).toEqual(2);
+      });
+
+      it('logs for each unique flag', async () => {
+        await storage.setEntries({
+          [hashedPrecomputedFlagKey]: mockPrecomputedFlag,
+          [hashedFlag2]: mockPrecomputedFlag,
+          [hashedFlag3]: mockPrecomputedFlag,
+        });
+
+        client.useNonExpiringInMemoryAssignmentCache();
+
+        client.getStringAssignment(precomputedFlagKey, 'default');
+        client.getStringAssignment(precomputedFlagKey, 'default');
+        client.getStringAssignment('flag-2', 'default');
+        client.getStringAssignment('flag-2', 'default');
+        client.getStringAssignment('flag-3', 'default');
+        client.getStringAssignment('flag-3', 'default');
+        client.getStringAssignment(precomputedFlagKey, 'default');
+        client.getStringAssignment('flag-2', 'default');
+        client.getStringAssignment('flag-3', 'default');
+
+        expect(td.explain(mockLogger.logAssignment).callCount).toEqual(3);
+      });
+
+      it('logs twice for the same flag when variation change', () => {
+        client.useNonExpiringInMemoryAssignmentCache();
+
+        storage.setEntries({
+          [hashedPrecomputedFlagKey]: {
+            ...mockPrecomputedFlag,
+            variationKey: encodeBase64('a'),
+            variationValue: encodeBase64('variation-a'),
+          },
+        });
+        client.getStringAssignment(precomputedFlagKey, 'default');
+
+        storage.setEntries({
+          [hashedPrecomputedFlagKey]: {
+            ...mockPrecomputedFlag,
+            variationKey: encodeBase64('b'),
+            variationValue: encodeBase64('variation-b'),
+          },
+        });
+        client.getStringAssignment(precomputedFlagKey, 'default');
+        expect(td.explain(mockLogger.logAssignment).callCount).toEqual(2);
+      });
+
+      it('logs the same subject/flag/variation after two changes', () => {
+        client.useNonExpiringInMemoryAssignmentCache();
+
+        // original configuration version
+        storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+
+        client.getStringAssignment(precomputedFlagKey, 'default'); // log this assignment
+        client.getStringAssignment(precomputedFlagKey, 'default'); // cache hit, don't log
+
+        // change the variation
+        storage.setEntries({
+          [hashedPrecomputedFlagKey]: {
+            ...mockPrecomputedFlag,
+            allocationKey: encodeBase64('allocation-a'), // same allocation key
+            variationKey: encodeBase64('b'), // but different variation
+            variationValue: encodeBase64('variation-b'), // but different variation
+          },
+        });
+
+        client.getStringAssignment(precomputedFlagKey, 'default'); // log this assignment
+        client.getStringAssignment(precomputedFlagKey, 'default'); // cache hit, don't log
+
+        // change the flag again, back to the original
+        storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+
+        client.getStringAssignment(precomputedFlagKey, 'default'); // important: log this assignment
+        client.getStringAssignment(precomputedFlagKey, 'default'); // cache hit, don't log
+
+        // change the allocation
+        storage.setEntries({
+          [hashedPrecomputedFlagKey]: {
+            ...mockPrecomputedFlag,
+            allocationKey: encodeBase64('allocation-b'), // different allocation key
+            variationKey: encodeBase64('b'), // but same variation
+            variationValue: encodeBase64('variation-b'), // but same variation
+          },
+        });
+
+        client.getStringAssignment(precomputedFlagKey, 'default'); // log this assignment
+        client.getStringAssignment(precomputedFlagKey, 'default'); // cache hit, don't log
+
+        expect(td.explain(mockLogger.logAssignment).callCount).toEqual(4);
+      });
+    });
+
+    describe('Obfuscated precomputed flags', () => {
+      let precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+      beforeEach(() => {
+        precomputedFlagStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+      });
+
+      it('returns decoded variation value', () => {
+        const salt = 'NaCl';
+        const saltedAndHashedFlagKey = getMD5Hash(precomputedFlagKey, salt);
+
+        precomputedFlagStore.setEntries({
+          [saltedAndHashedFlagKey]: {
+            ...mockPrecomputedFlag,
+            allocationKey: encodeBase64(mockPrecomputedFlag.allocationKey ?? ''),
+            variationKey: encodeBase64(mockPrecomputedFlag.variationKey ?? ''),
+            variationValue: encodeBase64(mockPrecomputedFlag.variationValue),
+            extraLogging: {},
+          },
+        });
+        precomputedFlagStore.salt = salt;
+
+        const client = new EppoPrecomputedClient({
+          precomputedFlagStore,
+          subject,
+        });
+
+        expect(client.getStringAssignment(precomputedFlagKey, 'default')).toBe(
+          mockPrecomputedFlag.variationValue,
+        );
+
+        td.reset();
+      });
+    });
+
+    it('logs variation assignment with format from precomputed flags response', () => {
+      const mockLogger = td.object<IAssignmentLogger>();
+      storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+      const client = new EppoPrecomputedClient({
+        precomputedFlagStore: storage,
+        subject,
+      });
+      client.setAssignmentLogger(mockLogger);
+
+      client.getStringAssignment(precomputedFlagKey, 'default');
+
+      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
+      const loggedEvent = td.explain(mockLogger.logAssignment).calls[0].args[0];
+
+      expect(loggedEvent.format).toEqual(FormatEnum.PRECOMPUTED);
+    });
+  });
+
+  // describe('Precomputed Bandits', () => {}
 
   describe('setLogger', () => {
     let flagStorage: IConfigurationStore<PrecomputedFlag>;
@@ -159,232 +445,10 @@ describe('EppoPrecomputedClient E2E test', () => {
     });
   });
 
-  it('returns null if getStringAssignment was called for the subject before any precomputed flags were loaded', () => {
-    const localClient = new EppoPrecomputedClient({
-      precomputedFlagStore: new MemoryOnlyConfigurationStore(),
-      subject,
-    });
-    expect(localClient.getStringAssignment(precomputedFlagKey, 'hello world')).toEqual(
-      'hello world',
-    );
-    expect(localClient.isInitialized()).toBe(false);
-  });
-
-  it('returns default value when key does not exist', async () => {
-    const client = new EppoPrecomputedClient({
-      precomputedFlagStore: storage,
-      subject,
-    });
-    const nonExistentFlag = 'non-existent-flag';
-    expect(client.getStringAssignment(nonExistentFlag, 'default')).toBe('default');
-  });
-
-  it('logs variation assignment with correct metadata', () => {
-    const mockLogger = td.object<IAssignmentLogger>();
-    storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
-    const client = new EppoPrecomputedClient({
-      precomputedFlagStore: storage,
-      subject,
-    });
-    client.setAssignmentLogger(mockLogger);
-
-    client.getStringAssignment(precomputedFlagKey, 'default');
-
-    expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
-    const loggedEvent = td.explain(mockLogger.logAssignment).calls[0].args[0];
-
-    expect(loggedEvent.featureFlag).toEqual(precomputedFlagKey);
-    expect(loggedEvent.variation).toEqual(decodeBase64(mockPrecomputedFlag.variationKey ?? ''));
-    expect(loggedEvent.allocation).toEqual(decodeBase64(mockPrecomputedFlag.allocationKey ?? ''));
-    expect(loggedEvent.experiment).toEqual(
-      `${precomputedFlagKey}-${decodeBase64(mockPrecomputedFlag.allocationKey ?? '')}`,
-    );
-  });
-
-  it('handles logging exception', () => {
-    const mockLogger = td.object<IAssignmentLogger>();
-    td.when(mockLogger.logAssignment(td.matchers.anything())).thenThrow(new Error('logging error'));
-
-    storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
-    const client = new EppoPrecomputedClient({
-      precomputedFlagStore: storage,
-      subject,
-    });
-    client.setAssignmentLogger(mockLogger);
-
-    const assignment = client.getStringAssignment(precomputedFlagKey, 'default');
-
-    expect(assignment).toEqual('variation-a');
-  });
-
-  describe('assignment logging deduplication', () => {
-    let client: EppoPrecomputedClient;
-    let mockLogger: IAssignmentLogger;
-
-    beforeEach(() => {
-      mockLogger = td.object<IAssignmentLogger>();
-      storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
-      client = new EppoPrecomputedClient({
-        precomputedFlagStore: storage,
-        subject,
-      });
-      client.setAssignmentLogger(mockLogger);
-    });
-
-    it('logs duplicate assignments without an assignment cache', async () => {
-      client.disableAssignmentCache();
-
-      client.getStringAssignment(precomputedFlagKey, 'default');
-      client.getStringAssignment(precomputedFlagKey, 'default');
-
-      // call count should be 2 because there is no cache.
-      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(2);
-    });
-
-    it('does not log duplicate assignments', async () => {
-      client.useNonExpiringInMemoryAssignmentCache();
-      client.getStringAssignment(precomputedFlagKey, 'default');
-      client.getStringAssignment(precomputedFlagKey, 'default');
-      // call count should be 1 because the second call is a cache hit and not logged.
-      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
-    });
-
-    it('logs assignment again after the lru cache is full', async () => {
-      await storage.setEntries({
-        [hashedPrecomputedFlagKey]: mockPrecomputedFlag,
-        [hashedFlag2]: {
-          ...mockPrecomputedFlag,
-          variationKey: encodeBase64('b'),
-        },
-        [hashedFlag3]: {
-          ...mockPrecomputedFlag,
-          variationKey: encodeBase64('c'),
-        },
-      });
-
-      client.useLRUInMemoryAssignmentCache(2);
-
-      client.getStringAssignment(precomputedFlagKey, 'default'); // logged
-      client.getStringAssignment(precomputedFlagKey, 'default'); // cached
-      client.getStringAssignment('flag-2', 'default'); // logged
-      client.getStringAssignment('flag-2', 'default'); // cached
-      client.getStringAssignment('flag-3', 'default'); // logged
-      client.getStringAssignment('flag-3', 'default'); // cached
-      client.getStringAssignment(precomputedFlagKey, 'default'); // logged
-      client.getStringAssignment('flag-2', 'default'); // logged
-      client.getStringAssignment('flag-3', 'default'); // logged
-
-      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(6);
-    });
-
-    it('does not cache assignments if the logger had an exception', () => {
-      td.when(mockLogger.logAssignment(td.matchers.anything())).thenThrow(
-        new Error('logging error'),
-      );
-
-      client.setAssignmentLogger(mockLogger);
-
-      client.getStringAssignment(precomputedFlagKey, 'default');
-      client.getStringAssignment(precomputedFlagKey, 'default');
-
-      // call count should be 2 because the first call had an exception
-      // therefore we are not sure the logger was successful and try again.
-      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(2);
-    });
-
-    it('logs for each unique flag', async () => {
-      await storage.setEntries({
-        [hashedPrecomputedFlagKey]: mockPrecomputedFlag,
-        [hashedFlag2]: mockPrecomputedFlag,
-        [hashedFlag3]: mockPrecomputedFlag,
-      });
-
-      client.useNonExpiringInMemoryAssignmentCache();
-
-      client.getStringAssignment(precomputedFlagKey, 'default');
-      client.getStringAssignment(precomputedFlagKey, 'default');
-      client.getStringAssignment('flag-2', 'default');
-      client.getStringAssignment('flag-2', 'default');
-      client.getStringAssignment('flag-3', 'default');
-      client.getStringAssignment('flag-3', 'default');
-      client.getStringAssignment(precomputedFlagKey, 'default');
-      client.getStringAssignment('flag-2', 'default');
-      client.getStringAssignment('flag-3', 'default');
-
-      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(3);
-    });
-
-    it('logs twice for the same flag when variation change', () => {
-      client.useNonExpiringInMemoryAssignmentCache();
-
-      storage.setEntries({
-        [hashedPrecomputedFlagKey]: {
-          ...mockPrecomputedFlag,
-          variationKey: encodeBase64('a'),
-          variationValue: encodeBase64('variation-a'),
-        },
-      });
-      client.getStringAssignment(precomputedFlagKey, 'default');
-
-      storage.setEntries({
-        [hashedPrecomputedFlagKey]: {
-          ...mockPrecomputedFlag,
-          variationKey: encodeBase64('b'),
-          variationValue: encodeBase64('variation-b'),
-        },
-      });
-      client.getStringAssignment(precomputedFlagKey, 'default');
-      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(2);
-    });
-
-    it('logs the same subject/flag/variation after two changes', () => {
-      client.useNonExpiringInMemoryAssignmentCache();
-
-      // original configuration version
-      storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
-
-      client.getStringAssignment(precomputedFlagKey, 'default'); // log this assignment
-      client.getStringAssignment(precomputedFlagKey, 'default'); // cache hit, don't log
-
-      // change the variation
-      storage.setEntries({
-        [hashedPrecomputedFlagKey]: {
-          ...mockPrecomputedFlag,
-          allocationKey: encodeBase64('allocation-a'), // same allocation key
-          variationKey: encodeBase64('b'), // but different variation
-          variationValue: encodeBase64('variation-b'), // but different variation
-        },
-      });
-
-      client.getStringAssignment(precomputedFlagKey, 'default'); // log this assignment
-      client.getStringAssignment(precomputedFlagKey, 'default'); // cache hit, don't log
-
-      // change the flag again, back to the original
-      storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
-
-      client.getStringAssignment(precomputedFlagKey, 'default'); // important: log this assignment
-      client.getStringAssignment(precomputedFlagKey, 'default'); // cache hit, don't log
-
-      // change the allocation
-      storage.setEntries({
-        [hashedPrecomputedFlagKey]: {
-          ...mockPrecomputedFlag,
-          allocationKey: encodeBase64('allocation-b'), // different allocation key
-          variationKey: encodeBase64('b'), // but same variation
-          variationValue: encodeBase64('variation-b'), // but same variation
-        },
-      });
-
-      client.getStringAssignment(precomputedFlagKey, 'default'); // log this assignment
-      client.getStringAssignment(precomputedFlagKey, 'default'); // cache hit, don't log
-
-      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(4);
-    });
-  });
-
   describe('Eppo Precomputed Client constructed with configuration request parameters', () => {
     let client: EppoPrecomputedClient;
     let precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+    let precomputedBanditStore: IConfigurationStore<IObfuscatedPrecomputedBandit>;
     let subject: Subject;
     let requestParameters: PrecomputedFlagsRequestParameters;
 
@@ -709,78 +773,30 @@ describe('EppoPrecomputedClient E2E test', () => {
     });
   });
 
-  describe('Obfuscated precomputed flags', () => {
-    let precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
-    beforeEach(() => {
-      precomputedFlagStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
-    });
-
-    it('returns decoded variation value', () => {
-      const salt = 'NaCl';
-      const saltedAndHashedFlagKey = getMD5Hash(precomputedFlagKey, salt);
-
-      precomputedFlagStore.setEntries({
-        [saltedAndHashedFlagKey]: {
-          ...mockPrecomputedFlag,
-          allocationKey: encodeBase64(mockPrecomputedFlag.allocationKey ?? ''),
-          variationKey: encodeBase64(mockPrecomputedFlag.variationKey ?? ''),
-          variationValue: encodeBase64(mockPrecomputedFlag.variationValue),
-          extraLogging: {},
-        },
-      });
-      precomputedFlagStore.salt = salt;
-
-      const requestParameters: PrecomputedFlagsRequestParameters = {
-        apiKey: 'DUMMY_API_KEY',
-        sdkName: 'js-precomputed-test',
-        sdkVersion: '100.0.1',
-      };
-
-      const client = new EppoPrecomputedClient({
-        precomputedFlagStore,
-        subject,
-      });
-
-      expect(client.getStringAssignment(precomputedFlagKey, 'default')).toBe(
-        mockPrecomputedFlag.variationValue,
-      );
-
-      td.reset();
-    });
-  });
-
-  it('logs variation assignment with format from precomputed flags response', () => {
-    const mockLogger = td.object<IAssignmentLogger>();
-    storage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
-    const client = new EppoPrecomputedClient({
-      precomputedFlagStore: storage,
-      subject,
-    });
-    client.setAssignmentLogger(mockLogger);
-
-    client.getStringAssignment(precomputedFlagKey, 'default');
-
-    expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
-    const loggedEvent = td.explain(mockLogger.logAssignment).calls[0].args[0];
-
-    expect(loggedEvent.format).toEqual(FormatEnum.PRECOMPUTED);
-  });
-
-  describe('EppoPrecomputedClient subject data and store initialization', () => {
+  describe('EppoPrecomputedClient subject/action context data and store initialization (offline mode)', () => {
     let client: EppoPrecomputedClient;
     let store: IConfigurationStore<PrecomputedFlag>;
+    let banditStore: IConfigurationStore<IObfuscatedPrecomputedBandit>;
     let mockLogger: IAssignmentLogger;
+    let mockBanditLogger: IBanditLogger;
 
     beforeEach(() => {
       store = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+      banditStore = new MemoryOnlyConfigurationStore<IObfuscatedPrecomputedBandit>();
       mockLogger = td.object<IAssignmentLogger>();
+      mockBanditLogger = td.object<IBanditLogger>();
     });
 
-    it('prints errors if initialized with a store that is not initialized and without requestParameters', () => {
+    it('prints errors if constructed with a store that is not initialized and without requestParameters', () => {
       const loggerErrorSpy = jest.spyOn(logger, 'error');
+      const loggerWarnSpy = jest.spyOn(logger, 'warn');
       expect(() => {
         client = new EppoPrecomputedClient({
           precomputedFlagStore: store,
+          banditOptions: {
+            precomputedBanditStore: banditStore,
+            banditActionsByFlag: {},
+          },
           subject,
         });
       }).not.toThrow();
@@ -789,36 +805,20 @@ describe('EppoPrecomputedClient E2E test', () => {
         '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
       );
       expect(loggerErrorSpy).toHaveBeenCalledWith(
-        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+        '[Eppo SDK] Passing banditOptions without requestParameters requires an initialized precomputedBanditStore',
       );
-      loggerErrorSpy.mockRestore();
-      expect(client.getStringAssignment('string-flag', 'default')).toBe('default');
-    });
 
-    it('prints only one error if initialized with a store without a salt and without requestParameters', async () => {
-      const loggerErrorSpy = jest.spyOn(logger, 'error');
-      await store.setEntries({
-        'test-flag': {
-          flagKey: 'test-flag',
-          variationType: VariationType.STRING,
-          variationKey: encodeBase64('control'),
-          variationValue: encodeBase64('test-value'),
-          allocationKey: encodeBase64('allocation-1'),
-          doLog: true,
-          extraLogging: {},
-        },
-      });
-      expect(() => {
-        client = new EppoPrecomputedClient({
-          precomputedFlagStore: store,
-          subject,
-        });
-      }).not.toThrow();
-      expect(loggerErrorSpy).toHaveBeenCalledTimes(1);
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+      expect(loggerWarnSpy).toHaveBeenCalledTimes(2);
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient missing or empty salt for precomputedFlagStore',
       );
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient missing or empty salt for precomputedBanditStore',
+      );
+
       loggerErrorSpy.mockRestore();
+      loggerWarnSpy.mockRestore();
+
       expect(client.getStringAssignment('string-flag', 'default')).toBe('default');
     });
 
