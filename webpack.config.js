@@ -22,9 +22,6 @@ module.exports = {
     fallback: {
       crypto: false, // Exclude crypto module in the browser bundle
     },
-    alias: {
-      'react-native-get-random-values': false, // Ignore this module in non-React Native environments
-    },
   },
   output: {
     filename: 'eppo-sdk.js',
