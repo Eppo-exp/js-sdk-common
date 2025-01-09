@@ -214,7 +214,7 @@ describe('EppoClient E2E test', () => {
     });
 
     it('skips disabled flags', () => {
-      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
+      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {}, false);
       const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
@@ -229,7 +229,7 @@ describe('EppoClient E2E test', () => {
     });
 
     it('evaluates and returns assignments', () => {
-      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
+      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {}, false);
       const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
@@ -248,7 +248,7 @@ describe('EppoClient E2E test', () => {
       // Use a known salt to produce deterministic hashes
       setSaltOverrideForTests(new Uint8Array([7, 53, 17, 78]));
 
-      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {}, true);
+      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
       const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
