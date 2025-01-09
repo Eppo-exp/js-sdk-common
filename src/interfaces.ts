@@ -1,5 +1,5 @@
 import { Rule } from './rules';
-import { ContextAttributes } from './types';
+import { Attributes, Base64String, ContextAttributes } from './types';
 
 export enum VariationType {
   STRING = 'STRING',
@@ -166,6 +166,26 @@ export interface PrecomputedFlag extends BasePrecomputedFlag {
 
 export interface DecodedPrecomputedFlag extends BasePrecomputedFlag {
   variationValue: Variation['value'];
+}
+
+export interface IPrecomputedBandit {
+  banditKey: string;
+  action: string;
+  actionProbability: number;
+  optimalityGap: number;
+  modelVersion: string;
+  actionNumericAttributes: Attributes;
+  actionCategoricalAttributes: Attributes;
+}
+
+export interface IObfuscatedPrecomputedBandit {
+  banditKey: Base64String;
+  action: Base64String;
+  actionProbability: number;
+  optimalityGap: number;
+  modelVersion: Base64String;
+  actionNumericAttributes: Record<Base64String, Base64String>;
+  actionCategoricalAttributes: Record<Base64String, Base64String>;
 }
 
 export interface PrecomputedFlagsDetails {
