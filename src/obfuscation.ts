@@ -9,6 +9,13 @@ let getRandomValues: (length: number) => Uint8Array;
 if (typeof window !== 'undefined' && window.crypto) {
   // Browser environment
   getRandomValues = (length: number) => window.crypto.getRandomValues(new Uint8Array(length));
+} else if (typeof navigator !== 'undefined' && navigator.product === 'ReactNative') {
+  // React Native environment
+  require('react-native-get-random-values');
+  getRandomValues = (length: number) => {
+    const array = new Uint8Array(length);
+    return window.crypto.getRandomValues(array);
+  };
 } else {
   // Node.js environment
   import('crypto')
@@ -17,7 +24,7 @@ if (typeof window !== 'undefined' && window.crypto) {
       return;
     })
     .catch((error) => {
-      logger.error('Failed to load crypto module:', error);
+      logger.error('[Eppo SDK] Failed to load crypto module:', error);
     });
 }
 
