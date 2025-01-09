@@ -1,6 +1,7 @@
 import {
   BanditParameters,
   BanditVariation,
+  BasePrecomputedBandit,
   Environment,
   Flag,
   PrecomputedFlag,
@@ -8,7 +9,7 @@ import {
 
 import { IConfigurationStore } from './configuration-store';
 
-type Entry = Flag | BanditVariation[] | BanditParameters | PrecomputedFlag;
+type Entry = Flag | BanditVariation[] | BanditParameters | PrecomputedFlag | BasePrecomputedBandit;
 
 export async function hydrateConfigurationStore<T extends Entry>(
   configurationStore: IConfigurationStore<T> | null,

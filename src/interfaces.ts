@@ -1,5 +1,5 @@
 import { Rule } from './rules';
-import { Attributes, Base64String, ContextAttributes } from './types';
+import { Attributes, BanditActions, Base64String, ContextAttributes, FlagKey } from './types';
 
 export enum VariationType {
   STRING = 'STRING',
@@ -158,31 +158,30 @@ export type BasePrecomputedFlag = {
   doLog: boolean;
 };
 
-type Base64 = string;
-
 export interface PrecomputedFlag extends BasePrecomputedFlag {
-  variationValue: Base64;
+  variationValue: Base64String;
 }
 
 export interface DecodedPrecomputedFlag extends BasePrecomputedFlag {
   variationValue: Variation['value'];
 }
 
-export interface IPrecomputedBandit {
-  banditKey: string;
-  action: string;
+export type BasePrecomputedBandit = {
   actionProbability: number;
   optimalityGap: number;
+};
+
+export interface IPrecomputedBandit extends BasePrecomputedBandit {
+  banditKey: string;
+  action: string;
   modelVersion: string;
   actionNumericAttributes: Attributes;
   actionCategoricalAttributes: Attributes;
 }
 
-export interface IObfuscatedPrecomputedBandit {
+export interface IObfuscatedPrecomputedBandit extends BasePrecomputedBandit {
   banditKey: Base64String;
   action: Base64String;
-  actionProbability: number;
-  optimalityGap: number;
   modelVersion: Base64String;
   actionNumericAttributes: Record<Base64String, Base64String>;
   actionCategoricalAttributes: Record<Base64String, Base64String>;
@@ -195,6 +194,7 @@ export interface PrecomputedFlagsDetails {
 }
 
 export interface PrecomputedFlagsPayload {
-  subject_key: string;
-  subject_attributes: ContextAttributes;
+  subjectKey: string;
+  subjectAttributes: ContextAttributes;
+  banditActions?: Record<FlagKey, BanditActions>;
 }

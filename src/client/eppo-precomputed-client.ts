@@ -20,11 +20,16 @@ import {
 import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
-import { DecodedPrecomputedFlag, PrecomputedFlag, VariationType } from '../interfaces';
+import {
+  DecodedPrecomputedFlag,
+  IObfuscatedPrecomputedBandit,
+  PrecomputedFlag,
+  VariationType,
+} from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
-import { Attributes, ContextAttributes } from '../types';
+import { Attributes, BanditActions, ContextAttributes, FlagKey } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
@@ -54,6 +59,10 @@ interface EppoPrecomputedClientOptions {
   precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   subject: Subject;
   requestParameters?: PrecomputedFlagsRequestParameters;
+  banditOptions?: {
+    precomputedBanditStore: IConfigurationStore<IObfuscatedPrecomputedBandit>;
+    banditActionsByFlag: Record<FlagKey, BanditActions>;
+  };
 }
 
 export default class EppoPrecomputedClient {
@@ -67,14 +76,18 @@ export default class EppoPrecomputedClient {
     subjectAttributes: ContextAttributes;
   };
   private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+  private precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
+  private banditActionsByFlag?: Record<FlagKey, BanditActions>;
 
   public constructor(options: EppoPrecomputedClientOptions) {
     this.precomputedFlagStore = options.precomputedFlagStore;
+    this.precomputedBanditStore = options.banditOptions?.precomputedBanditStore;
     const { subjectKey, subjectAttributes } = options.subject;
     this.subject = {
       subjectKey,
       subjectAttributes: ensureContextualSubjectAttributes(subjectAttributes),
     };
+    this.banditActionsByFlag = options.banditOptions?.banditActionsByFlag;
     if (options.requestParameters) {
       // Online-mode
       this.requestParameters = options.requestParameters;
@@ -132,6 +145,8 @@ export default class EppoPrecomputedClient {
       this.precomputedFlagStore,
       subjectKey,
       subjectAttributes,
+      this.precomputedBanditStore,
+      this.banditActionsByFlag,
     );
 
     const pollingCallback = async () => {
