@@ -47,7 +47,15 @@ import EventDispatcher from './events/event-dispatcher';
 import NamedEventQueue from './events/named-event-queue';
 import NetworkStatusListener from './events/network-status-listener';
 import HttpClient from './http-client';
-import { PrecomputedFlag, Flag, ObfuscatedFlag, VariationType, FormatEnum } from './interfaces';
+import {
+  PrecomputedFlag,
+  Flag,
+  ObfuscatedFlag,
+  VariationType,
+  FormatEnum,
+  BanditParameters,
+  BanditVariation,
+} from './interfaces';
 import {
   AttributeType,
   Attributes,
@@ -107,6 +115,8 @@ export {
   ContextAttributes,
   BanditSubjectAttributes,
   BanditActions,
+  BanditVariation,
+  BanditParameters,
   Subject,
   FormatEnum,
 
