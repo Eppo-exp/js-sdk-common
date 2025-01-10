@@ -10,6 +10,11 @@ import ApiEndpoints from '../api-endpoints';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
+import {
+  IConfigurationWire,
+  IPrecomputedConfiguration,
+  IObfuscatedPrecomputedConfigurationResponse,
+} from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { Evaluator, FlagEvaluation } from '../evaluator';
@@ -19,7 +24,8 @@ import {
 } from '../flag-evaluation-details-builder';
 import FetchHttpClient from '../http-client';
 import { BanditVariation, BanditParameters, Flag } from '../interfaces';
-import { Attributes, ContextAttributes } from '../types';
+import { attributeEncodeBase64, setSaltOverrideForTests } from '../obfuscation';
+import { Attributes, BanditActions, ContextAttributes } from '../types';
 
 import EppoClient, { IAssignmentDetails } from './eppo-client';
 
@@ -554,6 +560,7 @@ describe('EppoClient Bandits E2E test', () => {
       afterAll(() => {
         mockEvaluateFlag.mockClear();
         mockEvaluateBandit.mockClear();
+        jest.restoreAllMocks();
       });
 
       it('handles bandit actions appropriately', async () => {
@@ -616,6 +623,84 @@ describe('EppoClient Bandits E2E test', () => {
         expect(secondNonBanditAssignment.action).toBeNull();
         expect(mockLogAssignment).toHaveBeenCalledTimes(3); // "new" variation assignment
         expect(mockLogBanditAction).toHaveBeenCalledTimes(3); // no bandit assignment
+      });
+    });
+  });
+
+  describe('precomputed bandits', () => {
+    const bob = 'bob';
+
+    const bobInfo: ContextAttributes = {
+      numericAttributes: { age: 30, account_age: 10 },
+      categoricalAttributes: { country: 'UK', gender_identity: 'male' },
+    };
+
+    const bobActions: Record<string, BanditActions> = {
+      banner_bandit_flag: {
+        nike: {
+          numericAttributes: { brand_affinity: -2.5 },
+          categoricalAttributes: { loyalty_tier: 'bronze' },
+        },
+        adidas: {
+          numericAttributes: { brand_affinity: -2.5 },
+          categoricalAttributes: { loyalty_tier: 'bronze' },
+        },
+        reebok: {
+          numericAttributes: { brand_affinity: -2.5 },
+          categoricalAttributes: { loyalty_tier: 'bronze' },
+        },
+      },
+    };
+
+    function getPrecomputedResults(
+      client: EppoClient,
+      subjectKey: string,
+      subjectAttributes: ContextAttributes,
+      banditActions: Record<string, BanditActions>,
+    ): IPrecomputedConfiguration {
+      const precomputedResults = client.getPrecomputedConfiguration(
+        subjectKey,
+        subjectAttributes,
+        banditActions,
+      );
+
+      const { precomputed } = JSON.parse(precomputedResults) as IConfigurationWire;
+      if (!precomputed) {
+        fail('precomputed result was not parsed');
+      }
+      return precomputed;
+    }
+
+    describe('obfuscated results', () => {
+      beforeEach(() => {
+        setSaltOverrideForTests(new Uint8Array([101, 112, 112, 111])); // e p p o => "ZXBwbw=="
+      });
+
+      afterAll(() => {
+        setSaltOverrideForTests(null);
+      });
+
+      it('obfuscates precomputed bandits', () => {
+        const bannerBanditFlagMd5 = '3ac89e06235484aa6f2aec8c33109a02';
+        const brandAffinityB64 = 'YnJhbmRfYWZmaW5pdHk=';
+        const loyaltyTierB64 = 'bG95YWx0eV90aWVy';
+        const bronzeB64 = 'YnJvbnpl';
+        const adidasB64 = 'YWRpZGFz';
+        const modelB64 = 'MTIz'; // 123
+
+        const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions);
+
+        const response = JSON.parse(
+          precomputed.response,
+        ) as IObfuscatedPrecomputedConfigurationResponse;
+
+        const numericAttrs = response.bandits[bannerBanditFlagMd5]['actionNumericAttributes'];
+        const categoricalAttrs =
+          response.bandits[bannerBanditFlagMd5]['actionCategoricalAttributes'];
+        expect(response.bandits[bannerBanditFlagMd5]['action']).toEqual(adidasB64);
+        expect(response.bandits[bannerBanditFlagMd5]['modelVersion']).toEqual(modelB64);
+        expect(categoricalAttrs[loyaltyTierB64]).toEqual(bronzeB64);
+        expect(numericAttrs[brandAffinityB64]).toEqual(attributeEncodeBase64(-2.5));
       });
     });
   });

@@ -1,70 +1,145 @@
-import { Environment, FormatEnum, PrecomputedFlag } from './interfaces';
-import { generateSalt, obfuscatePrecomputedFlags } from './obfuscation';
-import { ContextAttributes } from './types';
+import {
+  Environment,
+  FormatEnum,
+  IObfuscatedPrecomputedBandit,
+  IPrecomputedBandit,
+  PrecomputedFlag,
+} from './interfaces';
+import {
+  generateSalt,
+  obfuscatePrecomputedBanditMap,
+  obfuscatePrecomputedFlags,
+} from './obfuscation';
+import { ContextAttributes, FlagKey, HashedFlagKey } from './types';
 
-export interface IPrecomputedConfigurationResponse {
-  // `format` is always `PRECOMPUTED`
-  readonly format: FormatEnum;
+// Base interface for all configuration responses
+interface IBasePrecomputedConfigurationResponse {
+  readonly format: FormatEnum.PRECOMPUTED;
   readonly obfuscated: boolean;
-  // Salt used for hashing md5-encoded strings.
-  readonly salt: string;
   readonly createdAt: string;
-  // Environment might be missing if configuration was absent during evaluation.
   readonly environment?: Environment;
-  readonly flags: Record<string, PrecomputedFlag>;
+}
+
+export interface IPrecomputedConfigurationResponse extends IBasePrecomputedConfigurationResponse {
+  readonly obfuscated: false; // Always false
+  readonly flags: Record<FlagKey, PrecomputedFlag>;
+  readonly bandits: Record<FlagKey, IPrecomputedBandit>;
+}
+
+export interface IObfuscatedPrecomputedConfigurationResponse
+  extends IBasePrecomputedConfigurationResponse {
+  readonly obfuscated: true; // Always true
+  readonly salt: string; // Salt used for hashing md5-encoded strings
+
+  // PrecomputedFlag ships values as string and uses ValueType to cast back on the client.
+  // Values are obfuscated as strings, so a separate Obfuscated interface is not needed for flags.
+  readonly flags: Record<HashedFlagKey, PrecomputedFlag>;
+  readonly bandits: Record<HashedFlagKey, IObfuscatedPrecomputedBandit>;
 }
 
 export interface IPrecomputedConfiguration {
-  // JSON encoded `PrecomputedConfigurationResponse`
+  // JSON encoded configuration response (obfuscated or unobfuscated)
   readonly response: string;
   readonly subjectKey: string;
-  // Optional in case server does not want to expose attributes to a client.
   readonly subjectAttributes?: ContextAttributes;
 }
 
-export class PrecomputedConfiguration implements IPrecomputedConfiguration {
+// Base class for configuration responses with common fields
+abstract class BasePrecomputedConfigurationResponse {
+  readonly createdAt: string;
   readonly format = FormatEnum.PRECOMPUTED;
-  readonly response: string;
 
   constructor(
-    readonly subjectKey: string,
-    flags: Record<string, PrecomputedFlag>,
-    readonly subjectAttributes?: ContextAttributes,
-    environment?: Environment,
+    public readonly subjectKey: string,
+    public readonly subjectAttributes?: ContextAttributes,
+    public readonly environment?: Environment,
   ) {
-    const precomputedResponse: IPrecomputedConfigurationResponse = {
-      format: FormatEnum.PRECOMPUTED,
-      obfuscated: false,
-      salt: '',
-      createdAt: new Date().toISOString(),
-      environment,
-      flags,
-    };
-    this.response = JSON.stringify(precomputedResponse);
+    this.createdAt = new Date().toISOString();
   }
 }
 
-export class ObfuscatedPrecomputedConfiguration implements IPrecomputedConfiguration {
-  readonly format = FormatEnum.PRECOMPUTED;
-  readonly response: string;
+export class PrecomputedConfiguration implements IPrecomputedConfiguration {
+  private constructor(
+    public readonly response: string,
+    public readonly subjectKey: string,
+    public readonly subjectAttributes?: ContextAttributes,
+  ) {}
+
+  public static obfuscated(
+    subjectKey: string,
+    flags: Record<FlagKey, PrecomputedFlag>,
+    bandits: Record<FlagKey, IPrecomputedBandit>,
+    subjectAttributes?: ContextAttributes,
+    environment?: Environment,
+  ): IPrecomputedConfiguration {
+    const response = new ObfuscatedPrecomputedConfigurationResponse(
+      subjectKey,
+      flags,
+      bandits,
+      subjectAttributes,
+      environment,
+    );
+
+    return new PrecomputedConfiguration(JSON.stringify(response), subjectKey, subjectAttributes);
+  }
+
+  public static unobfuscated(
+    subjectKey: string,
+    flags: Record<FlagKey, PrecomputedFlag>,
+    bandits: Record<FlagKey, IPrecomputedBandit>,
+    subjectAttributes?: ContextAttributes,
+    environment?: Environment,
+  ): IPrecomputedConfiguration {
+    const response = new PrecomputedConfigurationResponse(
+      subjectKey,
+      flags,
+      bandits,
+      subjectAttributes,
+      environment,
+    );
+
+    return new PrecomputedConfiguration(JSON.stringify(response), subjectKey, subjectAttributes);
+  }
+}
+
+export class PrecomputedConfigurationResponse
+  extends BasePrecomputedConfigurationResponse
+  implements IPrecomputedConfigurationResponse
+{
+  readonly obfuscated = false;
 
   constructor(
-    readonly subjectKey: string,
-    flags: Record<string, PrecomputedFlag>,
-    readonly subjectAttributes?: ContextAttributes,
+    subjectKey: string,
+    public readonly flags: Record<FlagKey, PrecomputedFlag>,
+    public readonly bandits: Record<FlagKey, IPrecomputedBandit>,
+    subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ) {
-    const salt = generateSalt();
+    super(subjectKey, subjectAttributes, environment);
+  }
+}
 
-    const precomputedResponse: IPrecomputedConfigurationResponse = {
-      format: FormatEnum.PRECOMPUTED,
-      obfuscated: true,
-      salt,
-      createdAt: new Date().toISOString(),
-      environment,
-      flags: obfuscatePrecomputedFlags(salt, flags),
-    };
-    this.response = JSON.stringify(precomputedResponse);
+export class ObfuscatedPrecomputedConfigurationResponse
+  extends BasePrecomputedConfigurationResponse
+  implements IObfuscatedPrecomputedConfigurationResponse
+{
+  readonly bandits: Record<HashedFlagKey, IObfuscatedPrecomputedBandit>;
+  readonly flags: Record<HashedFlagKey, PrecomputedFlag>;
+  readonly obfuscated = true;
+  readonly salt: string;
+
+  constructor(
+    subjectKey: string,
+    flags: Record<FlagKey, PrecomputedFlag>,
+    bandits: Record<FlagKey, IPrecomputedBandit>,
+    subjectAttributes?: ContextAttributes,
+    environment?: Environment,
+  ) {
+    super(subjectKey, subjectAttributes, environment);
+
+    this.salt = generateSalt();
+    this.bandits = obfuscatePrecomputedBanditMap(this.salt, bandits);
+    this.flags = obfuscatePrecomputedFlags(this.salt, flags);
   }
 }
 
@@ -82,6 +157,6 @@ export interface IConfigurationWire {
 }
 
 export class ConfigurationWireV1 implements IConfigurationWire {
-  version = 1;
+  public readonly version = 1;
   constructor(readonly precomputed?: IPrecomputedConfiguration) {}
 }
