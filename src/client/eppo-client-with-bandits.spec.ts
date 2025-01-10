@@ -1,3 +1,5 @@
+import * as base64 from 'js-base64';
+
 import {
   readMockUFCResponse,
   MOCK_BANDIT_MODELS_RESPONSE_FILE,
@@ -24,7 +26,7 @@ import {
 } from '../flag-evaluation-details-builder';
 import FetchHttpClient from '../http-client';
 import { BanditVariation, BanditParameters, Flag } from '../interfaces';
-import { attributeEncodeBase64, setSaltOverrideForTests } from '../obfuscation';
+import { attributeEncodeBase64 } from '../obfuscation';
 import { Attributes, BanditActions, ContextAttributes } from '../types';
 
 import EppoClient, { IAssignmentDetails } from './eppo-client';
@@ -658,10 +660,12 @@ describe('EppoClient Bandits E2E test', () => {
       subjectAttributes: ContextAttributes,
       banditActions: Record<string, BanditActions>,
     ): IPrecomputedConfiguration {
+      const salt = base64.fromUint8Array(new Uint8Array([101, 112, 112, 111]));
       const precomputedResults = client.getPrecomputedConfiguration(
         subjectKey,
         subjectAttributes,
         banditActions,
+        salt,
       );
 
       const { precomputed } = JSON.parse(precomputedResults) as IConfigurationWire;
@@ -672,14 +676,6 @@ describe('EppoClient Bandits E2E test', () => {
     }
 
     describe('obfuscated results', () => {
-      beforeEach(() => {
-        setSaltOverrideForTests(new Uint8Array([101, 112, 112, 111])); // e p p o => "ZXBwbw=="
-      });
-
-      afterAll(() => {
-        setSaltOverrideForTests(null);
-      });
-
       it('obfuscates precomputed bandits', () => {
         const bannerBanditFlagMd5 = '3ac89e06235484aa6f2aec8c33109a02';
         const brandAffinityB64 = 'YnJhbmRfYWZmaW5pdHk=';
