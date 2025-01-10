@@ -48,7 +48,6 @@ import NamedEventQueue from './events/named-event-queue';
 import NetworkStatusListener from './events/network-status-listener';
 import HttpClient from './http-client';
 import { PrecomputedFlag, Flag, ObfuscatedFlag, VariationType, FormatEnum } from './interfaces';
-import { setSaltOverrideForTests } from './obfuscation';
 import {
   AttributeType,
   Attributes,
@@ -129,6 +128,5 @@ export {
   PrecomputedFlag,
 
   // Test helpers
-  setSaltOverrideForTests,
   decodePrecomputedFlag,
 };

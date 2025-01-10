@@ -5,11 +5,7 @@ import {
   IPrecomputedBandit,
   PrecomputedFlag,
 } from './interfaces';
-import {
-  generateSalt,
-  obfuscatePrecomputedBanditMap,
-  obfuscatePrecomputedFlags,
-} from './obfuscation';
+import { obfuscatePrecomputedBanditMap, obfuscatePrecomputedFlags } from './obfuscation';
 import { ContextAttributes, FlagKey, HashedFlagKey } from './types';
 
 // Base interface for all configuration responses
@@ -69,6 +65,7 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
     subjectKey: string,
     flags: Record<FlagKey, PrecomputedFlag>,
     bandits: Record<FlagKey, IPrecomputedBandit>,
+    salt: string,
     subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ): IPrecomputedConfiguration {
@@ -76,6 +73,7 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
       subjectKey,
       flags,
       bandits,
+      salt,
       subjectAttributes,
       environment,
     );
@@ -132,12 +130,13 @@ export class ObfuscatedPrecomputedConfigurationResponse
     subjectKey: string,
     flags: Record<FlagKey, PrecomputedFlag>,
     bandits: Record<FlagKey, IPrecomputedBandit>,
+    salt: string,
     subjectAttributes?: ContextAttributes,
     environment?: Environment,
   ) {
     super(subjectKey, subjectAttributes, environment);
 
-    this.salt = generateSalt();
+    this.salt = salt;
     this.bandits = obfuscatePrecomputedBanditMap(this.salt, bandits);
     this.flags = obfuscatePrecomputedFlags(this.salt, flags);
   }

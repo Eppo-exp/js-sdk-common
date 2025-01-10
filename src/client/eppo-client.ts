@@ -866,12 +866,14 @@ export default class EppoClient {
    *
    * @param subjectKey an identifier of the experiment subject, for example a user ID.
    * @param subjectAttributes optional attributes associated with the subject, for example name and email.
-   * @param banditActions
+   * @param banditActions optional attributes associated with the bandit actions
+   * @param salt a salt to use for obfuscation
    */
   getPrecomputedConfiguration(
     subjectKey: string,
     subjectAttributes: Attributes | ContextAttributes = {},
     banditActions: Record<FlagKey, BanditActions> = {},
+    salt = '',
   ): string {
     const configDetails = this.getConfigDetails();
 
@@ -890,6 +892,7 @@ export default class EppoClient {
       subjectKey,
       flags,
       bandits,
+      salt,
       subjectContextualAttributes,
       configDetails.configEnvironment,
     );
