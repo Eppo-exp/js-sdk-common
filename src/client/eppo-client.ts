@@ -892,9 +892,9 @@ export default class EppoClient {
       subjectKey,
       flags,
       bandits,
-      salt ?? '', // no salt if not provided
       subjectContextualAttributes,
       configDetails.configEnvironment,
+      salt ?? '', // no salt if not provided
     );
 
     const configWire: IConfigurationWire = new ConfigurationWireV1(precomputedConfig);

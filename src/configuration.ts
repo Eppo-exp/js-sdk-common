@@ -67,11 +67,13 @@ export class PrecomputedConfiguration implements IPrecomputedConfiguration {
     bandits: Record<FlagKey, IPrecomputedBandit>,
     subjectAttributes?: ContextAttributes,
     environment?: Environment,
+    salt?: string,
   ): IPrecomputedConfiguration {
     const response = new ObfuscatedPrecomputedConfigurationResponse(
       subjectKey,
       flags,
       bandits,
+      salt ?? '',
       subjectAttributes,
       environment,
     );
