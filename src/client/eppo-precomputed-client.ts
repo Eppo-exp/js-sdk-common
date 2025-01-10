@@ -20,11 +20,16 @@ import {
 import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
-import { DecodedPrecomputedFlag, PrecomputedFlag, VariationType } from '../interfaces';
+import {
+  DecodedPrecomputedFlag,
+  IObfuscatedPrecomputedBandit,
+  PrecomputedFlag,
+  VariationType,
+} from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
-import { Attributes, ContextAttributes } from '../types';
+import { Attributes, BanditActions, ContextAttributes, FlagKey } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
@@ -67,6 +72,8 @@ export default class EppoPrecomputedClient {
     subjectAttributes: ContextAttributes;
   };
   private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+  private precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
+  private banditActionsByFlag?: Record<FlagKey, BanditActions>;
 
   public constructor(options: EppoPrecomputedClientOptions) {
     this.precomputedFlagStore = options.precomputedFlagStore;
@@ -80,14 +87,29 @@ export default class EppoPrecomputedClient {
       this.requestParameters = options.requestParameters;
     } else {
       // Offline-mode
+
+      // Offline mode depends on pre-populated IConfigurationStores (flags and bandits) to source configuration.
       if (!this.precomputedFlagStore.isInitialized()) {
         logger.error(
           '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
         );
       }
+
+      if (this.precomputedBanditStore && !this.precomputedBanditStore.isInitialized()) {
+        logger.error(
+          '[Eppo SDK] Passing banditOptions without requestParameters requires an initialized precomputedBanditStore',
+        );
+      }
+
       if (!this.precomputedFlagStore.salt) {
         logger.error(
           '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+        );
+      }
+
+      if (this.precomputedBanditStore && !this.precomputedBanditStore.salt) {
+        logger.warn(
+          '[Eppo SDK] EppoPrecomputedClient missing or empty salt for precomputedBanditStore',
         );
       }
     }
