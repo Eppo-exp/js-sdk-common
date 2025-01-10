@@ -8,7 +8,7 @@ import {
   ensureContextualSubjectAttributes,
   ensureNonContextualSubjectAttributes,
 } from '../attributes';
-import { BanditEvaluator } from '../bandit-evaluator';
+import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
@@ -18,7 +18,6 @@ import {
   IConfigurationWire,
   ConfigurationWireV1,
   IPrecomputedConfiguration,
-  ObfuscatedPrecomputedConfiguration,
   PrecomputedConfiguration,
 } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
@@ -42,10 +41,12 @@ import {
 import { FlagEvaluationError } from '../flag-evaluation-error';
 import FetchHttpClient from '../http-client';
 import {
+  BanditModelData,
   BanditParameters,
   BanditVariation,
   ConfigDetails,
   Flag,
+  IPrecomputedBandit,
   ObfuscatedFlag,
   PrecomputedFlag,
   Variation,
@@ -59,6 +60,7 @@ import {
   BanditActions,
   BanditSubjectAttributes,
   ContextAttributes,
+  FlagKey,
   ValueType,
 } from '../types';
 import { validateNotBlank } from '../validation';
@@ -541,7 +543,7 @@ export default class EppoClient {
     const banditKey = flagBanditVariations?.at(0)?.key;
 
     if (banditKey) {
-      const banditParameters = this.banditModelConfigurationStore?.get(banditKey);
+      const banditParameters = this.getBandit(banditKey);
       if (banditParameters) {
         const contextualSubjectAttributes = ensureContextualSubjectAttributes(subjectAttributes);
         const actionsWithContextualAttributes = ensureActionsWithContextualAttributes(actions);
@@ -592,21 +594,47 @@ export default class EppoClient {
       // Check if the assigned variation is an active bandit
       // Note: the reason for non-bandit assignments include the subject being bucketed into a non-bandit variation or
       // a rollout having been done.
-      const banditVariations = this.banditVariationConfigurationStore?.get(flagKey);
-      const banditKey = banditVariations?.find(
-        (banditVariation) => banditVariation.variationValue === variation,
-      )?.key;
+      const bandit = this.findBanditByVariation(flagKey, variation);
 
-      if (banditKey) {
-        evaluationDetails.banditKey = banditKey;
-        action = this.evaluateBanditAction(
-          flagKey,
-          subjectKey,
-          subjectAttributes,
-          actions,
-          banditKey,
+      if (!bandit) {
+        return { variation, action: null, evaluationDetails };
+      }
+
+      evaluationDetails.banditKey = bandit.banditKey;
+      const banditEvaluation = this.evaluateBanditAction(
+        flagKey,
+        subjectKey,
+        subjectAttributes,
+        actions,
+        bandit.modelData,
+      );
+
+      if (banditEvaluation?.actionKey) {
+        action = banditEvaluation.actionKey;
+
+        const banditEvent: IBanditEvent = {
+          timestamp: new Date().toISOString(),
+          featureFlag: flagKey,
+          bandit: bandit.banditKey,
+          subject: subjectKey,
+          action,
+          actionProbability: banditEvaluation.actionWeight,
+          optimalityGap: banditEvaluation.optimalityGap,
+          modelVersion: bandit.modelVersion,
+          subjectNumericAttributes: banditEvaluation.subjectAttributes.numericAttributes,
+          subjectCategoricalAttributes: banditEvaluation.subjectAttributes.categoricalAttributes,
+          actionNumericAttributes: banditEvaluation.actionAttributes.numericAttributes,
+          actionCategoricalAttributes: banditEvaluation.actionAttributes.categoricalAttributes,
+          metaData: this.buildLoggerMetadata(),
           evaluationDetails,
-        );
+        };
+
+        try {
+          this.logBanditAction(banditEvent);
+        } catch (err: any) {
+          logger.error('Error logging bandit event', err);
+        }
+
         evaluationDetails.banditAction = action;
       }
     } catch (err: any) {
@@ -675,51 +703,23 @@ export default class EppoClient {
     subjectKey: string,
     subjectAttributes: BanditSubjectAttributes,
     actions: BanditActions,
-    banditKey: string,
-    evaluationDetails: IFlagEvaluationDetails,
-  ): string | null {
+    banditModelData: BanditModelData,
+  ): BanditEvaluation | null {
     // If no actions, there is nothing to do
     if (!Object.keys(actions).length) {
       return null;
     }
-    // Retrieve the model parameters for the bandit
-    const banditParameters = this.banditModelConfigurationStore?.get(banditKey);
 
-    if (!banditParameters) {
-      throw new Error('No model parameters for bandit ' + banditKey);
-    }
-
-    const banditModelData = banditParameters.modelData;
     const contextualSubjectAttributes = ensureContextualSubjectAttributes(subjectAttributes);
     const actionsWithContextualAttributes = ensureActionsWithContextualAttributes(actions);
-    const banditEvaluation = this.banditEvaluator.evaluateBandit(
+
+    return this.banditEvaluator.evaluateBandit(
       flagKey,
       subjectKey,
       contextualSubjectAttributes,
       actionsWithContextualAttributes,
       banditModelData,
     );
-    const action = banditEvaluation.actionKey;
-
-    const banditEvent: IBanditEvent = {
-      timestamp: new Date().toISOString(),
-      featureFlag: flagKey,
-      bandit: banditKey,
-      subject: subjectKey,
-      action,
-      actionProbability: banditEvaluation.actionWeight,
-      optimalityGap: banditEvaluation.optimalityGap,
-      modelVersion: banditParameters.modelVersion,
-      subjectNumericAttributes: contextualSubjectAttributes.numericAttributes,
-      subjectCategoricalAttributes: contextualSubjectAttributes.categoricalAttributes,
-      actionNumericAttributes: actionsWithContextualAttributes[action].numericAttributes,
-      actionCategoricalAttributes: actionsWithContextualAttributes[action].categoricalAttributes,
-      metaData: this.buildLoggerMetadata(),
-      evaluationDetails,
-    };
-    this.logBanditAction(banditEvent);
-
-    return action;
   }
 
   private logBanditAction(banditEvent: IBanditEvent): void {
@@ -821,10 +821,10 @@ export default class EppoClient {
   private getAllAssignments(
     subjectKey: string,
     subjectAttributes: Attributes = {},
-  ): Record<string, PrecomputedFlag> {
+  ): Record<FlagKey, PrecomputedFlag> {
     const configDetails = this.getConfigDetails();
     const flagKeys = this.getFlagKeys();
-    const flags: Record<string, PrecomputedFlag> = {};
+    const flags: Record<FlagKey, PrecomputedFlag> = {};
 
     // Evaluate all the enabled flags for the user
     flagKeys.forEach((flagKey) => {
@@ -865,16 +865,18 @@ export default class EppoClient {
   }
 
   /**
-   * Computes and returns assignments for a subject from all loaded flags.
+   * Computes and returns assignments and bandits for a subject from all loaded flags.
    *
    * @param subjectKey an identifier of the experiment subject, for example a user ID.
    * @param subjectAttributes optional attributes associated with the subject, for example name and email.
-   * @param obfuscated optional whether to obfuscate the results.
+   * @param banditActions optional attributes associated with the bandit actions
+   * @param salt a salt to use for obfuscation
    */
-  getPrecomputedAssignments(
+  getPrecomputedConfiguration(
     subjectKey: string,
     subjectAttributes: Attributes | ContextAttributes = {},
-    obfuscated = true,
+    banditActions: Record<FlagKey, BanditActions> = {},
+    salt?: string,
   ): string {
     const configDetails = this.getConfigDetails();
 
@@ -882,19 +884,21 @@ export default class EppoClient {
     const subjectFlatAttributes = ensureNonContextualSubjectAttributes(subjectAttributes);
     const flags = this.getAllAssignments(subjectKey, subjectFlatAttributes);
 
-    const precomputedConfig: IPrecomputedConfiguration = obfuscated
-      ? new ObfuscatedPrecomputedConfiguration(
-          subjectKey,
-          flags,
-          subjectContextualAttributes,
-          configDetails.configEnvironment,
-        )
-      : new PrecomputedConfiguration(
-          subjectKey,
-          flags,
-          subjectContextualAttributes,
-          configDetails.configEnvironment,
-        );
+    const bandits = this.computeBanditsForFlags(
+      subjectKey,
+      subjectContextualAttributes,
+      banditActions,
+      flags,
+    );
+
+    const precomputedConfig: IPrecomputedConfiguration = PrecomputedConfiguration.obfuscated(
+      subjectKey,
+      flags,
+      bandits,
+      salt ?? '', // no salt if not provided
+      subjectContextualAttributes,
+      configDetails.configEnvironment,
+    );
 
     const configWire: IConfigurationWire = new ConfigurationWireV1(precomputedConfig);
     return JSON.stringify(configWire);
@@ -1029,7 +1033,6 @@ export default class EppoClient {
       configPublishedAt: this.flagConfigurationStore.getConfigPublishedAt() ?? '',
       configEnvironment: this.flagConfigurationStore.getEnvironment() ?? { name: '' },
       configFormat: this.flagConfigurationStore.getFormat() ?? '',
-      salt: this.flagConfigurationStore.salt,
     };
   }
 
@@ -1044,6 +1047,11 @@ export default class EppoClient {
       getMD5Hash(flagKey),
     ) as ObfuscatedFlag;
     return flag ? decodeFlag(flag) : null;
+  }
+
+  private getBandit(banditKey: string): BanditParameters | null {
+    // Upstreams for this SDK do not yet support obfuscating bandits, so no `isObfuscated` check here.
+    return this.banditModelConfigurationStore?.get(banditKey) ?? null;
   }
 
   // noinspection JSUnusedGlobalSymbols
@@ -1201,6 +1209,80 @@ export default class EppoClient {
       sdkLanguage: 'javascript',
       sdkLibVersion: LIB_VERSION,
     };
+  }
+
+  private computeBanditsForFlags(
+    subjectKey: string,
+    subjectAttributes: ContextAttributes,
+    banditActions: Record<FlagKey, BanditActions>,
+    flags: Record<FlagKey, PrecomputedFlag>,
+  ): Record<FlagKey, IPrecomputedBandit> {
+    const banditResults: Record<FlagKey, IPrecomputedBandit> = {};
+
+    Object.keys(banditActions).forEach((flagKey: string) => {
+      // First, check how the flag evaluated.
+      const flagVariation = flags[flagKey];
+      if (flagVariation) {
+        // Precompute a bandit, if there is one matching this variation.
+        const precomputedResult = this.getPrecomputedBandit(
+          flagKey,
+          flagVariation.variationValue,
+          subjectKey,
+          subjectAttributes,
+          banditActions[flagKey],
+        );
+        if (precomputedResult) {
+          banditResults[flagKey] = precomputedResult;
+        }
+      }
+    });
+    return banditResults;
+  }
+
+  private findBanditByVariation(flagKey: string, variationValue: string): BanditParameters | null {
+    const banditVariations = this.banditVariationConfigurationStore?.get(flagKey);
+    const banditKey = banditVariations?.find(
+      (banditVariation) => banditVariation.variationValue === variationValue,
+    )?.key;
+
+    if (banditKey) {
+      // Retrieve the model parameters for the bandit
+      return this.getBandit(banditKey);
+    }
+    return null;
+  }
+
+  private getPrecomputedBandit(
+    flagKey: string,
+    variationValue: string,
+    subjectKey: string,
+    subjectAttributes: ContextAttributes,
+    banditActions: BanditActions,
+  ): IPrecomputedBandit | null {
+    const bandit = this.findBanditByVariation(flagKey, variationValue);
+    if (!bandit) {
+      return null;
+    }
+
+    const result = this.evaluateBanditAction(
+      flagKey,
+      subjectKey,
+      subjectAttributes,
+      banditActions,
+      bandit.modelData,
+    );
+
+    return result
+      ? {
+          banditKey: bandit.banditKey,
+          action: result.actionKey,
+          actionNumericAttributes: result.actionAttributes.numericAttributes,
+          actionCategoricalAttributes: result.actionAttributes.categoricalAttributes,
+          actionProbability: result.actionWeight,
+          modelVersion: bandit.modelVersion,
+          optimalityGap: result.optimalityGap,
+        }
+      : null;
   }
 }
 

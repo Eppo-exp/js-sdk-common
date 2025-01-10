@@ -1,3 +1,4 @@
+import * as base64 from 'js-base64';
 import { times } from 'lodash';
 import * as td from 'testdouble';
 
@@ -13,17 +14,24 @@ import {
   validateTestAssignments,
 } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
-import { IConfigurationWire } from '../configuration';
+import {
+  IConfigurationWire,
+  IObfuscatedPrecomputedConfigurationResponse,
+  ObfuscatedPrecomputedConfigurationResponse,
+} from '../configuration';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
-import { setSaltOverrideForTests } from '../obfuscation';
+import { getMD5Hash } from '../obfuscation';
 import { AttributeType } from '../types';
 
 import EppoClient, { FlagConfigurationRequestParameters, checkTypeMatch } from './eppo-client';
 import { initConfiguration } from './test-utils';
+
+// Use a known salt to produce deterministic hashes
+const salt = base64.fromUint8Array(new Uint8Array([7, 53, 17, 78]));
 
 describe('EppoClient E2E test', () => {
   global.fetch = jest.fn(() => {
@@ -47,6 +55,8 @@ describe('EppoClient E2E test', () => {
     key: 'a',
     value: 'variation-a',
   };
+  const variationAEncoded = 'dmFyaWF0aW9uLWE=';
+  const variationBEncoded = 'dmFyaWF0aW9uLWI=';
 
   const variationB = {
     key: 'b',
@@ -209,46 +219,45 @@ describe('EppoClient E2E test', () => {
       client = new EppoClient({ flagConfigurationStore: storage });
     });
 
-    afterEach(() => {
-      setSaltOverrideForTests(null);
-    });
-
     it('skips disabled flags', () => {
-      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {}, false);
+      const encodedPrecomputedWire = client.getPrecomputedConfiguration('subject', {}, {}, salt);
       const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
       }
-      const precomputedResponse = JSON.parse(precomputed.response);
+      const precomputedResponse = JSON.parse(
+        precomputed.response,
+      ) as ObfuscatedPrecomputedConfigurationResponse;
 
       expect(precomputedResponse).toBeTruthy();
       const precomputedFlags = precomputedResponse?.flags ?? {};
-      expect(Object.keys(precomputedFlags)).toContain('anotherFlag');
-      expect(Object.keys(precomputedFlags)).toContain(flagKey);
-      expect(Object.keys(precomputedFlags)).not.toContain('disabledFlag');
+
+      expect(Object.keys(precomputedFlags)).toHaveLength(2);
+      expect(Object.keys(precomputedFlags)).toContain(getMD5Hash('anotherFlag', salt));
+      expect(Object.keys(precomputedFlags)).toContain(getMD5Hash(flagKey, salt));
+      expect(Object.keys(precomputedFlags)).not.toContain(getMD5Hash('disabledFlag', salt));
     });
 
     it('evaluates and returns assignments', () => {
-      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {}, false);
+      const encodedPrecomputedWire = client.getPrecomputedConfiguration('subject', {}, {}, salt);
       const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
       }
-      const precomputedResponse = JSON.parse(precomputed.response);
+      const precomputedResponse = JSON.parse(
+        precomputed.response,
+      ) as IObfuscatedPrecomputedConfigurationResponse;
 
       expect(precomputedResponse).toBeTruthy();
       const precomputedFlags = precomputedResponse?.flags ?? {};
-      const firstFlag = precomputedFlags[flagKey];
-      const secondFlag = precomputedFlags['anotherFlag'];
-      expect(firstFlag.variationValue).toEqual('variation-a');
-      expect(secondFlag.variationValue).toEqual('variation-b');
+      const firstFlag = precomputedFlags[getMD5Hash(flagKey, salt)];
+      const secondFlag = precomputedFlags[getMD5Hash('anotherFlag', salt)];
+      expect(firstFlag.variationValue).toEqual(variationAEncoded);
+      expect(secondFlag.variationValue).toEqual(variationBEncoded);
     });
 
     it('obfuscates assignments', () => {
-      // Use a known salt to produce deterministic hashes
-      setSaltOverrideForTests(new Uint8Array([7, 53, 17, 78]));
-
-      const encodedPrecomputedWire = client.getPrecomputedAssignments('subject', {});
+      const encodedPrecomputedWire = client.getPrecomputedConfiguration('subject', {}, {}, salt);
       const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
