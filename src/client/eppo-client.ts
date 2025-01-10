@@ -875,9 +875,6 @@ export default class EppoClient {
     banditActions: Record<FlagKey, BanditActions> = {},
     salt?: string,
   ): string {
-    if (!salt) {
-      throw new Error('[Eppo SDK] Salt is required for precomputed configuration');
-    }
     const configDetails = this.getConfigDetails();
 
     const subjectContextualAttributes = ensureContextualSubjectAttributes(subjectAttributes);
@@ -895,7 +892,7 @@ export default class EppoClient {
       subjectKey,
       flags,
       bandits,
-      salt,
+      salt ?? '', // no salt if not provided
       subjectContextualAttributes,
       configDetails.configEnvironment,
     );
