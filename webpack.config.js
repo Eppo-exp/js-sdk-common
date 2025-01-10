@@ -19,9 +19,6 @@ module.exports = {
   },
   resolve: {
     extensions: ['.tsx', '.ts', '.js'],
-    fallback: {
-      crypto: false, // Exclude crypto module in the browser bundle
-    },
   },
   output: {
     filename: 'eppo-sdk.js',
