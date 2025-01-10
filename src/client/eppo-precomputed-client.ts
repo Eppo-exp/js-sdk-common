@@ -5,6 +5,7 @@ import {
   ensureContextualSubjectAttributes,
   ensureNonContextualSubjectAttributes,
 } from '../attributes';
+import { IBanditEvent, IBanditLogger } from '../bandit-logger';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
@@ -19,8 +20,11 @@ import {
 } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
+import { BoundedEventQueue } from '../events/bounded-event-queue';
+import { IFlagEvaluationDetails } from '../flag-evaluation-details-builder';
 import FetchHttpClient from '../http-client';
 import {
+  IPrecomputedBandit,
   DecodedPrecomputedFlag,
   IObfuscatedPrecomputedBandit,
   PrecomputedFlag,
@@ -29,11 +33,11 @@ import {
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
-import { Attributes, ContextAttributes } from '../types';
+import { Attributes, BanditActions, ContextAttributes, FlagKey } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
-import { checkTypeMatch } from './eppo-client';
+import { checkTypeMatch, IAssignmentDetails } from './eppo-client';
 
 export interface Subject {
   subjectKey: string;
@@ -59,12 +63,17 @@ interface EppoPrecomputedClientOptions {
   precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
   subject: Subject;
+  banditActions?: Record<FlagKey, BanditActions>;
   requestParameters?: PrecomputedFlagsRequestParameters;
 }
 
 export default class EppoPrecomputedClient {
   private readonly queuedAssignmentEvents: IAssignmentEvent[] = [];
+  private readonly banditEventsQueue: BoundedEventQueue<IBanditEvent> =
+    new BoundedEventQueue<IBanditEvent>('bandit');
   private assignmentLogger?: IAssignmentLogger;
+  private banditLogger?: IBanditLogger;
+  private banditAssignmentCache?: AssignmentCache;
   private assignmentCache?: AssignmentCache;
   private requestPoller?: IPoller;
   private requestParameters?: PrecomputedFlagsRequestParameters;
@@ -72,6 +81,7 @@ export default class EppoPrecomputedClient {
     subjectKey: string;
     subjectAttributes: ContextAttributes;
   };
+  private banditActions?: Record<FlagKey, BanditActions>;
   private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   private precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
 
@@ -83,6 +93,7 @@ export default class EppoPrecomputedClient {
       subjectKey,
       subjectAttributes: ensureContextualSubjectAttributes(subjectAttributes),
     };
+    this.banditActions = options.banditActions;
     if (options.requestParameters) {
       // Online-mode
       this.requestParameters = options.requestParameters;
@@ -155,6 +166,8 @@ export default class EppoPrecomputedClient {
       this.precomputedFlagStore,
       subjectKey,
       subjectAttributes,
+      this.precomputedBanditStore,
+      this.banditActions,
     );
 
     const pollingCallback = async () => {
@@ -297,6 +310,70 @@ export default class EppoPrecomputedClient {
     );
   }
 
+  getBanditAction(
+    flagKey: string,
+    defaultValue: string,
+  ): Omit<IAssignmentDetails<string>, 'evaluationDetails'> {
+    const { variation, action } = this.getBanditActionDetails(flagKey, defaultValue);
+    return { variation, action };
+  }
+
+  getBanditActionDetails(flagKey: string, defaultValue: string): IAssignmentDetails<string> {
+    const evaluationDetails: IFlagEvaluationDetails = {
+      environmentName: '',
+      flagEvaluationCode: 'ASSIGNMENT_ERROR',
+      flagEvaluationDescription: 'Unexpected error getting assigned variation for bandit action',
+      variationKey: '',
+      variationValue: '',
+      banditKey: '',
+      banditAction: '',
+      configFetchedAt: '',
+      configPublishedAt: '',
+      matchedRule: null,
+      matchedAllocation: null,
+      unmatchedAllocations: [],
+      unevaluatedAllocations: [],
+    };
+
+    const banditEvaluation = this.getPrecomputedBandit(flagKey);
+
+    if (banditEvaluation == null) {
+      logger.warn(`[Eppo SDK] No assigned variation. Bandit not found: ${flagKey}`);
+      return { variation: defaultValue, action: null, evaluationDetails };
+    }
+
+    if (banditEvaluation.action) {
+      const banditEvent: IBanditEvent = {
+        timestamp: new Date().toISOString(),
+        featureFlag: flagKey,
+        bandit: banditEvaluation.banditKey,
+        subject: this.subject.subjectKey ?? '',
+        action: banditEvaluation.action,
+        actionProbability: banditEvaluation.actionProbability,
+        optimalityGap: banditEvaluation.optimalityGap,
+        modelVersion: banditEvaluation.modelVersion,
+        subjectNumericAttributes: banditEvaluation.actionNumericAttributes,
+        subjectCategoricalAttributes: banditEvaluation.actionCategoricalAttributes,
+        actionNumericAttributes: banditEvaluation.actionNumericAttributes,
+        actionCategoricalAttributes: banditEvaluation.actionCategoricalAttributes,
+        metaData: this.buildLoggerMetadata(),
+        evaluationDetails,
+      };
+
+      try {
+        this.logBanditAction(banditEvent);
+      } catch (error) {
+        logger.error(`[Eppo SDK] Error logging bandit action: ${error}`);
+      }
+
+      evaluationDetails.banditAction = banditEvent.action;
+
+      return { variation: defaultValue, action: banditEvent.action, evaluationDetails };
+    }
+
+    return { variation: defaultValue, action: null, evaluationDetails };
+  }
+
   private getPrecomputedFlag(flagKey: string): DecodedPrecomputedFlag | null {
     return this.getObfuscatedFlag(flagKey);
   }
@@ -310,6 +387,16 @@ export default class EppoPrecomputedClient {
     return precomputedFlag ? decodePrecomputedFlag(precomputedFlag) : null;
   }
 
+  private getPrecomputedBandit(banditKey: string): IPrecomputedBandit | null {
+    return this.getObfuscatedPrecomputedBandit(banditKey);
+  }
+
+  private getObfuscatedPrecomputedBandit(banditKey: string): IObfuscatedPrecomputedBandit | null {
+    const salt = this.precomputedBanditStore?.salt;
+    const saltedAndHashedBanditKey = getMD5Hash(banditKey, salt);
+    return this.precomputedBanditStore?.get(saltedAndHashedBanditKey) ?? null;
+  }
+
   public isInitialized() {
     return this.precomputedFlagStore.isInitialized();
   }
@@ -318,6 +405,10 @@ export default class EppoPrecomputedClient {
     this.assignmentLogger = logger;
     // log any assignment events that may have been queued while initializing
     this.flushQueuedEvents(this.queuedAssignmentEvents, this.assignmentLogger?.logAssignment);
+  }
+
+  public setBanditLogger(logger: IBanditLogger) {
+    this.banditLogger = logger;
   }
 
   /**
@@ -402,6 +493,40 @@ export default class EppoPrecomputedClient {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       logger.error(`[Eppo SDK] Error logging assignment event: ${error.message}`);
+    }
+  }
+
+  private logBanditAction(banditEvent: IBanditEvent): void {
+    // First we check if this bandit action has been logged before
+    const subjectKey = banditEvent.subject;
+    const flagKey = banditEvent.featureFlag;
+    const banditKey = banditEvent.bandit;
+    const actionKey = banditEvent.action ?? '__eppo_no_action';
+
+    const banditAssignmentCacheProperties = {
+      flagKey,
+      subjectKey,
+      banditKey,
+      actionKey,
+    };
+
+    if (this.banditAssignmentCache?.has(banditAssignmentCacheProperties)) {
+      // Ignore repeat assignment
+      return;
+    }
+
+    // If here, we have a logger and a new assignment to be logged
+    try {
+      if (this.banditLogger) {
+        this.banditLogger.logBanditAction(banditEvent);
+      } else {
+        // If no logger defined, queue up the events (up to a max) to flush if a logger is later defined
+        this.banditEventsQueue.push(banditEvent);
+      }
+      // Record in the assignment cache, if active, to deduplicate subsequent repeat assignments
+      this.banditAssignmentCache?.set(banditAssignmentCacheProperties);
+    } catch (err) {
+      logger.warn('Error encountered logging bandit action', err);
     }
   }
 

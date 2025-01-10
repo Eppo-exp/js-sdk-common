@@ -198,5 +198,5 @@ export interface PrecomputedFlagsDetails {
 export interface PrecomputedFlagsPayload {
   subject_key: string;
   subject_attributes: ContextAttributes;
-  banditActions?: Record<FlagKey, BanditActions>;
+  bandit_actions?: Record<FlagKey, BanditActions>;
 }
