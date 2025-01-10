@@ -757,7 +757,9 @@ describe('EppoClient E2E test', () => {
       it('Continues to poll when cache has not expired', async () => {
         class MockStore<T> extends MemoryOnlyConfigurationStore<T> {
           public static expired = false;
-
+          public isInitialized(): boolean {
+            return true;
+          }
           async isExpired(): Promise<boolean> {
             return MockStore.expired;
           }
@@ -790,6 +792,9 @@ describe('EppoClient E2E test', () => {
     });
     it('Does not fetch configurations if the configuration store is unexpired', async () => {
       class MockStore<T> extends MemoryOnlyConfigurationStore<T> {
+        public isInitialized(): boolean {
+          return true;
+        }
         async isExpired(): Promise<boolean> {
           return false;
         }

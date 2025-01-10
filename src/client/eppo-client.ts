@@ -211,10 +211,14 @@ export default class EppoClient {
     );
 
     const pollingCallback = async () => {
-      if (await this.flagConfigurationStore.isExpired()) {
+      if (
+        !this.flagConfigurationStore.isInitialized() ||
+        (await this.flagConfigurationStore.isExpired())
+      ) {
         return configurationRequestor.fetchAndStoreConfigurations();
       }
     };
+
 
     this.requestPoller = initPoller(pollingIntervalMs, pollingCallback, {
       maxStartRetries: numInitialRequestRetries,
