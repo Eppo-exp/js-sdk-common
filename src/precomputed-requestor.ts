@@ -6,7 +6,7 @@ import {
   PrecomputedFlag,
   UNKNOWN_ENVIRONMENT_NAME,
 } from './interfaces';
-import { BanditActions, ContextAttributes, FlagKey } from './types';
+import { ContextAttributes } from './types';
 
 // Requests AND stores precomputed flags, reuses the configuration store
 export default class PrecomputedFlagRequestor {
@@ -16,14 +16,12 @@ export default class PrecomputedFlagRequestor {
     private readonly subjectKey: string,
     private readonly subjectAttributes: ContextAttributes,
     private readonly precomputedBanditsStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>,
-    private readonly banditActionsByFlag?: Record<FlagKey, BanditActions>,
   ) {}
 
   async fetchAndStorePrecomputedFlags(): Promise<void> {
     const precomputedResponse = await this.httpClient.getPrecomputedFlags({
       subject_key: this.subjectKey,
       subject_attributes: this.subjectAttributes,
-      banditActions: this.banditActionsByFlag,
     });
 
     if (!precomputedResponse) {

@@ -29,7 +29,7 @@ import {
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
-import { Attributes, BanditActions, ContextAttributes, FlagKey } from '../types';
+import { Attributes, ContextAttributes } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
@@ -57,6 +57,7 @@ export type PrecomputedFlagsRequestParameters = {
 
 interface EppoPrecomputedClientOptions {
   precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+  precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
   subject: Subject;
   requestParameters?: PrecomputedFlagsRequestParameters;
 }
@@ -73,10 +74,10 @@ export default class EppoPrecomputedClient {
   };
   private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   private precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
-  private banditActionsByFlag?: Record<FlagKey, BanditActions>;
 
   public constructor(options: EppoPrecomputedClientOptions) {
     this.precomputedFlagStore = options.precomputedFlagStore;
+    this.precomputedBanditStore = options.precomputedBanditStore;
     const { subjectKey, subjectAttributes } = options.subject;
     this.subject = {
       subjectKey,

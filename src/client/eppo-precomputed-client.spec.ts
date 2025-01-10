@@ -16,7 +16,12 @@ import { IConfigurationStore } from '../configuration-store/configuration-store'
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { DEFAULT_POLL_INTERVAL_MS, MAX_EVENT_QUEUE_SIZE, POLL_JITTER_PCT } from '../constants';
 import FetchHttpClient from '../http-client';
-import { FormatEnum, PrecomputedFlag, VariationType } from '../interfaces';
+import {
+  FormatEnum,
+  IObfuscatedPrecomputedBandit,
+  PrecomputedFlag,
+  VariationType,
+} from '../interfaces';
 import { decodeBase64, encodeBase64, getMD5Hash } from '../obfuscation';
 import PrecomputedRequestor from '../precomputed-requestor';
 
@@ -857,5 +862,176 @@ describe('EppoPrecomputedClient E2E test', () => {
         ensureNonContextualSubjectAttributes(subjectAttributes),
       );
     });
+  });
+});
+
+describe('Precomputed Bandit Store', () => {
+  let precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
+  let precomputedBanditStore: IConfigurationStore<IObfuscatedPrecomputedBandit>;
+  let subject: Subject;
+  let mockLogger: IAssignmentLogger;
+
+  beforeEach(() => {
+    precomputedFlagStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+    precomputedBanditStore = new MemoryOnlyConfigurationStore<IObfuscatedPrecomputedBandit>();
+    subject = {
+      subjectKey: 'test-subject',
+      subjectAttributes: { attr1: 'value1' },
+    };
+    mockLogger = td.object<IAssignmentLogger>();
+  });
+
+  it('prints errors if initialized with a bandit store that is not initialized and without requestParameters', () => {
+    const loggerErrorSpy = jest.spyOn(logger, 'error');
+    const loggerWarnSpy = jest.spyOn(logger, 'warn');
+
+    const client = new EppoPrecomputedClient({
+      precomputedFlagStore,
+      precomputedBanditStore,
+      subject,
+    });
+
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+    );
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+    );
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      '[Eppo SDK] Passing banditOptions without requestParameters requires an initialized precomputedBanditStore',
+    );
+    expect(loggerWarnSpy).toHaveBeenCalledWith(
+      '[Eppo SDK] EppoPrecomputedClient missing or empty salt for precomputedBanditStore',
+    );
+
+    loggerErrorSpy.mockRestore();
+    loggerWarnSpy.mockRestore();
+  });
+
+  it('prints only salt-related errors if stores are initialized but missing salts', async () => {
+    const loggerErrorSpy = jest.spyOn(logger, 'error');
+    const loggerWarnSpy = jest.spyOn(logger, 'warn');
+
+    await precomputedFlagStore.setEntries({
+      'test-flag': {
+        flagKey: 'test-flag',
+        variationType: VariationType.STRING,
+        variationKey: encodeBase64('control'),
+        variationValue: encodeBase64('test-value'),
+        allocationKey: encodeBase64('allocation-1'),
+        doLog: true,
+        extraLogging: {},
+      },
+    });
+
+    await precomputedBanditStore.setEntries({
+      'test-bandit': {
+        banditKey: encodeBase64('test-bandit'),
+        action: encodeBase64('action1'),
+        modelVersion: encodeBase64('v1'),
+        actionProbability: 0.5,
+        optimalityGap: 0.1,
+        actionNumericAttributes: {
+          [encodeBase64('attr1')]: encodeBase64('1.0'),
+        },
+        actionCategoricalAttributes: {
+          [encodeBase64('attr2')]: encodeBase64('value2'),
+        },
+      },
+    });
+
+    const client = new EppoPrecomputedClient({
+      precomputedFlagStore,
+      precomputedBanditStore,
+      subject,
+    });
+
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+    );
+    expect(loggerWarnSpy).toHaveBeenCalledWith(
+      '[Eppo SDK] EppoPrecomputedClient missing or empty salt for precomputedBanditStore',
+    );
+
+    loggerErrorSpy.mockRestore();
+    loggerWarnSpy.mockRestore();
+  });
+
+  it('initializes correctly with both stores having salts', async () => {
+    const loggerErrorSpy = jest.spyOn(logger, 'error');
+    const loggerWarnSpy = jest.spyOn(logger, 'warn');
+
+    precomputedFlagStore.salt = 'flag-salt';
+    precomputedBanditStore.salt = 'bandit-salt';
+
+    await precomputedFlagStore.setEntries({
+      'test-flag': {
+        flagKey: 'test-flag',
+        variationType: VariationType.STRING,
+        variationKey: encodeBase64('control'),
+        variationValue: encodeBase64('test-value'),
+        allocationKey: encodeBase64('allocation-1'),
+        doLog: true,
+        extraLogging: {},
+      },
+    });
+
+    await precomputedBanditStore.setEntries({
+      'test-bandit': {
+        banditKey: encodeBase64('test-bandit'),
+        action: encodeBase64('action1'),
+        modelVersion: encodeBase64('v1'),
+        actionProbability: 0.5,
+        optimalityGap: 0.1,
+        actionNumericAttributes: {
+          [encodeBase64('attr1')]: encodeBase64('1.0'),
+        },
+        actionCategoricalAttributes: {
+          [encodeBase64('attr2')]: encodeBase64('value2'),
+        },
+      },
+    });
+
+    const client = new EppoPrecomputedClient({
+      precomputedFlagStore,
+      precomputedBanditStore,
+      subject,
+    });
+
+    expect(loggerErrorSpy).not.toHaveBeenCalled();
+    expect(loggerWarnSpy).not.toHaveBeenCalled();
+
+    loggerErrorSpy.mockRestore();
+    loggerWarnSpy.mockRestore();
+  });
+
+  it('allows initialization without bandit store', async () => {
+    const loggerErrorSpy = jest.spyOn(logger, 'error');
+    const loggerWarnSpy = jest.spyOn(logger, 'warn');
+
+    precomputedFlagStore.salt = 'flag-salt';
+
+    await precomputedFlagStore.setEntries({
+      'test-flag': {
+        flagKey: 'test-flag',
+        variationType: VariationType.STRING,
+        variationKey: encodeBase64('control'),
+        variationValue: encodeBase64('test-value'),
+        allocationKey: encodeBase64('allocation-1'),
+        doLog: true,
+        extraLogging: {},
+      },
+    });
+
+    const client = new EppoPrecomputedClient({
+      precomputedFlagStore,
+      subject,
+    });
+
+    expect(loggerErrorSpy).not.toHaveBeenCalled();
+    expect(loggerWarnSpy).not.toHaveBeenCalled();
+
+    loggerErrorSpy.mockRestore();
+    loggerWarnSpy.mockRestore();
   });
 });
