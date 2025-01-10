@@ -85,14 +85,3 @@ export function obfuscatePrecomputedFlags(
   });
   return response;
 }
-
-let saltOverrideBytes: Uint8Array | null;
-export function setSaltOverrideForTests(salt: Uint8Array | null) {
-  saltOverrideBytes = salt ? salt : null;
-}
-
-export function generateSalt(length = 16): string {
-  return base64.fromUint8Array(
-    saltOverrideBytes ? saltOverrideBytes : crypto.getRandomValues(new Uint8Array(length)),
-  );
-}
