@@ -33,7 +33,7 @@ import {
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
-import { Attributes, BanditActions, ContextAttributes, FlagKey } from '../types';
+import { Attributes, ContextAttributes, FlagKey } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
@@ -63,7 +63,7 @@ interface EppoPrecomputedClientOptions {
   precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
   subject: Subject;
-  banditActions?: Record<FlagKey, BanditActions>;
+  banditActions?: Record<FlagKey, Record<string, ContextAttributes>>;
   requestParameters?: PrecomputedFlagsRequestParameters;
 }
 
@@ -81,7 +81,7 @@ export default class EppoPrecomputedClient {
     subjectKey: string;
     subjectAttributes: ContextAttributes;
   };
-  private banditActions?: Record<FlagKey, BanditActions>;
+  private banditActions?: Record<FlagKey, Record<string, ContextAttributes>>;
   private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   private precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
 
@@ -314,19 +314,22 @@ export default class EppoPrecomputedClient {
     flagKey: string,
     defaultValue: string,
   ): Omit<IAssignmentDetails<string>, 'evaluationDetails'> {
-    const { variation, action } = this.getBanditActionDetails(flagKey, defaultValue);
-    return { variation, action };
-  }
+    const banditEvaluation = this.getPrecomputedBandit(flagKey);
 
-  getBanditActionDetails(flagKey: string, defaultValue: string): IAssignmentDetails<string> {
+    if (banditEvaluation == null) {
+      logger.warn(`[Eppo SDK] No assigned variation. Bandit not found: ${flagKey}`);
+      return { variation: defaultValue, action: null };
+    }
+
+    // An evaluation details object is needed for the bandit event, but it is not used for anything else.
     const evaluationDetails: IFlagEvaluationDetails = {
       environmentName: '',
-      flagEvaluationCode: 'ASSIGNMENT_ERROR',
-      flagEvaluationDescription: 'Unexpected error getting assigned variation for bandit action',
+      flagEvaluationCode: 'MATCH',
+      flagEvaluationDescription: 'Bandit action assigned',
       variationKey: '',
       variationValue: '',
-      banditKey: '',
-      banditAction: '',
+      banditKey: banditEvaluation.banditKey,
+      banditAction: banditEvaluation.action,
       configFetchedAt: '',
       configPublishedAt: '',
       matchedRule: null,
@@ -335,43 +338,32 @@ export default class EppoPrecomputedClient {
       unevaluatedAllocations: [],
     };
 
-    const banditEvaluation = this.getPrecomputedBandit(flagKey);
+    const banditEvent: IBanditEvent = {
+      timestamp: new Date().toISOString(),
+      featureFlag: flagKey,
+      bandit: banditEvaluation.banditKey,
+      subject: this.subject.subjectKey ?? '',
+      action: banditEvaluation.action,
+      actionProbability: banditEvaluation.actionProbability,
+      optimalityGap: banditEvaluation.optimalityGap,
+      modelVersion: banditEvaluation.modelVersion,
+      subjectNumericAttributes: banditEvaluation.actionNumericAttributes,
+      subjectCategoricalAttributes: banditEvaluation.actionCategoricalAttributes,
+      actionNumericAttributes: banditEvaluation.actionNumericAttributes,
+      actionCategoricalAttributes: banditEvaluation.actionCategoricalAttributes,
+      metaData: this.buildLoggerMetadata(),
+      evaluationDetails,
+    };
 
-    if (banditEvaluation == null) {
-      logger.warn(`[Eppo SDK] No assigned variation. Bandit not found: ${flagKey}`);
-      return { variation: defaultValue, action: null, evaluationDetails };
+    try {
+      this.logBanditAction(banditEvent);
+    } catch (error) {
+      logger.error(`[Eppo SDK] Error logging bandit action: ${error}`);
     }
 
-    if (banditEvaluation.action) {
-      const banditEvent: IBanditEvent = {
-        timestamp: new Date().toISOString(),
-        featureFlag: flagKey,
-        bandit: banditEvaluation.banditKey,
-        subject: this.subject.subjectKey ?? '',
-        action: banditEvaluation.action,
-        actionProbability: banditEvaluation.actionProbability,
-        optimalityGap: banditEvaluation.optimalityGap,
-        modelVersion: banditEvaluation.modelVersion,
-        subjectNumericAttributes: banditEvaluation.actionNumericAttributes,
-        subjectCategoricalAttributes: banditEvaluation.actionCategoricalAttributes,
-        actionNumericAttributes: banditEvaluation.actionNumericAttributes,
-        actionCategoricalAttributes: banditEvaluation.actionCategoricalAttributes,
-        metaData: this.buildLoggerMetadata(),
-        evaluationDetails,
-      };
+    evaluationDetails.banditAction = banditEvent.action;
 
-      try {
-        this.logBanditAction(banditEvent);
-      } catch (error) {
-        logger.error(`[Eppo SDK] Error logging bandit action: ${error}`);
-      }
-
-      evaluationDetails.banditAction = banditEvent.action;
-
-      return { variation: defaultValue, action: banditEvent.action, evaluationDetails };
-    }
-
-    return { variation: defaultValue, action: null, evaluationDetails };
+    return { variation: defaultValue, action: banditEvent.action };
   }
 
   private getPrecomputedFlag(flagKey: string): DecodedPrecomputedFlag | null {
