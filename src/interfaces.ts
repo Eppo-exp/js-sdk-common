@@ -1,5 +1,5 @@
 import { Rule } from './rules';
-import { Attributes, BanditActions, Base64String, ContextAttributes, FlagKey } from './types';
+import { Attributes, Base64String, ContextAttributes, FlagKey } from './types';
 
 export enum VariationType {
   STRING = 'STRING',
@@ -198,5 +198,5 @@ export interface PrecomputedFlagsDetails {
 export interface PrecomputedFlagsPayload {
   subject_key: string;
   subject_attributes: ContextAttributes;
-  bandit_actions?: Record<FlagKey, BanditActions>;
+  bandit_actions?: Record<FlagKey, Record<string, ContextAttributes>>;
 }
