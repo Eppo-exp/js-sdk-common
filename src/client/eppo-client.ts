@@ -218,10 +218,7 @@ export default class EppoClient {
     );
 
     const pollingCallback = async () => {
-      if (
-        !this.flagConfigurationStore.isInitialized() ||
-        (await this.flagConfigurationStore.isExpired())
-      ) {
+      if (await this.flagConfigurationStore.isExpired()) {
         return configurationRequestor.fetchAndStoreConfigurations();
       }
     };
