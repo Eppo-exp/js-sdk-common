@@ -20,7 +20,6 @@ import {
 } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
-import { BoundedEventQueue } from '../events/bounded-event-queue';
 import FetchHttpClient from '../http-client';
 import {
   IPrecomputedBandit,
@@ -68,8 +67,7 @@ interface EppoPrecomputedClientOptions {
 
 export default class EppoPrecomputedClient {
   private readonly queuedAssignmentEvents: IAssignmentEvent[] = [];
-  private readonly banditEventsQueue: BoundedEventQueue<IBanditEvent> =
-    new BoundedEventQueue<IBanditEvent>('bandit');
+  private readonly banditEventsQueue: IBanditEvent[] = [];
   private assignmentLogger?: IAssignmentLogger;
   private banditLogger?: IBanditLogger;
   private banditAssignmentCache?: AssignmentCache;
@@ -381,6 +379,8 @@ export default class EppoPrecomputedClient {
 
   public setBanditLogger(logger: IBanditLogger) {
     this.banditLogger = logger;
+    // log any bandit events that may have been queued while initializing
+    this.flushQueuedEvents(this.banditEventsQueue, this.banditLogger?.logBanditAction);
   }
 
   /**
