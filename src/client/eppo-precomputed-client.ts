@@ -20,7 +20,6 @@ import {
 } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
-import { BoundedEventQueue } from '../events/bounded-event-queue';
 import FetchHttpClient from '../http-client';
 import {
   IPrecomputedBandit,
