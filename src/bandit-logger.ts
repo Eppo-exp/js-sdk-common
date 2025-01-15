@@ -15,7 +15,7 @@ export interface IBanditEvent {
   actionNumericAttributes: Attributes;
   actionCategoricalAttributes: Attributes;
   metaData?: Record<string, unknown>;
-  evaluationDetails: IFlagEvaluationDetails;
+  evaluationDetails: IFlagEvaluationDetails | null;
 }
 
 export interface IBanditLogger {

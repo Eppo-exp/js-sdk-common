@@ -21,7 +21,6 @@ import {
 import { decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
-import { IFlagEvaluationDetails } from '../flag-evaluation-details-builder';
 import FetchHttpClient from '../http-client';
 import {
   IPrecomputedBandit,
@@ -321,23 +320,6 @@ export default class EppoPrecomputedClient {
       return { variation: defaultValue, action: null };
     }
 
-    // An evaluation details object is needed for the bandit event, but it is not used for anything else.
-    const evaluationDetails: IFlagEvaluationDetails = {
-      environmentName: '',
-      flagEvaluationCode: 'MATCH',
-      flagEvaluationDescription: 'Bandit action assigned',
-      variationKey: '',
-      variationValue: '',
-      banditKey: banditEvaluation.banditKey,
-      banditAction: banditEvaluation.action,
-      configFetchedAt: '',
-      configPublishedAt: '',
-      matchedRule: null,
-      matchedAllocation: null,
-      unmatchedAllocations: [],
-      unevaluatedAllocations: [],
-    };
-
     const banditEvent: IBanditEvent = {
       timestamp: new Date().toISOString(),
       featureFlag: flagKey,
@@ -352,7 +334,7 @@ export default class EppoPrecomputedClient {
       actionNumericAttributes: banditEvaluation.actionNumericAttributes,
       actionCategoricalAttributes: banditEvaluation.actionCategoricalAttributes,
       metaData: this.buildLoggerMetadata(),
-      evaluationDetails,
+      evaluationDetails: null,
     };
 
     try {
@@ -360,8 +342,6 @@ export default class EppoPrecomputedClient {
     } catch (error) {
       logger.error(`[Eppo SDK] Error logging bandit action: ${error}`);
     }
-
-    evaluationDetails.banditAction = banditEvent.action;
 
     return { variation: defaultValue, action: banditEvent.action };
   }
