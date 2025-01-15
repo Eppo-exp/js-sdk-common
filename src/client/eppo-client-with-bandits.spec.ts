@@ -186,8 +186,8 @@ describe('EppoClient Bandits E2E test', () => {
       expect(banditEvent.actionCategoricalAttributes).toStrictEqual({ loyalty_tier: 'bronze' });
       expect(banditEvent.metaData?.obfuscated).toBe(false);
 
-      expect(banditEvent.evaluationDetails.configFetchedAt).toBeTruthy();
-      expect(typeof banditEvent.evaluationDetails.configFetchedAt).toBe('string');
+      expect(banditEvent.evaluationDetails?.configFetchedAt).toBeTruthy();
+      expect(typeof banditEvent.evaluationDetails?.configFetchedAt).toBe('string');
       const expectedEvaluationDetails: IFlagEvaluationDetails = {
         configFetchedAt: expect.any(String),
         configPublishedAt: '2024-04-17T19:40:53.716Z',

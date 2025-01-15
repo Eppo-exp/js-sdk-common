@@ -18,7 +18,7 @@ export const OBFUSCATED_MOCK_UFC_RESPONSE_FILE = `${MOCK_UFC_FILENAME}-obfuscate
 const TEST_CONFIGURATION_WIRE_DATA_DIR = './test/data/configuration-wire/';
 const MOCK_PRECOMPUTED_FILENAME = 'precomputed-v1';
 export const MOCK_PRECOMPUTED_WIRE_FILE = `${MOCK_PRECOMPUTED_FILENAME}.json`;
-export const MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE = `${MOCK_PRECOMPUTED_WIRE_FILE}-deobfuscated.json`;
+export const MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE = `${MOCK_PRECOMPUTED_FILENAME}-deobfuscated.json`;
 
 export interface SubjectTestCase {
   subjectKey: string;
