@@ -1,5 +1,5 @@
 import ApiEndpoints from '../api-endpoints';
-import { logger } from '../application-logger';
+import { logger, loggerPrefix } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import {
   ensureContextualSubjectAttributes,
@@ -100,25 +100,25 @@ export default class EppoPrecomputedClient {
       // Offline mode depends on pre-populated IConfigurationStores (flags and bandits) to source configuration.
       if (!this.precomputedFlagStore.isInitialized()) {
         logger.error(
-          '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+          `${loggerPrefix} EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided`,
         );
       }
 
       if (this.precomputedBanditStore && !this.precomputedBanditStore.isInitialized()) {
         logger.error(
-          '[Eppo SDK] Passing banditOptions without requestParameters requires an initialized precomputedBanditStore',
+          `${loggerPrefix} Passing banditOptions without requestParameters requires an initialized precomputedBanditStore`,
         );
       }
 
       if (!this.precomputedFlagStore.salt) {
         logger.error(
-          '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+          `${loggerPrefix} EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided`,
         );
       }
 
       if (this.precomputedBanditStore && !this.precomputedBanditStore.salt) {
         logger.warn(
-          '[Eppo SDK] EppoPrecomputedClient missing or empty salt for precomputedBanditStore',
+          `${loggerPrefix} EppoPrecomputedClient missing or empty salt for precomputedBanditStore`,
         );
       }
     }
@@ -202,13 +202,13 @@ export default class EppoPrecomputedClient {
     const precomputedFlag = this.getPrecomputedFlag(flagKey);
 
     if (precomputedFlag == null) {
-      logger.warn(`[Eppo SDK] No assigned variation. Flag not found: ${flagKey}`);
+      logger.warn(`${loggerPrefix} No assigned variation. Flag not found: ${flagKey}`);
       return defaultValue;
     }
 
     // Add type checking before proceeding
     if (!checkTypeMatch(expectedType, precomputedFlag.variationType)) {
-      const errorMessage = `[Eppo SDK] Type mismatch: expected ${expectedType} but flag ${flagKey} has type ${precomputedFlag.variationType}`;
+      const errorMessage = `${loggerPrefix} Type mismatch: expected ${expectedType} but flag ${flagKey} has type ${precomputedFlag.variationType}`;
       logger.error(errorMessage);
       return defaultValue;
     }
@@ -232,7 +232,7 @@ export default class EppoPrecomputedClient {
         this.logAssignment(result);
       }
     } catch (error) {
-      logger.error(`[Eppo SDK] Error logging assignment event: ${error}`);
+      logger.error(`${loggerPrefix} Error logging assignment event: ${error}`);
     }
 
     try {
@@ -240,7 +240,7 @@ export default class EppoPrecomputedClient {
         ? valueTransformer(result.variation.value)
         : defaultValue;
     } catch (error) {
-      logger.error(`[Eppo SDK] Error transforming value: ${error}`);
+      logger.error(`${loggerPrefix} Error transforming value: ${error}`);
       return defaultValue;
     }
   }
@@ -314,7 +314,7 @@ export default class EppoPrecomputedClient {
     const banditEvaluation = this.getPrecomputedBandit(flagKey);
 
     if (banditEvaluation == null) {
-      logger.warn(`[Eppo SDK] No assigned variation. Bandit not found: ${flagKey}`);
+      logger.warn(`${loggerPrefix} No assigned variation. Bandit not found: ${flagKey}`);
       return { variation: defaultValue, action: null };
     }
 
@@ -338,7 +338,7 @@ export default class EppoPrecomputedClient {
     try {
       this.logBanditAction(banditEvent);
     } catch (error) {
-      logger.error(`[Eppo SDK] Error logging bandit action: ${error}`);
+      logger.error(`${loggerPrefix} Error logging bandit action: ${error}`);
     }
 
     return { variation: defaultValue, action: banditEvent.action };
@@ -415,7 +415,7 @@ export default class EppoPrecomputedClient {
         logFunction(event);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
-        logger.error(`[Eppo SDK] Error flushing event to logger: ${error.message}`);
+        logger.error(`${loggerPrefix} Error flushing event to logger: ${error.message}`);
       }
     });
   }
@@ -464,7 +464,7 @@ export default class EppoPrecomputedClient {
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      logger.error(`[Eppo SDK] Error logging assignment event: ${error.message}`);
+      logger.error(`${loggerPrefix} Error logging assignment event: ${error.message}`);
     }
   }
 
