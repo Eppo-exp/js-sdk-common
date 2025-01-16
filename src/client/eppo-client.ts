@@ -1,7 +1,7 @@
 import { v4 as randomUUID } from 'uuid';
 
 import ApiEndpoints from '../api-endpoints';
-import { logger } from '../application-logger';
+import { logger, loggerPrefix } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import {
   ensureActionsWithContextualAttributes,
@@ -809,7 +809,7 @@ export default class EppoClient {
 
   private rethrowIfNotGraceful(err: Error, defaultValue?: EppoValue): EppoValue {
     if (this.isGracefulFailureMode) {
-      logger.error(`[Eppo SDK] Error getting assignment: ${err.message}`);
+      logger.error(`${loggerPrefix} Error getting assignment: ${err.message}`);
       return defaultValue ?? EppoValue.Null();
     }
     throw err;
@@ -827,7 +827,7 @@ export default class EppoClient {
     flagKeys.forEach((flagKey) => {
       const flag = this.getFlag(flagKey);
       if (!flag) {
-        logger.debug(`[Eppo SDK] No assigned variation. Flag does not exist.`);
+        logger.debug(`${loggerPrefix} No assigned variation. Flag does not exist.`);
         return;
       }
 
@@ -842,7 +842,7 @@ export default class EppoClient {
 
       // allocationKey is set along with variation when there is a result. this check appeases typescript below
       if (!evaluation.variation || !evaluation.allocationKey) {
-        logger.debug(`[Eppo SDK] No assigned variation: ${flagKey}`);
+        logger.debug(`${loggerPrefix} No assigned variation: ${flagKey}`);
         return;
       }
 
@@ -927,7 +927,7 @@ export default class EppoClient {
     const flag = this.getFlag(flagKey);
 
     if (flag === null) {
-      logger.warn(`[Eppo SDK] No assigned variation. Flag not found: ${flagKey}`);
+      logger.warn(`${loggerPrefix} No assigned variation. Flag not found: ${flagKey}`);
       // note: this is different from the Python SDK, which returns None instead
       const flagEvaluationDetails = flagEvaluationDetailsBuilder.buildForNoneResult(
         'FLAG_UNRECOGNIZED_OR_DISABLED',
@@ -961,7 +961,7 @@ export default class EppoClient {
     }
 
     if (!flag.enabled) {
-      logger.info(`[Eppo SDK] No assigned variation. Flag is disabled: ${flagKey}`);
+      logger.info(`${loggerPrefix} No assigned variation. Flag is disabled: ${flagKey}`);
       // note: this is different from the Python SDK, which returns None instead
       const flagEvaluationDetails = flagEvaluationDetailsBuilder.buildForNoneResult(
         'FLAG_UNRECOGNIZED_OR_DISABLED',
@@ -994,7 +994,7 @@ export default class EppoClient {
         this.maybeLogAssignment(result);
       }
     } catch (error) {
-      logger.error(`[Eppo SDK] Error logging assignment event: ${error}`);
+      logger.error(`${loggerPrefix} Error logging assignment event: ${error}`);
     }
 
     return result;
@@ -1147,7 +1147,7 @@ export default class EppoClient {
       try {
         logFunction(event);
       } catch (error: any) {
-        logger.error(`[Eppo SDK] Error flushing event to logger: ${error.message}`);
+        logger.error(`${loggerPrefix} Error flushing event to logger: ${error.message}`);
       }
     });
   }
@@ -1196,7 +1196,7 @@ export default class EppoClient {
         variationKey: variation?.key ?? '__eppo_no_variation',
       });
     } catch (error: any) {
-      logger.error(`[Eppo SDK] Error logging assignment event: ${error.message}`);
+      logger.error(`${loggerPrefix} Error logging assignment event: ${error.message}`);
     }
   }
 

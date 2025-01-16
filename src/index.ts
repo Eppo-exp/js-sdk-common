@@ -1,5 +1,5 @@
 import ApiEndpoints from './api-endpoints';
-import { logger as applicationLogger } from './application-logger';
+import { logger as applicationLogger, loggerPrefix } from './application-logger';
 import { IAssignmentHooks } from './assignment-hooks';
 import { IAssignmentLogger, IAssignmentEvent } from './assignment-logger';
 import { IBanditLogger, IBanditEvent } from './bandit-logger';
@@ -66,6 +66,7 @@ import {
 import * as validation from './validation';
 
 export {
+  loggerPrefix,
   applicationLogger,
   AbstractAssignmentCache,
   IAssignmentDetails,
