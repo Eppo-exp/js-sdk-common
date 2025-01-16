@@ -96,7 +96,6 @@ export function decodePrecomputedBandit(
 ): IPrecomputedBandit {
   return {
     ...precomputedBandit,
-    banditKey: decodeBase64(precomputedBandit.banditKey),
     action: decodeBase64(precomputedBandit.action),
     modelVersion: decodeBase64(precomputedBandit.modelVersion),
     actionNumericAttributes: decodeObject(precomputedBandit.actionNumericAttributes ?? {}),
