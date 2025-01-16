@@ -11,6 +11,8 @@ import {
   ObfuscatedSplit,
   PrecomputedFlag,
   DecodedPrecomputedFlag,
+  IPrecomputedBandit,
+  IObfuscatedPrecomputedBandit,
 } from './interfaces';
 import { decodeBase64 } from './obfuscation';
 
@@ -86,5 +88,18 @@ export function decodePrecomputedFlag(precomputedFlag: PrecomputedFlag): Decoded
     variationKey: decodeBase64(precomputedFlag.variationKey ?? ''),
     variationValue: decodeValue(precomputedFlag.variationValue, precomputedFlag.variationType),
     extraLogging: decodeObject(precomputedFlag.extraLogging ?? {}),
+  };
+}
+
+export function decodePrecomputedBandit(
+  precomputedBandit: IObfuscatedPrecomputedBandit,
+): IPrecomputedBandit {
+  return {
+    ...precomputedBandit,
+    banditKey: decodeBase64(precomputedBandit.banditKey),
+    action: decodeBase64(precomputedBandit.action),
+    modelVersion: decodeBase64(precomputedBandit.modelVersion),
+    actionNumericAttributes: decodeObject(precomputedBandit.actionNumericAttributes ?? {}),
+    actionCategoricalAttributes: decodeObject(precomputedBandit.actionCategoricalAttributes ?? {}),
   };
 }

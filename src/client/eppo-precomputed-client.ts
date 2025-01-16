@@ -18,7 +18,7 @@ import {
   MAX_EVENT_QUEUE_SIZE,
   PRECOMPUTED_BASE_URL,
 } from '../constants';
-import { decodePrecomputedFlag } from '../decoding';
+import { decodePrecomputedBandit, decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
 import {
@@ -361,10 +361,13 @@ export default class EppoPrecomputedClient {
     return this.getObfuscatedPrecomputedBandit(banditKey);
   }
 
-  private getObfuscatedPrecomputedBandit(banditKey: string): IObfuscatedPrecomputedBandit | null {
+  private getObfuscatedPrecomputedBandit(banditKey: string): IPrecomputedBandit | null {
     const salt = this.precomputedBanditStore?.salt;
     const saltedAndHashedBanditKey = getMD5Hash(banditKey, salt);
-    return this.precomputedBanditStore?.get(saltedAndHashedBanditKey) ?? null;
+    const precomputedBandit: IObfuscatedPrecomputedBandit | null = this.precomputedBanditStore?.get(
+      saltedAndHashedBanditKey,
+    ) as IObfuscatedPrecomputedBandit;
+    return precomputedBandit ? decodePrecomputedBandit(precomputedBandit) : null;
   }
 
   public isInitialized() {
