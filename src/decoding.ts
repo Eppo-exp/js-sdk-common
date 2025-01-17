@@ -76,8 +76,14 @@ export function decodeShard(shard: Shard): Shard {
 }
 
 export function decodeObject(obj: Record<string, string>): Record<string, string> {
+  return decodeObjectTo(obj, (v: string) => v);
+}
+export function decodeObjectTo<T>(
+  obj: Record<string, string>,
+  transform: (v: string) => T,
+): Record<string, T> {
   return Object.fromEntries(
-    Object.entries(obj).map(([key, value]) => [decodeBase64(key), decodeBase64(value)]),
+    Object.entries(obj).map(([key, value]) => [decodeBase64(key), transform(decodeBase64(value))]),
   );
 }
 
@@ -99,7 +105,10 @@ export function decodePrecomputedBandit(
     banditKey: decodeBase64(precomputedBandit.banditKey),
     action: decodeBase64(precomputedBandit.action),
     modelVersion: decodeBase64(precomputedBandit.modelVersion),
-    actionNumericAttributes: decodeObject(precomputedBandit.actionNumericAttributes ?? {}),
+    actionNumericAttributes: decodeObjectTo<number>(
+      precomputedBandit.actionNumericAttributes ?? {},
+      (v) => +v, // Convert to a number
+    ),
     actionCategoricalAttributes: decodeObject(precomputedBandit.actionCategoricalAttributes ?? {}),
   };
 }
