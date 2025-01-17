@@ -29,17 +29,16 @@ export function obfuscatePrecomputedBanditMap(
   return Object.fromEntries(
     Object.entries(bandits).map(([variationValue, bandit]) => {
       const hashedKey = getMD5Hash(variationValue, salt);
-      return [hashedKey, obfuscatePrecomputedBandit(salt, bandit)];
+      return [hashedKey, obfuscatePrecomputedBandit(bandit)];
     }),
   );
 }
 
 function obfuscatePrecomputedBandit(
-  salt: string,
   banditResult: IPrecomputedBandit,
 ): IObfuscatedPrecomputedBandit {
   return {
-    banditKey: getMD5Hash(banditResult.banditKey, salt),
+    banditKey: encodeBase64(banditResult.banditKey),
     action: encodeBase64(banditResult.action),
     actionProbability: banditResult.actionProbability,
     optimalityGap: banditResult.optimalityGap,

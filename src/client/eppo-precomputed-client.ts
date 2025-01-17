@@ -18,7 +18,7 @@ import {
   MAX_EVENT_QUEUE_SIZE,
   PRECOMPUTED_BASE_URL,
 } from '../constants';
-import { decodePrecomputedFlag } from '../decoding';
+import { decodePrecomputedBandit, decodePrecomputedFlag } from '../decoding';
 import { FlagEvaluationWithoutDetails } from '../evaluator';
 import FetchHttpClient from '../http-client';
 import {
@@ -307,7 +307,7 @@ export default class EppoPrecomputedClient {
     );
   }
 
-  getBanditAction(
+  public getBanditAction(
     flagKey: string,
     defaultValue: string,
   ): Omit<IAssignmentDetails<string>, 'evaluationDetails'> {
@@ -317,6 +317,8 @@ export default class EppoPrecomputedClient {
       logger.warn(`${loggerPrefix} No assigned variation. Bandit not found: ${flagKey}`);
       return { variation: defaultValue, action: null };
     }
+
+    const assignedVariation = this.getStringAssignment(flagKey, defaultValue);
 
     const banditEvent: IBanditEvent = {
       timestamp: new Date().toISOString(),
@@ -341,7 +343,7 @@ export default class EppoPrecomputedClient {
       logger.error(`${loggerPrefix} Error logging bandit action: ${error}`);
     }
 
-    return { variation: defaultValue, action: banditEvent.action };
+    return { variation: assignedVariation, action: banditEvent.action };
   }
 
   private getPrecomputedFlag(flagKey: string): DecodedPrecomputedFlag | null {
@@ -358,13 +360,17 @@ export default class EppoPrecomputedClient {
   }
 
   private getPrecomputedBandit(banditKey: string): IPrecomputedBandit | null {
-    return this.getObfuscatedPrecomputedBandit(banditKey);
+    const obfuscatedBandit = this.getObfuscatedPrecomputedBandit(banditKey);
+    return obfuscatedBandit ? decodePrecomputedBandit(obfuscatedBandit) : null;
   }
 
   private getObfuscatedPrecomputedBandit(banditKey: string): IObfuscatedPrecomputedBandit | null {
     const salt = this.precomputedBanditStore?.salt;
     const saltedAndHashedBanditKey = getMD5Hash(banditKey, salt);
-    return this.precomputedBanditStore?.get(saltedAndHashedBanditKey) ?? null;
+    const precomputedBandit: IObfuscatedPrecomputedBandit | null = this.precomputedBanditStore?.get(
+      saltedAndHashedBanditKey,
+    ) as IObfuscatedPrecomputedBandit;
+    return precomputedBandit ?? null;
   }
 
   public isInitialized() {
