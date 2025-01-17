@@ -1,6 +1,6 @@
 {
   "name": "@eppo/js-client-sdk-common",
-  "version": "4.8.3-alpha.4",
+  "version": "4.8.3-alpha.5",
   "description": "Common library for Eppo JavaScript SDKs (web, react native, and node)",
   "main": "dist/index.js",
   "files": [
