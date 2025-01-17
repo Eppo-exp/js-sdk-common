@@ -307,7 +307,7 @@ export default class EppoPrecomputedClient {
     );
   }
 
-  getBanditAction(
+  public getBanditAction(
     flagKey: string,
     defaultValue: string,
   ): Omit<IAssignmentDetails<string>, 'evaluationDetails'> {
@@ -317,6 +317,8 @@ export default class EppoPrecomputedClient {
       logger.warn(`${loggerPrefix} No assigned variation. Bandit not found: ${flagKey}`);
       return { variation: defaultValue, action: null };
     }
+
+    const assignedVariation = this.getStringAssignment(flagKey, defaultValue);
 
     const banditEvent: IBanditEvent = {
       timestamp: new Date().toISOString(),
@@ -341,7 +343,7 @@ export default class EppoPrecomputedClient {
       logger.error(`${loggerPrefix} Error logging bandit action: ${error}`);
     }
 
-    return { variation: defaultValue, action: banditEvent.action };
+    return { variation: assignedVariation, action: banditEvent.action };
   }
 
   private getPrecomputedFlag(flagKey: string): DecodedPrecomputedFlag | null {
