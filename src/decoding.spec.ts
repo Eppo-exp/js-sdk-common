@@ -1,5 +1,16 @@
-import { decodeAllocation, decodeSplit, decodeValue, decodeVariations } from './decoding';
-import { VariationType, ObfuscatedVariation, Variation } from './interfaces';
+import {
+  decodeAllocation,
+  decodePrecomputedBandit,
+  decodeSplit,
+  decodeValue,
+  decodeVariations,
+} from './decoding';
+import {
+  VariationType,
+  ObfuscatedVariation,
+  Variation,
+  IObfuscatedPrecomputedBandit,
+} from './interfaces';
 
 describe('decoding', () => {
   describe('decodeVariations', () => {
@@ -173,6 +184,40 @@ describe('decoding', () => {
       };
 
       expect(decodeAllocation(obfuscatedAllocation)).toEqual(expectedAllocation);
+    });
+  });
+
+  describe('decode bandit', () => {
+    it('should correctly decode bandit', () => {
+      const encodedBandit = {
+        action: 'Z3JlZW5CYWNrZ3JvdW5k',
+        actionCategoricalAttributes: {
+          'Y29sb3I=': 'Z3JlZW4=',
+          'dHlwZQ==': 'YmFja2dyb3VuZA==',
+        },
+        actionNumericAttributes: { Zm9udEhlaWdodEVt: 'MTA=' },
+        actionProbability: 0.95,
+        banditKey: 'bGF1bmNoLWJ1dHRvbi10cmVhdG1lbnQ=',
+        modelVersion: 'MzI0OQ==',
+        optimalityGap: 0,
+      } as IObfuscatedPrecomputedBandit;
+
+      const decodedBandit = decodePrecomputedBandit(encodedBandit);
+
+      expect(decodedBandit).toEqual({
+        action: 'greenBackground',
+        actionCategoricalAttributes: {
+          color: 'green',
+          type: 'background',
+        },
+        actionNumericAttributes: {
+          fontHeightEm: 10,
+        },
+        actionProbability: 0.95,
+        banditKey: 'launch-button-treatment',
+        modelVersion: '3249',
+        optimalityGap: 0,
+      });
     });
   });
 });

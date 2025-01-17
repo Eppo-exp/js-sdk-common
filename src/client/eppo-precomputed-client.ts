@@ -360,16 +360,17 @@ export default class EppoPrecomputedClient {
   }
 
   private getPrecomputedBandit(banditKey: string): IPrecomputedBandit | null {
-    return this.getObfuscatedPrecomputedBandit(banditKey);
+    const obfuscatedBandit = this.getObfuscatedPrecomputedBandit(banditKey);
+    return obfuscatedBandit ? decodePrecomputedBandit(obfuscatedBandit) : null;
   }
 
-  private getObfuscatedPrecomputedBandit(banditKey: string): IPrecomputedBandit | null {
+  private getObfuscatedPrecomputedBandit(banditKey: string): IObfuscatedPrecomputedBandit | null {
     const salt = this.precomputedBanditStore?.salt;
     const saltedAndHashedBanditKey = getMD5Hash(banditKey, salt);
     const precomputedBandit: IObfuscatedPrecomputedBandit | null = this.precomputedBanditStore?.get(
       saltedAndHashedBanditKey,
     ) as IObfuscatedPrecomputedBandit;
-    return precomputedBandit ? decodePrecomputedBandit(precomputedBandit) : null;
+    return precomputedBandit ?? null;
   }
 
   public isInitialized() {
