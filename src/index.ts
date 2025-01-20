@@ -62,6 +62,7 @@ import {
   BanditActions,
   BanditSubjectAttributes,
   ContextAttributes,
+  FlagKey,
 } from './types';
 import * as validation from './validation';
 
@@ -137,6 +138,7 @@ export {
   IConfigurationWire,
   IPrecomputedConfigurationResponse,
   PrecomputedFlag,
+  FlagKey,
 
   // Test helpers
   decodePrecomputedFlag,
