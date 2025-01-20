@@ -17,8 +17,6 @@ describe('EppoPrecomputedClient Bandits E2E test', () => {
   const mockLogAssignment = jest.fn();
   const mockLogBanditAction = jest.fn();
 
-  const salt = 'NaCl';
-
   const precomputedConfigurationWire = readMockConfigurationWireResponse(
     MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE,
   );
@@ -31,7 +29,7 @@ describe('EppoPrecomputedClient Bandits E2E test', () => {
       beforeAll(async () => {
         if (mode === 'online') {
           // Mock fetch for online mode
-          global.fetch = jest.fn((url: string) => {
+          global.fetch = jest.fn(() => {
             return Promise.resolve({
               ok: true,
               status: 200,
