@@ -883,7 +883,6 @@ describe('Precomputed Bandit Store', () => {
       subject,
     });
 
-
     expect(loggerErrorSpy).toHaveBeenCalledWith(
       '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
     );
