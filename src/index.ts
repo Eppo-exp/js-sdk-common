@@ -24,7 +24,11 @@ import EppoPrecomputedClient, {
   PrecomputedFlagsRequestParameters,
   Subject,
 } from './client/eppo-precomputed-client';
-import { IConfigurationWire, IPrecomputedConfigurationResponse } from './configuration';
+import {
+  IConfigurationWire,
+  IObfuscatedPrecomputedConfigurationResponse,
+  IPrecomputedConfigurationResponse,
+} from './configuration';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -55,6 +59,9 @@ import {
   FormatEnum,
   BanditParameters,
   BanditVariation,
+  IObfuscatedPrecomputedBandit,
+  Variation,
+  Environment,
 } from './interfaces';
 import {
   AttributeType,
@@ -62,6 +69,7 @@ import {
   BanditActions,
   BanditSubjectAttributes,
   ContextAttributes,
+  FlagKey,
 } from './types';
 import * as validation from './validation';
 
@@ -86,6 +94,8 @@ export {
   // Precomputed Client
   EppoPrecomputedClient,
   PrecomputedFlagsRequestParameters,
+  IObfuscatedPrecomputedConfigurationResponse,
+  IObfuscatedPrecomputedBandit,
 
   // Configuration store
   IConfigurationStore,
@@ -110,6 +120,7 @@ export {
   FlagConfigurationRequestParameters,
   Flag,
   ObfuscatedFlag,
+  Variation,
   VariationType,
   AttributeType,
   Attributes,
@@ -119,6 +130,7 @@ export {
   BanditVariation,
   BanditParameters,
   Subject,
+  Environment,
   FormatEnum,
 
   // event dispatcher types
@@ -137,6 +149,7 @@ export {
   IConfigurationWire,
   IPrecomputedConfigurationResponse,
   PrecomputedFlag,
+  FlagKey,
 
   // Test helpers
   decodePrecomputedFlag,

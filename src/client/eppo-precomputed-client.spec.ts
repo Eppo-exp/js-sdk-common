@@ -735,12 +735,6 @@ describe('EppoPrecomputedClient E2E test', () => {
       });
       precomputedFlagStore.salt = salt;
 
-      const requestParameters: PrecomputedFlagsRequestParameters = {
-        apiKey: 'DUMMY_API_KEY',
-        sdkName: 'js-precomputed-test',
-        sdkVersion: '100.0.1',
-      };
-
       const client = new EppoPrecomputedClient({
         precomputedFlagStore,
         subject,
@@ -869,7 +863,6 @@ describe('Precomputed Bandit Store', () => {
   let precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   let precomputedBanditStore: IConfigurationStore<IObfuscatedPrecomputedBandit>;
   let subject: Subject;
-  let mockLogger: IAssignmentLogger;
 
   beforeEach(() => {
     precomputedFlagStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
@@ -878,14 +871,13 @@ describe('Precomputed Bandit Store', () => {
       subjectKey: 'test-subject',
       subjectAttributes: { attr1: 'value1' },
     };
-    mockLogger = td.object<IAssignmentLogger>();
   });
 
   it('prints errors if initialized with a bandit store that is not initialized and without requestParameters', () => {
     const loggerErrorSpy = jest.spyOn(logger, 'error');
     const loggerWarnSpy = jest.spyOn(logger, 'warn');
 
-    const client = new EppoPrecomputedClient({
+    new EppoPrecomputedClient({
       precomputedFlagStore,
       precomputedBanditStore,
       subject,
@@ -940,7 +932,7 @@ describe('Precomputed Bandit Store', () => {
       },
     });
 
-    const client = new EppoPrecomputedClient({
+    new EppoPrecomputedClient({
       precomputedFlagStore,
       precomputedBanditStore,
       subject,
@@ -992,7 +984,7 @@ describe('Precomputed Bandit Store', () => {
       },
     });
 
-    const client = new EppoPrecomputedClient({
+    new EppoPrecomputedClient({
       precomputedFlagStore,
       precomputedBanditStore,
       subject,
@@ -1023,7 +1015,7 @@ describe('Precomputed Bandit Store', () => {
       },
     });
 
-    const client = new EppoPrecomputedClient({
+    new EppoPrecomputedClient({
       precomputedFlagStore,
       subject,
     });
