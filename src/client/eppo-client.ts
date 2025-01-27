@@ -141,17 +141,17 @@ export default class EppoClient {
     flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
     banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
     banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
+    overridesStore?: IConfigurationStore<Variation>;
     configurationRequestParameters?: FlagConfigurationRequestParameters;
     isObfuscated?: boolean;
-    overridesStore?: IConfigurationStore<Variation>;
   }) {
     this.eventDispatcher = eventDispatcher;
     this.flagConfigurationStore = flagConfigurationStore;
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
     this.banditModelConfigurationStore = banditModelConfigurationStore;
+    this.overridesStore = overridesStore;
     this.configurationRequestParameters = configurationRequestParameters;
     this.isObfuscated = isObfuscated;
-    this.overridesStore = overridesStore;
   }
 
   setConfigurationRequestParameters(
