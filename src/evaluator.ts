@@ -259,3 +259,34 @@ export function matchesRules(
         matchedRule: null,
       };
 }
+
+export function overrideResult(
+  flagKey: string,
+  subjectKey: string,
+  subjectAttributes: Attributes,
+  overrideVariation: Variation,
+  flagEvaluationDetailsBuilder: FlagEvaluationDetailsBuilder,
+): FlagEvaluation {
+  const overrideAllocationKey = 'override-' + overrideVariation.key;
+  const flagEvaluationDetails = flagEvaluationDetailsBuilder
+    .setMatch(
+      0,
+      overrideVariation,
+      { key: overrideAllocationKey, splits: [], doLog: false },
+      null,
+      undefined,
+    )
+    .build('MATCH', 'Flag override applied');
+
+  return {
+    flagKey,
+    subjectKey,
+    variation: overrideVariation,
+    subjectAttributes,
+    flagEvaluationDetails,
+    doLog: false,
+    format: '',
+    allocationKey: overrideAllocationKey,
+    extraLogging: {},
+  };
+}

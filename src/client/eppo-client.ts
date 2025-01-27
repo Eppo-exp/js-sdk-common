@@ -30,7 +30,7 @@ import {
 } from '../constants';
 import { decodeFlag } from '../decoding';
 import { EppoValue } from '../eppo_value';
-import { Evaluator, FlagEvaluation, noneResult } from '../evaluator';
+import { Evaluator, FlagEvaluation, noneResult, overrideResult } from '../evaluator';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
 import EventDispatcher from '../events/event-dispatcher';
 import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
@@ -948,28 +948,13 @@ export default class EppoClient {
     const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
     const overrideVariation = this.overridesStore?.get(flagKey);
     if (overrideVariation) {
-      const overrideAllocationKey = 'override-' + overrideVariation.key;
-      const flagEvaluationDetails = flagEvaluationDetailsBuilder
-        .setMatch(
-          0,
-          overrideVariation,
-          { key: overrideAllocationKey, splits: [], doLog: false },
-          null,
-          undefined,
-        )
-        .build('MATCH', 'Flag override applied');
-
-      return {
+      return overrideResult(
         flagKey,
         subjectKey,
-        variation: overrideVariation,
         subjectAttributes,
-        flagEvaluationDetails,
-        doLog: false,
-        format: '',
-        allocationKey: 'override',
-        extraLogging: {},
-      };
+        overrideVariation,
+        flagEvaluationDetailsBuilder,
+      );
     }
 
     const configDetails = this.getConfigDetails();
