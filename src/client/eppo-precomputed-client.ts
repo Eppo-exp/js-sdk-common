@@ -9,7 +9,7 @@ import { IBanditEvent, IBanditLogger } from '../bandit-logger';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
-import { IConfigurationStore } from '../configuration-store/configuration-store';
+import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -27,6 +27,7 @@ import {
   IObfuscatedPrecomputedBandit,
   PrecomputedFlag,
   VariationType,
+  Variation,
 } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
@@ -60,6 +61,7 @@ export type PrecomputedFlagsRequestParameters = {
 interface EppoPrecomputedClientOptions {
   precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
+  overridesStore?: ISyncStore<Variation>;
   subject: Subject;
   banditActions?: Record<FlagKey, Record<string, ContextAttributes>>;
   requestParameters?: PrecomputedFlagsRequestParameters;
@@ -81,10 +83,13 @@ export default class EppoPrecomputedClient {
   private banditActions?: Record<FlagKey, Record<string, ContextAttributes>>;
   private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   private precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
+  private overridesStore?: ISyncStore<Variation>;
 
   public constructor(options: EppoPrecomputedClientOptions) {
     this.precomputedFlagStore = options.precomputedFlagStore;
     this.precomputedBanditStore = options.precomputedBanditStore;
+    this.overridesStore = options.overridesStore;
+
     const { subjectKey, subjectAttributes } = options.subject;
     this.subject = {
       subjectKey,
@@ -198,6 +203,11 @@ export default class EppoPrecomputedClient {
     valueTransformer: (value: unknown) => T = (v) => v as T,
   ): T {
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
+
+    const overrideVariation = this.overridesStore?.get(flagKey);
+    if (overrideVariation) {
+      return valueTransformer(overrideVariation.value);
+    }
 
     const precomputedFlag = this.getPrecomputedFlag(flagKey);
 
@@ -514,5 +524,13 @@ export default class EppoPrecomputedClient {
       sdkLanguage: 'javascript',
       sdkLibVersion: LIB_VERSION,
     };
+  }
+
+  public setOverridesStore(store: ISyncStore<Variation>): void {
+    this.overridesStore = store;
+  }
+
+  public unsetOverridesStore(): void {
+    this.overridesStore = undefined;
   }
 }
