@@ -141,7 +141,7 @@ export class FlagEvaluationDetailsBuilder {
           key: allocation.key,
           allocationEvaluationCode: AllocationEvaluationCode.UNEVALUATED,
           orderPosition: unevaluatedStartOrderPosition + i,
-        } as AllocationEvaluation),
+        }) as AllocationEvaluation,
     );
   };
 }
