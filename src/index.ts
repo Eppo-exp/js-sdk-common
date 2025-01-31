@@ -64,6 +64,7 @@ import {
   Variation,
   Environment,
 } from './interfaces';
+import { buildStorageKeySuffix } from './obfuscation';
 import {
   AttributeType,
   Attributes,
@@ -155,4 +156,7 @@ export {
 
   // Test helpers
   decodePrecomputedFlag,
+
+  // Utilities
+  buildStorageKeySuffix,
 };
