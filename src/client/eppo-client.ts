@@ -141,7 +141,7 @@ export default class EppoClient {
     flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
     banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
     banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
-    overridesStore?: IConfigurationStore<Variation>;
+    overridesStore?: ISyncStore<Variation>;
     configurationRequestParameters?: FlagConfigurationRequestParameters;
     isObfuscated?: boolean;
   }) {
