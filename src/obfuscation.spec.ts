@@ -16,10 +16,10 @@ describe('obfuscation', () => {
   });
 
   it('hashes API keys for storage key suffixes', () => {
-    expect(buildStorageKeySuffix('MYKEY')).toEqual('b91f045b8605b2dc');
-    expect(buildStorageKeySuffix('MYKEY2')).toEqual('0357cae46d798d95');
+    expect(buildStorageKeySuffix('MYKEY')).toEqual('ea89bd7e7594e5beb91f045b8605b2dc');
+    expect(buildStorageKeySuffix('MYKEY2')).toEqual('3fc4c6f1358c630f0357cae46d798d95');
     expect(buildStorageKeySuffix('fwezo8v7nsotfizw3rtw===.3t wtw4ztwe3tjw8')).toEqual(
-      '6411d0d9b32f577e',
+      'cf6c7dcee09875546411d0d9b32f577e',
     );
   });
 

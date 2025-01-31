@@ -11,12 +11,12 @@ export function getMD5Hash(input: string, salt = ''): string {
 /**
  * Builds a storage key suffix from an API key.
  * @param apiKey - The API key to build the suffix from
- * @returns A string suffix for storage keys that does not leak the API key
+ * @returns A string suffix for storage keys
  * @public
  */
 export function buildStorageKeySuffix(apiKey: string): string {
-  // Note that we hash the API key and use the last 16 characters of the digest.
-  return new SparkMD5().append(apiKey).end().slice(-16);
+  // Note that we hash the API key and use the digest.
+  return getMD5Hash(apiKey);
 }
 
 export function encodeBase64(input: string) {
