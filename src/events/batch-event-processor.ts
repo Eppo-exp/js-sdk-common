@@ -7,7 +7,10 @@ const MAX_BATCH_SIZE = 10_000;
 export default class BatchEventProcessor {
   private readonly batchSize: number;
 
-  constructor(private readonly eventQueue: NamedEventQueue<Event>, batchSize: number) {
+  constructor(
+    private readonly eventQueue: NamedEventQueue<Event>,
+    batchSize: number,
+  ) {
     // clamp batch size between min and max
     this.batchSize = Math.max(MIN_BATCH_SIZE, Math.min(MAX_BATCH_SIZE, batchSize));
   }

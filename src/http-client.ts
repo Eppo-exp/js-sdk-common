@@ -22,7 +22,11 @@ export interface IQueryParamsWithSubject extends IQueryParams {
 }
 
 export class HttpRequestError extends Error {
-  constructor(public message: string, public status: number, public cause?: Error) {
+  constructor(
+    public message: string,
+    public status: number,
+    public cause?: Error,
+  ) {
     super(message);
     if (cause) {
       this.cause = cause;
@@ -53,7 +57,10 @@ export interface IHttpClient {
 }
 
 export default class FetchHttpClient implements IHttpClient {
-  constructor(private readonly apiEndpoints: ApiEndpoints, private readonly timeout: number) {}
+  constructor(
+    private readonly apiEndpoints: ApiEndpoints,
+    private readonly timeout: number,
+  ) {}
 
   async getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined> {
     const url = this.apiEndpoints.ufcEndpoint();
