@@ -15,8 +15,9 @@ export function getMD5Hash(input: string, salt = ''): string {
  * @public
  */
 export function buildStorageKeySuffix(apiKey: string): string {
-  // Note that we hash the API key and use the digest.
-  return getMD5Hash(apiKey);
+  // Note that we hash the API key and use the first 16 characters of the digest.
+  const hashed = getMD5Hash(apiKey);
+  return hashed.slice(0, 16);
 }
 
 export function encodeBase64(input: string) {
