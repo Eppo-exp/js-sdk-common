@@ -93,6 +93,17 @@ export interface IContainerExperiment<T> {
   treatmentVariationEntries: Array<T>;
 }
 
+export type EppoClientParameters = {
+  // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
+  // or bandit events). These events are application-specific and captures by EppoClient#track API.
+  eventDispatcher?: EventDispatcher;
+  flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
+  banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
+  banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
+  configurationRequestParameters?: FlagConfigurationRequestParameters;
+  isObfuscated?: boolean;
+};
+
 export default class EppoClient {
   private eventDispatcher: EventDispatcher;
   private readonly assignmentEventsQueue: BoundedEventQueue<IAssignmentEvent> =
@@ -121,16 +132,7 @@ export default class EppoClient {
     banditVariationConfigurationStore,
     banditModelConfigurationStore,
     configurationRequestParameters,
-  }: {
-    // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
-    // or bandit events). These events are application-specific and captures by EppoClient#track API.
-    eventDispatcher?: EventDispatcher;
-    flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
-    banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
-    banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
-    configurationRequestParameters?: FlagConfigurationRequestParameters;
-    isObfuscated?: boolean;
-  }) {
+  }: EppoClientParameters) {
     this.eventDispatcher = eventDispatcher;
     this.flagConfigurationStore = flagConfigurationStore;
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;

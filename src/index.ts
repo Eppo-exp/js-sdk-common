@@ -16,6 +16,7 @@ import {
 import { LRUInMemoryAssignmentCache } from './cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from './cache/non-expiring-in-memory-cache-assignment';
 import EppoClient, {
+  EppoClientParameters,
   FlagConfigurationRequestParameters,
   IAssignmentDetails,
   IContainerExperiment,
@@ -84,6 +85,7 @@ export {
   IBanditLogger,
   IBanditEvent,
   IContainerExperiment,
+  EppoClientParameters,
   EppoClient,
   constants,
   ApiEndpoints,
