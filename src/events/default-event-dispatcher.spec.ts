@@ -7,6 +7,7 @@ import DefaultEventDispatcher, {
 import Event from './event';
 import NetworkStatusListener from './network-status-listener';
 import NoOpEventDispatcher from './no-op-event-dispatcher';
+import { v4 as randomUUID } from 'uuid';
 
 global.fetch = jest.fn();
 
@@ -120,6 +121,7 @@ describe('DefaultEventDispatcher', () => {
       let fetchOptions = fetch.mock.calls[0][1];
       let payload = JSON.parse(fetchOptions.body);
       expect(payload).toEqual({
+        context: {},
         eppo_events: [
           expect.objectContaining({ payload: { foo: 'event1' } }),
           expect.objectContaining({ payload: { foo: 'event2' } }),
@@ -139,6 +141,7 @@ describe('DefaultEventDispatcher', () => {
       fetchOptions = fetch.mock.calls[1][1];
       payload = JSON.parse(fetchOptions.body);
       expect(payload).toEqual({
+        context: {},
         eppo_events: [expect.objectContaining({ payload: { foo: 'event3' } })],
       });
     });
@@ -316,6 +319,38 @@ describe('DefaultEventDispatcher', () => {
         'zCsQuoHJxVPp895.ZWg9MTIzNDU2LmUudGVzdGluZy5lcHBvLmNsb3Vk',
       );
       expect(dispatcher).toBeInstanceOf(DefaultEventDispatcher);
+    });
+  });
+
+  describe('attachContext', () => {
+    it.only('attaches a context to be included with all events dispatched by this dispatcher', async () => {
+      const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
+      const { dispatcher } = createDispatcher({ maxRetries: 1 }, eventQueue);
+      dispatcher.attachContext('foo', 'bar');
+      dispatcher.attachContext('baz', 'qux');
+      const event = {
+        uuid: randomUUID(),
+        payload: { foo: 'event1' },
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      };
+      dispatcher.dispatch(event);
+      const fetch = global.fetch as jest.Mock;
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://example.com',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-eppo-token': 'test-sdk-key' },
+          body: JSON.stringify({
+            eppo_events: [event],
+            context: { foo: 'bar', baz: 'qux' },
+          }),
+        },
+      );
     });
   });
 });

@@ -20,19 +20,19 @@ describe('EventDelivery', () => {
   it('should deliver events successfully when response is OK', async () => {
     const mockResponse = { ok: true, json: async () => ({}) };
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
-    const result = await eventDelivery.deliver(testBatch);
+    const result = await eventDelivery.deliver(testBatch, {});
     expect(result).toEqual({ failedEvents: [] });
     expect(global.fetch).toHaveBeenCalledWith(ingestionUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-eppo-token': sdkKey },
-      body: JSON.stringify({ eppo_events: testBatch }),
+      body: JSON.stringify({ eppo_events: testBatch, context: {} }),
     });
   });
 
   it('should return failed result if response is not OK', async () => {
     const mockResponse = { ok: false };
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
-    const result = await eventDelivery.deliver(testBatch);
+    const result = await eventDelivery.deliver(testBatch, {});
     expect(result).toEqual({ failedEvents: testBatch });
   });
 
@@ -40,20 +40,20 @@ describe('EventDelivery', () => {
     const failedEvents = ['1', '2'];
     const mockResponse = { ok: true, json: async () => ({ failed_events: failedEvents }) };
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
-    const result = await eventDelivery.deliver(testBatch);
+    const result = await eventDelivery.deliver(testBatch, {});
     expect(result).toEqual({ failedEvents: [testBatch[0], testBatch[1]] });
   });
 
   it('should return success=true if no failed events in the response', async () => {
     const mockResponse = { ok: true, json: async () => ({}) };
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
-    const result = await eventDelivery.deliver(testBatch);
+    const result = await eventDelivery.deliver(testBatch, {});
     expect(result).toEqual({ failedEvents: [] });
   });
 
   it('should handle fetch errors gracefully', async () => {
     (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
-    const result = await eventDelivery.deliver(testBatch);
+    const result = await eventDelivery.deliver(testBatch, {});
     expect(result).toEqual({ failedEvents: testBatch });
   });
 });

@@ -1,10 +1,11 @@
 import { logger } from '../application-logger';
+import { EventContext } from './default-event-dispatcher';
 
 import Event from './event';
 import { EventDeliveryResult } from './event-delivery';
 
-export type IEventDelivery = {
-  deliver(batch: Event[]): Promise<EventDeliveryResult>;
+export interface IEventDelivery {
+  deliver(batch: Event[], context: EventContext): Promise<EventDeliveryResult>;
 };
 
 /**
@@ -27,7 +28,7 @@ export default class BatchRetryManager {
   ) {}
 
   /** Re-attempts delivery of the provided batch, returns the UUIDs of events that failed retry. */
-  async retry(batch: Event[], attempt = 0): Promise<Event[]> {
+  async retry(batch: Event[], context: EventContext, attempt = 0): Promise<Event[]> {
     const { retryIntervalMs, maxRetryDelayMs, maxRetries } = this.config;
     const delay = Math.min(retryIntervalMs * Math.pow(2, attempt), maxRetryDelayMs);
     logger.info(
@@ -35,14 +36,14 @@ export default class BatchRetryManager {
     );
     await new Promise((resolve) => setTimeout(resolve, delay));
 
-    const { failedEvents } = await this.delivery.deliver(batch);
+    const { failedEvents } = await this.delivery.deliver(batch, context);
     if (failedEvents.length === 0) {
       logger.info(`[BatchRetryManager] Batch delivery successfully after ${attempt + 1} tries.`);
       return [];
     }
     // attempts are zero-indexed while maxRetries is not
     if (attempt < maxRetries - 1) {
-      return this.retry(failedEvents, attempt + 1);
+      return this.retry(failedEvents, context, attempt + 1);
     } else {
       logger.warn(`[BatchRetryManager] Failed to deliver batch after ${maxRetries} tries, bailing`);
       return batch;

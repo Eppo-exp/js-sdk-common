@@ -25,6 +25,8 @@ export type EventDispatcherConfig = {
   maxRetries?: number;
 };
 
+export type EventContext = Record<string, string | number | boolean | null>;
+
 export const DEFAULT_EVENT_DISPATCHER_BATCH_SIZE = 1_000;
 export const DEFAULT_EVENT_DISPATCHER_CONFIG: Omit<
   EventDispatcherConfig,
@@ -46,6 +48,7 @@ export default class DefaultEventDispatcher implements EventDispatcher {
   private readonly eventDelivery: EventDelivery;
   private readonly retryManager: BatchRetryManager;
   private readonly deliveryIntervalMs: number;
+  private readonly context: EventContext = {};
   private dispatchTimer: NodeJS.Timeout | null = null;
   private isOffline = false;
 
@@ -74,6 +77,10 @@ export default class DefaultEventDispatcher implements EventDispatcher {
     });
   }
 
+  attachContext(key: string, value: string | number | boolean | null): void {
+    this.context[key] = value;
+  }
+
   dispatch(event: Event) {
     this.batchProcessor.push(event);
     this.maybeScheduleNextDelivery();
@@ -92,10 +99,12 @@ export default class DefaultEventDispatcher implements EventDispatcher {
       return;
     }
 
-    const { failedEvents } = await this.eventDelivery.deliver(batch);
+    // make a defensive copy of the context to avoid mutating the original
+    const context = { ...this.context };
+    const { failedEvents } = await this.eventDelivery.deliver(batch, context);
     if (failedEvents.length > 0) {
       logger.warn('[EventDispatcher] Failed to deliver some events from batch, retrying...');
-      const failedRetry = await this.retryManager.retry(failedEvents);
+      const failedRetry = await this.retryManager.retry(failedEvents, context);
       if (failedRetry.length > 0) {
         // re-enqueue events that failed to retry
         this.batchProcessor.push(...failedRetry);

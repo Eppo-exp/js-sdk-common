@@ -19,15 +19,15 @@ describe('BatchRetryManager', () => {
 
   it('should successfully retry and deliver a batch with no failures', async () => {
     mockDelivery.deliver.mockResolvedValueOnce({ failedEvents: [] });
-    const result = await batchRetryManager.retry(mockBatch);
+    const result = await batchRetryManager.retry(mockBatch, {});
     expect(result).toEqual([]);
     expect(mockDelivery.deliver).toHaveBeenCalledTimes(1);
-    expect(mockDelivery.deliver).toHaveBeenCalledWith(mockBatch);
+    expect(mockDelivery.deliver).toHaveBeenCalledWith(mockBatch, {});
   });
 
   it('should retry failed deliveries up to maxRetries times and return last failed batch', async () => {
     mockDelivery.deliver.mockResolvedValue({ failedEvents: [{ id: 'event1' }] });
-    const result = await batchRetryManager.retry(mockBatch);
+    const result = await batchRetryManager.retry(mockBatch, {});
     expect(result).toEqual([{ id: 'event1' }]);
     expect(mockDelivery.deliver).toHaveBeenCalledTimes(maxRetries);
   });
@@ -40,7 +40,7 @@ describe('BatchRetryManager', () => {
 
     jest.useFakeTimers();
 
-    const retryPromise = batchRetryManager.retry(mockBatch);
+    const retryPromise = batchRetryManager.retry(mockBatch, {});
 
     // 1st retry: 100ms
     // 2nd retry: 200ms
@@ -67,7 +67,7 @@ describe('BatchRetryManager', () => {
 
     jest.useFakeTimers();
 
-    const retryPromise = batchRetryManager.retry(mockBatch);
+    const retryPromise = batchRetryManager.retry(mockBatch, {});
     // 100ms + 200ms + 300ms (maxRetryDelayMs) = 600ms
     await jest.advanceTimersByTimeAsync(600);
     const result = await retryPromise;
