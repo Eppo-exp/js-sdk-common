@@ -198,6 +198,16 @@ export default class EppoClient {
     this.overridesStore = undefined;
   }
 
+  // Returns a mapping of flag key to variation key for all active overrides
+  getOverrideVariationKeys(): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(this.overridesStore?.entries() ?? {}).map(([flagKey, value]) => [
+        flagKey,
+        value.key,
+      ]),
+    );
+  }
+
   async fetchFlagConfigurations() {
     if (!this.configurationRequestParameters) {
       throw new Error(
