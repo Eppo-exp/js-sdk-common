@@ -1148,5 +1148,23 @@ describe('EppoClient E2E test', () => {
       const normalAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
       expect(normalAssignment).toBe(variationA.value);
     });
+
+    it('returns a mapping of flag key to variation key for all active overrides', () => {
+      overrideStore.setEntries({
+        [flagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+        'other-flag': {
+          key: 'other-variation',
+          value: 'other-value',
+        },
+      });
+
+      expect(client.getOverrideVariationKeys()).toEqual({
+        [flagKey]: 'override-variation',
+        'other-flag': 'other-variation',
+      });
+    });
   });
 });
