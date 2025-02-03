@@ -958,7 +958,7 @@ describe('EppoClient E2E test', () => {
       overrideStore = new MemoryOnlyConfigurationStore<Variation>();
       client = new EppoClient({
         flagConfigurationStore: storage,
-        overridesStore: overrideStore,
+        overrideStore: overrideStore,
       });
       client.setAssignmentLogger(mockLogger);
       client.useNonExpiringInMemoryAssignmentCache();
@@ -1143,7 +1143,7 @@ describe('EppoClient E2E test', () => {
         },
       });
 
-      client.unsetOverridesStore();
+      client.unsetOverrideStore();
 
       const normalAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
       expect(normalAssignment).toBe(variationA.value);

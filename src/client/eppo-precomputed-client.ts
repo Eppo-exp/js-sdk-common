@@ -61,7 +61,7 @@ export type PrecomputedFlagsRequestParameters = {
 interface EppoPrecomputedClientOptions {
   precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
-  overridesStore?: ISyncStore<Variation>;
+  overrideStore?: ISyncStore<Variation>;
   subject: Subject;
   banditActions?: Record<FlagKey, Record<string, ContextAttributes>>;
   requestParameters?: PrecomputedFlagsRequestParameters;
@@ -83,12 +83,12 @@ export default class EppoPrecomputedClient {
   private banditActions?: Record<FlagKey, Record<string, ContextAttributes>>;
   private precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
   private precomputedBanditStore?: IConfigurationStore<IObfuscatedPrecomputedBandit>;
-  private overridesStore?: ISyncStore<Variation>;
+  private overrideStore?: ISyncStore<Variation>;
 
   public constructor(options: EppoPrecomputedClientOptions) {
     this.precomputedFlagStore = options.precomputedFlagStore;
     this.precomputedBanditStore = options.precomputedBanditStore;
-    this.overridesStore = options.overridesStore;
+    this.overrideStore = options.overrideStore;
 
     const { subjectKey, subjectAttributes } = options.subject;
     this.subject = {
@@ -204,7 +204,7 @@ export default class EppoPrecomputedClient {
   ): T {
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
 
-    const overrideVariation = this.overridesStore?.get(flagKey);
+    const overrideVariation = this.overrideStore?.get(flagKey);
     if (overrideVariation) {
       return valueTransformer(overrideVariation.value);
     }
@@ -526,11 +526,11 @@ export default class EppoPrecomputedClient {
     };
   }
 
-  public setOverridesStore(store: ISyncStore<Variation>): void {
-    this.overridesStore = store;
+  public setOverrideStore(store: ISyncStore<Variation>): void {
+    this.overrideStore = store;
   }
 
-  public unsetOverridesStore(): void {
-    this.overridesStore = undefined;
+  public unsetOverrideStore(): void {
+    this.overrideStore = undefined;
   }
 }
