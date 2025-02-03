@@ -116,7 +116,7 @@ export default class EppoClient {
   private configurationRequestParameters?: FlagConfigurationRequestParameters;
   private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
   private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
-  private overridesStore?: ISyncStore<Variation>;
+  private overrideStore?: ISyncStore<Variation>;
   private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
@@ -132,7 +132,7 @@ export default class EppoClient {
     flagConfigurationStore,
     banditVariationConfigurationStore,
     banditModelConfigurationStore,
-    overridesStore,
+    overrideStore,
     configurationRequestParameters,
   }: {
     // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
@@ -141,7 +141,7 @@ export default class EppoClient {
     flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
     banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
     banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
-    overridesStore?: ISyncStore<Variation>;
+    overrideStore?: ISyncStore<Variation>;
     configurationRequestParameters?: FlagConfigurationRequestParameters;
     isObfuscated?: boolean;
   }) {
@@ -149,7 +149,7 @@ export default class EppoClient {
     this.flagConfigurationStore = flagConfigurationStore;
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
     this.banditModelConfigurationStore = banditModelConfigurationStore;
-    this.overridesStore = overridesStore;
+    this.overrideStore = overrideStore;
     this.configurationRequestParameters = configurationRequestParameters;
     this.isObfuscated = isObfuscated;
   }
@@ -190,18 +190,18 @@ export default class EppoClient {
     this.isObfuscated = isObfuscated;
   }
 
-  setOverridesStore(store: ISyncStore<Variation>): void {
-    this.overridesStore = store;
+  setOverrideStore(store: ISyncStore<Variation>): void {
+    this.overrideStore = store;
   }
 
-  unsetOverridesStore(): void {
-    this.overridesStore = undefined;
+  unsetOverrideStore(): void {
+    this.overrideStore = undefined;
   }
 
   // Returns a mapping of flag key to variation key for all active overrides
   getOverrideVariationKeys(): Record<string, string> {
     return Object.fromEntries(
-      Object.entries(this.overridesStore?.entries() ?? {}).map(([flagKey, value]) => [
+      Object.entries(this.overrideStore?.entries() ?? {}).map(([flagKey, value]) => [
         flagKey,
         value.key,
       ]),
@@ -956,7 +956,7 @@ export default class EppoClient {
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
 
     const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
-    const overrideVariation = this.overridesStore?.get(flagKey);
+    const overrideVariation = this.overrideStore?.get(flagKey);
     if (overrideVariation) {
       return overrideResult(
         flagKey,
