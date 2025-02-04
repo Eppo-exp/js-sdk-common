@@ -1,12 +1,12 @@
 import { logger } from '../application-logger';
-import { EventContext } from './default-event-dispatcher';
 
+import { EventContext } from './default-event-dispatcher';
 import Event from './event';
 import { EventDeliveryResult } from './event-delivery';
 
 export interface IEventDelivery {
   deliver(batch: Event[], context: EventContext): Promise<EventDeliveryResult>;
-};
+}
 
 /**
  * Attempts to retry delivering a batch of events to the ingestionUrl up to `maxRetries` times

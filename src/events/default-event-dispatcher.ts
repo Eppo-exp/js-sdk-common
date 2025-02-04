@@ -95,14 +95,21 @@ export default class DefaultEventDispatcher implements EventDispatcher {
     if (value && (typeof value === 'object' || Array.isArray(value))) {
       throw new Error('Context value must be a string, number, boolean, or null');
     }
-    if (value && JSON.stringify({ ...this.context, [key]: value }).length > MAX_CONTEXT_SERIALIZED_LENGTH) {
-      throw new Error(`Context value must be less than ${MAX_CONTEXT_SERIALIZED_LENGTH} characters`);
+    if (
+      value &&
+      JSON.stringify({ ...this.context, [key]: value }).length > MAX_CONTEXT_SERIALIZED_LENGTH
+    ) {
+      throw new Error(
+        `Context value must be less than ${MAX_CONTEXT_SERIALIZED_LENGTH} characters`,
+      );
     }
   }
 
   private ensureValidEvent(event: Event) {
     if (JSON.stringify(event).length > MAX_EVENT_SERIALIZED_LENGTH) {
-      throw new Error(`Event serialized length exceeds maximum allowed length of #{MAX_EVENT_SERIALIZED_LENGTH}`);
+      throw new Error(
+        `Event serialized length exceeds maximum allowed length of #{MAX_EVENT_SERIALIZED_LENGTH}`,
+      );
     }
   }
 

@@ -1,7 +1,7 @@
 import { logger } from '../application-logger';
+
 import { IEventDelivery } from './batch-retry-manager';
 import { EventContext } from './default-event-dispatcher';
-
 import Event from './event';
 
 export type EventDeliveryResult = {

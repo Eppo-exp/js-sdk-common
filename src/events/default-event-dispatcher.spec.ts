@@ -1,3 +1,5 @@
+import { v4 as randomUUID } from 'uuid';
+
 import ArrayBackedNamedEventQueue from './array-backed-named-event-queue';
 import BatchEventProcessor from './batch-event-processor';
 import DefaultEventDispatcher, {
@@ -7,7 +9,6 @@ import DefaultEventDispatcher, {
 import Event from './event';
 import NetworkStatusListener from './network-status-listener';
 import NoOpEventDispatcher from './no-op-event-dispatcher';
-import { v4 as randomUUID } from 'uuid';
 
 global.fetch = jest.fn();
 
@@ -362,17 +363,14 @@ describe('DefaultEventDispatcher', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://example.com',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-eppo-token': 'test-sdk-key' },
-          body: JSON.stringify({
-            eppo_events: [event],
-            context: { foo: 'bar', baz: 'qux' },
-          }),
-        },
-      );
+      expect(global.fetch).toHaveBeenCalledWith('http://example.com', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-eppo-token': 'test-sdk-key' },
+        body: JSON.stringify({
+          eppo_events: [event],
+          context: { foo: 'bar', baz: 'qux' },
+        }),
+      });
     });
   });
 
