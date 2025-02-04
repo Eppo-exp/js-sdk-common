@@ -1004,7 +1004,6 @@ export default class EppoClient {
 
   /**
    * Enqueues an arbitrary event. Events must have a type and a payload.
-   * TODO: enforce max message size
    */
   track(type: string, payload: Record<string, unknown>) {
     this.eventDispatcher.dispatch({
@@ -1030,7 +1029,9 @@ export default class EppoClient {
     return {
       configFetchedAt: this.flagConfigurationStore.getConfigFetchedAt() ?? '',
       configPublishedAt: this.flagConfigurationStore.getConfigPublishedAt() ?? '',
-      configEnvironment: this.flagConfigurationStore.getEnvironment() ?? { name: '' },
+      configEnvironment: this.flagConfigurationStore.getEnvironment() ?? {
+        name: '',
+      },
       configFormat: this.flagConfigurationStore.getFormat() ?? '',
     };
   }
