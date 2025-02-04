@@ -173,9 +173,13 @@ export default class EppoClient {
    * given key.
    *
    * @param key - The context entry key.
-   * @param value - The context entry value.
+   * @param value - The context entry value, must be a string, number, boolean, or null. If value is
+   * an object or an array, will throw an ArgumentError.
    */
   setContext(key: string, value: string | number | boolean | null) {
+    if (value && (typeof value === 'object' || Array.isArray(value))) {
+      throw new Error('Context value must be a string, number, boolean, or null');
+    }
     this.eventDispatcher?.attachContext(key, value);
   }
 
