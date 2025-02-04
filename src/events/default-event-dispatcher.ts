@@ -27,6 +27,7 @@ export type EventDispatcherConfig = {
 
 export type EventContext = Record<string, string | number | boolean | null>;
 
+export const MAX_EVENT_SERIALIZED_LENGTH = 4096;
 export const DEFAULT_EVENT_DISPATCHER_BATCH_SIZE = 1_000;
 export const DEFAULT_EVENT_DISPATCHER_CONFIG: Omit<
   EventDispatcherConfig,
@@ -82,8 +83,15 @@ export default class DefaultEventDispatcher implements EventDispatcher {
   }
 
   dispatch(event: Event) {
+    this.ensureValidEvent(event);
     this.batchProcessor.push(event);
     this.maybeScheduleNextDelivery();
+  }
+
+  private ensureValidEvent(event: Event) {
+    if (JSON.stringify(event).length > MAX_EVENT_SERIALIZED_LENGTH) {
+      throw new Error('Event serialized length exceeds maximum allowed length of 4096');
+    }
   }
 
   private async deliverNextBatch() {

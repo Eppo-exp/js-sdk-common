@@ -353,4 +353,35 @@ describe('DefaultEventDispatcher', () => {
       );
     });
   });
+
+  describe('validation', () => {
+    it('should throw an error if the serialized event is too long', () => {
+      const { dispatcher } = createDispatcher();
+      // craft a payload that is over the limit
+      const payload = 'a'.repeat(5000);
+      expect(() =>
+        dispatcher.dispatch({
+          uuid: 'foo-1',
+          payload: { foo: payload },
+          timestamp: new Date().getTime(),
+          type: 'foo',
+        }),
+      ).toThrow();
+    });
+
+    it('should not throw an error if the serialized event is within the limit', () => {
+      const { dispatcher } = createDispatcher();
+      const payload = 'a'.repeat(4000);
+      const fetch = global.fetch as jest.Mock;
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+      expect(() =>
+        dispatcher.dispatch({
+          uuid: 'foo-1',
+          payload: { foo: payload },
+          timestamp: new Date().getTime(),
+          type: 'foo',
+        }),
+      ).not.toThrow();
+    });
+  });
 });
