@@ -945,28 +945,4 @@ describe('EppoClient E2E test', () => {
       );
     });
   });
-
-  describe('setContext', () => {
-    class MockStore<T> extends MemoryOnlyConfigurationStore<T> {
-      public static expired = false;
-
-      async isExpired(): Promise<boolean> {
-        return MockStore.expired;
-      }
-    };
-
-    it('should throw an error if the value is an object', () => {
-      const client = new EppoClient({ flagConfigurationStore: new MockStore(), });
-      expect(() => client.setContext('foo', {} as any)).toThrow();
-      expect(() => client.setContext('foo', [] as any)).toThrow();
-    });
-
-    it('should not throw an error if the value is a string, number, boolean, or null', () => {
-      const client = new EppoClient({ flagConfigurationStore: new MockStore(), });
-      expect(() => client.setContext('foo', 'bar')).not.toThrow();
-      expect(() => client.setContext('foo', 1)).not.toThrow();
-      expect(() => client.setContext('foo', true)).not.toThrow();
-      expect(() => client.setContext('foo', null)).not.toThrow();
-    });
-  });
 });

@@ -323,7 +323,29 @@ describe('DefaultEventDispatcher', () => {
   });
 
   describe('attachContext', () => {
-    it.only('attaches a context to be included with all events dispatched by this dispatcher', async () => {
+    it('should throw an error if the value is an object', () => {
+      const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
+      const { dispatcher } = createDispatcher({ maxRetries: 1 }, eventQueue);
+      expect(() => dispatcher.attachContext('foo', {} as any)).toThrow();
+      expect(() => dispatcher.attachContext('foo', [] as any)).toThrow();
+    });
+
+    it('should not throw an error if the value is a string, number, boolean, or null', () => {
+      const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
+      const { dispatcher } = createDispatcher({ maxRetries: 1 }, eventQueue);
+      expect(() => dispatcher.attachContext('foo', 'bar')).not.toThrow();
+      expect(() => dispatcher.attachContext('foo', 1)).not.toThrow();
+      expect(() => dispatcher.attachContext('foo', true)).not.toThrow();
+      expect(() => dispatcher.attachContext('foo', null)).not.toThrow();
+    });
+
+    it('should throw an error if the context value is too long', () => {
+      const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
+      const { dispatcher } = createDispatcher({ maxRetries: 1 }, eventQueue);
+      expect(() => dispatcher.attachContext('foo', 'a'.repeat(2049))).toThrow();
+    });
+
+    it('attaches a context to be included with all events dispatched by this dispatcher', async () => {
       const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
       const { dispatcher } = createDispatcher({ maxRetries: 1 }, eventQueue);
       dispatcher.attachContext('foo', 'bar');

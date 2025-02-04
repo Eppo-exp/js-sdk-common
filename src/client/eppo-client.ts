@@ -177,9 +177,6 @@ export default class EppoClient {
    * an object or an array, will throw an ArgumentError.
    */
   setContext(key: string, value: string | number | boolean | null) {
-    if (value && (typeof value === 'object' || Array.isArray(value))) {
-      throw new Error('Context value must be a string, number, boolean, or null');
-    }
     this.eventDispatcher?.attachContext(key, value);
   }
 
