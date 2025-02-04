@@ -105,6 +105,7 @@ export type EppoClientParameters = {
 };
 
 export default class EppoClient {
+  private overrides: Record<string, string> = {};
   private eventDispatcher: EventDispatcher;
   private readonly assignmentEventsQueue: BoundedEventQueue<IAssignmentEvent> =
     new BoundedEventQueue<IAssignmentEvent>('assignments');
@@ -139,6 +140,12 @@ export default class EppoClient {
     this.banditModelConfigurationStore = banditModelConfigurationStore;
     this.configurationRequestParameters = configurationRequestParameters;
     this.isObfuscated = isObfuscated;
+  }
+
+  withOverrides(overrides: Record<string, string>): EppoClient {
+    const copy = structuredClone(this);
+    copy.overrides = overrides;
+    return copy;
   }
 
   setConfigurationRequestParameters(
