@@ -22,6 +22,7 @@ import {
 } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
+import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -53,6 +54,7 @@ import {
   VariationType,
 } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
+import { OverrideValidator } from '../override-validator';
 import initPoller, { IPoller } from '../poller';
 import {
   Attributes,
@@ -63,6 +65,7 @@ import {
   FlagKey,
   ValueType,
 } from '../types';
+import { shallowClone } from '../util';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
@@ -91,6 +94,11 @@ export interface IContainerExperiment<T> {
   flagKey: string;
   controlVariationEntry: T;
   treatmentVariationEntries: Array<T>;
+}
+
+export interface OverridePayload {
+  apiKey: string;
+  overrides: Record<FlagKey, Variation>;
 }
 
 export type EppoClientParameters = {
@@ -125,6 +133,7 @@ export default class EppoClient {
   private isObfuscated: boolean;
   private requestPoller?: IPoller;
   private readonly evaluator = new Evaluator();
+  private readonly overrideValidator = new OverrideValidator();
 
   constructor({
     eventDispatcher = new NoOpEventDispatcher(),
@@ -152,6 +161,28 @@ export default class EppoClient {
     this.overrideStore = overrideStore;
     this.configurationRequestParameters = configurationRequestParameters;
     this.isObfuscated = isObfuscated;
+  }
+
+  async withOverrides(overridePayload: string | undefined): Promise<EppoClient> {
+    if (overridePayload) {
+      try {
+        const { apiKey, overrides } = JSON.parse(overridePayload) as OverridePayload;
+        const isValidApiKey = await this.overrideValidator.validateOverrideApiKey(apiKey);
+        if (!isValidApiKey) {
+          // TODO - handle error
+          return this;
+        }
+        if (overrides && Object.keys(overrides).length) {
+          const copy = shallowClone(this);
+          copy.overrideStore = new MemoryOnlyConfigurationStore<Variation>();
+          copy.overrideStore.setEntries(overrides);
+          return copy;
+        }
+      } catch (err) {
+        logger.error(err);
+      }
+    }
+    return this;
   }
 
   setConfigurationRequestParameters(
