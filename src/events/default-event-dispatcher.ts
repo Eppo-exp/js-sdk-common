@@ -100,7 +100,7 @@ export default class DefaultEventDispatcher implements EventDispatcher {
       JSON.stringify({ ...this.context, [key]: value }).length > MAX_CONTEXT_SERIALIZED_LENGTH
     ) {
       throw new Error(
-        `Context value must be less than ${MAX_CONTEXT_SERIALIZED_LENGTH} characters`,
+        `The total context size must be less than ${MAX_CONTEXT_SERIALIZED_LENGTH} characters`,
       );
     }
   }
