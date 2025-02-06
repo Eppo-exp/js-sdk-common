@@ -1,3 +1,5 @@
+import { v4 as randomUUID } from 'uuid';
+
 import ArrayBackedNamedEventQueue from './array-backed-named-event-queue';
 import BatchEventProcessor from './batch-event-processor';
 import DefaultEventDispatcher, {
@@ -120,6 +122,7 @@ describe('DefaultEventDispatcher', () => {
       let fetchOptions = fetch.mock.calls[0][1];
       let payload = JSON.parse(fetchOptions.body);
       expect(payload).toEqual({
+        context: {},
         eppo_events: [
           expect.objectContaining({ payload: { foo: 'event1' } }),
           expect.objectContaining({ payload: { foo: 'event2' } }),
@@ -139,6 +142,7 @@ describe('DefaultEventDispatcher', () => {
       fetchOptions = fetch.mock.calls[1][1];
       payload = JSON.parse(fetchOptions.body);
       expect(payload).toEqual({
+        context: {},
         eppo_events: [expect.objectContaining({ payload: { foo: 'event3' } })],
       });
     });
@@ -316,6 +320,57 @@ describe('DefaultEventDispatcher', () => {
         'zCsQuoHJxVPp895.ZWg9MTIzNDU2LmUudGVzdGluZy5lcHBvLmNsb3Vk',
       );
       expect(dispatcher).toBeInstanceOf(DefaultEventDispatcher);
+    });
+  });
+
+  describe('attachContext', () => {
+    it('should throw an error if the value is an object', () => {
+      const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
+      const { dispatcher } = createDispatcher({ maxRetries: 1 }, eventQueue);
+      expect(() => dispatcher.attachContext('foo', {} as any)).toThrow();
+      expect(() => dispatcher.attachContext('foo', [] as any)).toThrow();
+    });
+
+    it('should not throw an error if the value is a string, number, boolean, or null', () => {
+      const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
+      const { dispatcher } = createDispatcher({ maxRetries: 1 }, eventQueue);
+      expect(() => dispatcher.attachContext('foo', 'bar')).not.toThrow();
+      expect(() => dispatcher.attachContext('foo', 1)).not.toThrow();
+      expect(() => dispatcher.attachContext('foo', true)).not.toThrow();
+      expect(() => dispatcher.attachContext('foo', null)).not.toThrow();
+    });
+
+    it('should throw an error if the context value is too long', () => {
+      const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
+      const { dispatcher } = createDispatcher({ maxRetries: 1 }, eventQueue);
+      expect(() => dispatcher.attachContext('foo', 'a'.repeat(2049))).toThrow();
+    });
+
+    it('attaches a context to be included with all events dispatched by this dispatcher', async () => {
+      const eventQueue = new ArrayBackedNamedEventQueue<Event>('test-queue');
+      const { dispatcher } = createDispatcher({ maxRetries: 1 }, eventQueue);
+      dispatcher.attachContext('foo', 'bar');
+      dispatcher.attachContext('baz', 'qux');
+      const event = {
+        uuid: randomUUID(),
+        payload: { foo: 'event1' },
+        timestamp: new Date().getTime(),
+        type: 'foo',
+      };
+      dispatcher.dispatch(event);
+      const fetch = global.fetch as jest.Mock;
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(global.fetch).toHaveBeenCalledWith('http://example.com', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-eppo-token': 'test-sdk-key' },
+        body: JSON.stringify({
+          eppo_events: [event],
+          context: { foo: 'bar', baz: 'qux' },
+        }),
+      });
     });
   });
 

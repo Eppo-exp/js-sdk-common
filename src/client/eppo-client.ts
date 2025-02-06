@@ -165,6 +165,21 @@ export default class EppoClient {
     this.eventDispatcher = eventDispatcher;
   }
 
+  /**
+   * Attaches a context to be included with all events dispatched by the EventDispatcher.
+   * The context is delivered as a top-level object in the ingestion request payload.
+   * An existing key can be removed by providing a `null` value.
+   * Calling this method with same key multiple times causes only the last value to be used for the
+   * given key.
+   *
+   * @param key - The context entry key.
+   * @param value - The context entry value, must be a string, number, boolean, or null. If value is
+   * an object or an array, will throw an ArgumentError.
+   */
+  setContext(key: string, value: string | number | boolean | null) {
+    this.eventDispatcher?.attachContext(key, value);
+  }
+
   // noinspection JSUnusedGlobalSymbols
   setBanditModelConfigurationStore(
     banditModelConfigurationStore: IConfigurationStore<BanditParameters>,

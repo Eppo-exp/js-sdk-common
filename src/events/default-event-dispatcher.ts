@@ -25,7 +25,11 @@ export type EventDispatcherConfig = {
   maxRetries?: number;
 };
 
-export const MAX_EVENT_SERIALIZED_LENGTH = 4096;
+export type EventContext = Record<string, string | number | boolean | null>;
+
+const MAX_CONTEXT_SERIALIZED_LENGTH = 2048;
+const MAX_EVENT_SERIALIZED_LENGTH = 4096;
+
 export const DEFAULT_EVENT_DISPATCHER_BATCH_SIZE = 1_000;
 export const DEFAULT_EVENT_DISPATCHER_CONFIG: Omit<
   EventDispatcherConfig,
@@ -47,6 +51,7 @@ export default class DefaultEventDispatcher implements EventDispatcher {
   private readonly eventDelivery: EventDelivery;
   private readonly retryManager: BatchRetryManager;
   private readonly deliveryIntervalMs: number;
+  private readonly context: EventContext = {};
   private dispatchTimer: NodeJS.Timeout | null = null;
   private isOffline = false;
 
@@ -75,15 +80,36 @@ export default class DefaultEventDispatcher implements EventDispatcher {
     });
   }
 
+  attachContext(key: string, value: string | number | boolean | null): void {
+    this.ensureValidContext(key, value);
+    this.context[key] = value;
+  }
+
   dispatch(event: Event) {
     this.ensureValidEvent(event);
     this.batchProcessor.push(event);
     this.maybeScheduleNextDelivery();
   }
 
+  private ensureValidContext(key: string, value: string | number | boolean | null) {
+    if (value && (typeof value === 'object' || Array.isArray(value))) {
+      throw new Error('Context value must be a string, number, boolean, or null');
+    }
+    if (
+      value &&
+      JSON.stringify({ ...this.context, [key]: value }).length > MAX_CONTEXT_SERIALIZED_LENGTH
+    ) {
+      throw new Error(
+        `The total context size must be less than ${MAX_CONTEXT_SERIALIZED_LENGTH} characters`,
+      );
+    }
+  }
+
   private ensureValidEvent(event: Event) {
     if (JSON.stringify(event).length > MAX_EVENT_SERIALIZED_LENGTH) {
-      throw new Error('Event serialized length exceeds maximum allowed length of 4096');
+      throw new Error(
+        `Event serialized length exceeds maximum allowed length of ${MAX_EVENT_SERIALIZED_LENGTH}`,
+      );
     }
   }
 
@@ -100,10 +126,12 @@ export default class DefaultEventDispatcher implements EventDispatcher {
       return;
     }
 
-    const { failedEvents } = await this.eventDelivery.deliver(batch);
+    // make a defensive copy of the context to avoid mutating the original
+    const context = { ...this.context };
+    const { failedEvents } = await this.eventDelivery.deliver(batch, context);
     if (failedEvents.length > 0) {
       logger.warn('[EventDispatcher] Failed to deliver some events from batch, retrying...');
-      const failedRetry = await this.retryManager.retry(failedEvents);
+      const failedRetry = await this.retryManager.retry(failedEvents, context);
       if (failedRetry.length > 0) {
         // re-enqueue events that failed to retry
         this.batchProcessor.push(...failedRetry);

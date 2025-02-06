@@ -1,12 +1,14 @@
 import { logger } from '../application-logger';
 
+import { IEventDelivery } from './batch-retry-manager';
+import { EventContext } from './default-event-dispatcher';
 import Event from './event';
 
 export type EventDeliveryResult = {
   failedEvents: Event[];
 };
 
-export default class EventDelivery {
+export default class EventDelivery implements IEventDelivery {
   constructor(
     private readonly sdkKey: string,
     private readonly ingestionUrl: string,
@@ -16,7 +18,7 @@ export default class EventDelivery {
    * Delivers a batch of events to the ingestion URL endpoint. Returns the UUIDs of any events from
    * the batch that failed ingestion.
    */
-  async deliver(batch: Event[]): Promise<EventDeliveryResult> {
+  async deliver(batch: Event[], context: EventContext): Promise<EventDeliveryResult> {
     try {
       logger.info(
         `[EventDispatcher] Delivering batch of ${batch.length} events to ${this.ingestionUrl}...`,
@@ -24,7 +26,7 @@ export default class EventDelivery {
       const response = await fetch(this.ingestionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-eppo-token': this.sdkKey },
-        body: JSON.stringify({ eppo_events: batch }),
+        body: JSON.stringify({ eppo_events: batch, context }),
       });
       if (response.ok) {
         return await this.parseFailedEvents(response, batch);
