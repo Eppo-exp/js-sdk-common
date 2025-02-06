@@ -108,7 +108,7 @@ export default class DefaultEventDispatcher implements EventDispatcher {
   private ensureValidEvent(event: Event) {
     if (JSON.stringify(event).length > MAX_EVENT_SERIALIZED_LENGTH) {
       throw new Error(
-        `Event serialized length exceeds maximum allowed length of #{MAX_EVENT_SERIALIZED_LENGTH}`,
+        `Event serialized length exceeds maximum allowed length of ${MAX_EVENT_SERIALIZED_LENGTH}`,
       );
     }
   }
