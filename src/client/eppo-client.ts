@@ -1171,10 +1171,19 @@ export default class EppoClient {
   }
 
   private maybeLogAssignment(result: FlagEvaluation) {
-    const { flagKey, format, subjectKey, allocationKey, subjectAttributes, variation } = result;
+    const {
+      flagKey,
+      format,
+      subjectKey,
+      allocationKey = null,
+      subjectAttributes,
+      variation,
+      flagEvaluationDetails,
+      extraLogging = {},
+    } = result;
     const event: IAssignmentEvent = {
-      ...(result.extraLogging ?? {}),
-      allocation: allocationKey ?? null,
+      ...extraLogging,
+      allocation: allocationKey,
       experiment: allocationKey ? `${flagKey}-${allocationKey}` : null,
       featureFlag: flagKey,
       format,
@@ -1183,7 +1192,7 @@ export default class EppoClient {
       timestamp: new Date().toISOString(),
       subjectAttributes,
       metaData: this.buildLoggerMetadata(),
-      evaluationDetails: result.flagEvaluationDetails,
+      evaluationDetails: flagEvaluationDetails,
     };
 
     if (variation && allocationKey) {
