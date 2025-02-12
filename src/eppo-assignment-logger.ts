@@ -7,14 +7,20 @@ export class EppoAssignmentLogger implements IAssignmentLogger {
 
   logAssignment(event: IAssignmentEvent): void {
     const entity = event.subjectAttributes.entity;
-    const { holdoutKey, holdoutVariation, subject: subject_id, experiment, variant } = event;
+    const {
+      holdoutKey: holdout,
+      holdoutVariation: holdout_variant,
+      subject: subject_id,
+      experiment,
+      variant,
+    } = event;
     this.eppoClient.track('__eppo_assignment', {
       subject_id,
       experiment,
       variant,
       entity,
-      holdout: holdoutKey,
-      holdout_variant: holdoutVariation,
+      holdout,
+      holdout_variant,
     });
   }
 }
