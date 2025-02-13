@@ -15,8 +15,8 @@ import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-ca
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
 import {
-  IConfigurationWire,
   ConfigurationWireV1,
+  IConfigurationWire,
   IPrecomputedConfiguration,
   PrecomputedConfiguration,
 } from '../configuration';
@@ -27,6 +27,7 @@ import {
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_INTERVAL_MS,
   DEFAULT_REQUEST_TIMEOUT_MS,
+  OBFUSCATED_FORMATS,
 } from '../constants';
 import { decodeFlag } from '../decoding';
 import { EppoValue } from '../eppo_value';
@@ -46,6 +47,7 @@ import {
   BanditVariation,
   ConfigDetails,
   Flag,
+  getFormatFromString,
   IPrecomputedBandit,
   ObfuscatedFlag,
   PrecomputedFlag,
@@ -101,6 +103,9 @@ export type EppoClientParameters = {
   banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
   banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
   configurationRequestParameters?: FlagConfigurationRequestParameters;
+  /**
+   * @deprecated obfuscation is determined by inspecting the `format` field of the UFC response.
+   */
   isObfuscated?: boolean;
 };
 
@@ -121,7 +126,7 @@ export default class EppoClient {
   private assignmentCache?: AssignmentCache;
   // whether to suppress any errors and return default values instead
   private isGracefulFailureMode = true;
-  private isObfuscated: boolean;
+  private expectObfuscated: boolean;
   private requestPoller?: IPoller;
   private readonly evaluator = new Evaluator();
 
@@ -138,7 +143,18 @@ export default class EppoClient {
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
     this.banditModelConfigurationStore = banditModelConfigurationStore;
     this.configurationRequestParameters = configurationRequestParameters;
-    this.isObfuscated = isObfuscated;
+    this.expectObfuscated = isObfuscated;
+  }
+
+  private isObfuscated() {
+    const configFormat = getFormatFromString(this.flagConfigurationStore.getFormat());
+    const configObfuscated = OBFUSCATED_FORMATS.includes(configFormat);
+    if (configObfuscated !== this.expectObfuscated) {
+      logger.warn(
+        `[Eppo SDK] configuration obfuscation [${configObfuscated}] does not match expected [${this.expectObfuscated}]`,
+      );
+    }
+    return configObfuscated;
   }
 
   setConfigurationRequestParameters(
@@ -188,8 +204,12 @@ export default class EppoClient {
   }
 
   // noinspection JSUnusedGlobalSymbols
+  /**
+   * @deprecated The client determines whether the configuration is obfuscated by inspection
+   * @param isObfuscated
+   */
   setIsObfuscated(isObfuscated: boolean) {
-    this.isObfuscated = isObfuscated;
+    this.expectObfuscated = isObfuscated;
   }
 
   async fetchFlagConfigurations() {
@@ -854,7 +874,7 @@ export default class EppoClient {
         configDetails,
         subjectKey,
         subjectAttributes,
-        this.isObfuscated,
+        this.isObfuscated(),
       );
 
       // allocationKey is set along with variation when there is a result. this check appeases typescript below
@@ -993,15 +1013,16 @@ export default class EppoClient {
       );
     }
 
+    const isObfuscated = this.isObfuscated();
     const result = this.evaluator.evaluateFlag(
       flag,
       configDetails,
       subjectKey,
       subjectAttributes,
-      this.isObfuscated,
+      isObfuscated,
       expectedVariationType,
     );
-    if (this.isObfuscated) {
+    if (isObfuscated) {
       // flag.key is obfuscated, replace with requested flag key
       result.flagKey = flagKey;
     }
@@ -1052,7 +1073,7 @@ export default class EppoClient {
   }
 
   private getFlag(flagKey: string): Flag | null {
-    return this.isObfuscated
+    return this.isObfuscated()
       ? this.getObfuscatedFlag(flagKey)
       : this.flagConfigurationStore.get(flagKey);
   }
@@ -1220,7 +1241,7 @@ export default class EppoClient {
 
   private buildLoggerMetadata(): Record<string, unknown> {
     return {
-      obfuscated: this.isObfuscated,
+      obfuscated: this.isObfuscated(),
       sdkLanguage: 'javascript',
       sdkLibVersion: LIB_VERSION,
     };

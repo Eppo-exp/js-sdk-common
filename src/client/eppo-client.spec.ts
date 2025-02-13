@@ -4,12 +4,12 @@ import * as td from 'testdouble';
 
 import {
   ASSIGNMENT_TEST_DATA_DIR,
+  getTestAssignments,
   IAssignmentTestCase,
   MOCK_UFC_RESPONSE_FILE,
   OBFUSCATED_MOCK_UFC_RESPONSE_FILE,
-  SubjectTestCase,
-  getTestAssignments,
   readMockUFCResponse,
+  SubjectTestCase,
   testCasesByFileName,
   validateTestAssignments,
 } from '../../test/testHelpers';
@@ -21,13 +21,13 @@ import {
 } from '../configuration';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
-import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
+import { DEFAULT_POLL_INTERVAL_MS, MAX_EVENT_QUEUE_SIZE, POLL_JITTER_PCT } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
-import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
+import { Flag, FormatEnum, ObfuscatedFlag, VariationType } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import { AttributeType } from '../types';
 
-import EppoClient, { FlagConfigurationRequestParameters, checkTypeMatch } from './eppo-client';
+import EppoClient, { checkTypeMatch, FlagConfigurationRequestParameters } from './eppo-client';
 import { initConfiguration } from './test-utils';
 
 // Use a known salt to produce deterministic hashes
@@ -428,6 +428,7 @@ describe('EppoClient E2E test', () => {
     const mockLogger = td.object<IAssignmentLogger>();
 
     storage.setEntries({ [flagKey]: mockFlag });
+    storage.setFormat(FormatEnum.SERVER)
     const client = new EppoClient({ flagConfigurationStore: storage });
     client.setAssignmentLogger(mockLogger);
 
