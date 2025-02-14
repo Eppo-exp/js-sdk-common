@@ -148,10 +148,10 @@ export enum FormatEnum {
   CLIENT = 'CLIENT',
   PRECOMPUTED = 'PRECOMPUTED',
 }
-// enums are a little sticky to work with in conjunction with serialization.
+
 export function getFormatFromString(str: string | null): FormatEnum {
   // default to SERVER. Should always be set, but the ConfigurationStore allows null.
-  return Object.values(FormatEnum).find((val) => val === str) ?? FormatEnum.SERVER;
+  return FormatEnum[str as keyof typeof FormatEnum] ?? FormatEnum.SERVER;
 }
 
 export type BasePrecomputedFlag = {
