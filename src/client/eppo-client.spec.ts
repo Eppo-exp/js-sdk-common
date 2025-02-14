@@ -45,6 +45,18 @@ describe('EppoClient E2E test', () => {
   }) as jest.Mock;
   const storage = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
 
+  /**
+   * Use this helper instead of directly setting entries on the `storage` ConfigurationStore.
+   * This method ensures the format field is set as it is required for parsing.
+   * @param entries
+   */
+  function setUnobfuscatedFlagEntries(
+    entries: Record<string, Flag | ObfuscatedFlag>,
+  ): Promise<boolean> {
+    storage.setFormat(FormatEnum.SERVER);
+    return storage.setEntries(entries);
+  }
+
   beforeAll(async () => {
     await initConfiguration(storage);
   });
@@ -88,7 +100,7 @@ describe('EppoClient E2E test', () => {
     let client: EppoClient;
 
     beforeAll(() => {
-      storage.setEntries({ [flagKey]: mockFlag });
+      setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
       client = new EppoClient({ flagConfigurationStore: storage });
 
       td.replace(EppoClient.prototype, 'getAssignmentDetail', function () {
@@ -144,7 +156,7 @@ describe('EppoClient E2E test', () => {
 
   describe('setLogger', () => {
     beforeAll(() => {
-      storage.setEntries({ [flagKey]: mockFlag });
+      setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
     });
 
     it('Invokes logger for queued events', () => {
@@ -192,7 +204,7 @@ describe('EppoClient E2E test', () => {
 
   describe('precomputed flags', () => {
     beforeAll(() => {
-      storage.setEntries({
+      setUnobfuscatedFlagEntries({
         [flagKey]: mockFlag,
         disabledFlag: { ...mockFlag, enabled: false },
         anotherFlag: {
@@ -424,11 +436,10 @@ describe('EppoClient E2E test', () => {
     );
   });
 
-  it('logs variation assignment and experiment key', () => {
+  it('logs variation assignment and experiment key', async () => {
     const mockLogger = td.object<IAssignmentLogger>();
 
-    storage.setEntries({ [flagKey]: mockFlag });
-    storage.setFormat(FormatEnum.SERVER)
+    await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
     const client = new EppoClient({ flagConfigurationStore: storage });
     client.setAssignmentLogger(mockLogger);
 
@@ -450,11 +461,11 @@ describe('EppoClient E2E test', () => {
     expect(loggedAssignmentEvent.allocation).toEqual(mockFlag.allocations[0].key);
   });
 
-  it('handles logging exception', () => {
+  it('handles logging exception', async () => {
     const mockLogger = td.object<IAssignmentLogger>();
     td.when(mockLogger.logAssignment(td.matchers.anything())).thenThrow(new Error('logging error'));
 
-    storage.setEntries({ [flagKey]: mockFlag });
+    await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
     const client = new EppoClient({ flagConfigurationStore: storage });
     client.setAssignmentLogger(mockLogger);
 
@@ -469,8 +480,8 @@ describe('EppoClient E2E test', () => {
     expect(assignment).toEqual('variation-a');
   });
 
-  it('exports flag configuration', () => {
-    storage.setEntries({ [flagKey]: mockFlag });
+  it('exports flag configuration', async () => {
+    await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
     const client = new EppoClient({ flagConfigurationStore: storage });
     expect(client.getFlagConfigurations()).toEqual({ [flagKey]: mockFlag });
   });
@@ -479,10 +490,10 @@ describe('EppoClient E2E test', () => {
     let client: EppoClient;
     let mockLogger: IAssignmentLogger;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       mockLogger = td.object<IAssignmentLogger>();
 
-      storage.setEntries({ [flagKey]: mockFlag });
+      await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
       client = new EppoClient({ flagConfigurationStore: storage });
       client.setAssignmentLogger(mockLogger);
     });
@@ -537,7 +548,7 @@ describe('EppoClient E2E test', () => {
     });
 
     it('logs for each unique flag', async () => {
-      await storage.setEntries({
+      await setUnobfuscatedFlagEntries({
         [flagKey]: mockFlag,
         'flag-2': {
           ...mockFlag,
@@ -564,10 +575,10 @@ describe('EppoClient E2E test', () => {
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(3);
     });
 
-    it('logs twice for the same flag when allocations change', () => {
+    it('logs twice for the same flag when allocations change', async () => {
       client.useNonExpiringInMemoryAssignmentCache();
 
-      storage.setEntries({
+      setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
 
@@ -588,7 +599,7 @@ describe('EppoClient E2E test', () => {
       });
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
 
-      storage.setEntries({
+      await setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
           allocations: [
@@ -614,13 +625,13 @@ describe('EppoClient E2E test', () => {
       client.useNonExpiringInMemoryAssignmentCache();
 
       // original configuration version
-      storage.setEntries({ [flagKey]: mockFlag });
+      setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
 
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // log this assignment
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
 
       // change the variation
-      storage.setEntries({
+      setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
           allocations: [
@@ -643,13 +654,13 @@ describe('EppoClient E2E test', () => {
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
 
       // change the flag again, back to the original
-      storage.setEntries({ [flagKey]: mockFlag });
+      setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
 
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // important: log this assignment
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
 
       // change the allocation
-      storage.setEntries({
+      setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
           allocations: [
