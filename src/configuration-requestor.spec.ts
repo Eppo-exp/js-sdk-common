@@ -575,7 +575,7 @@ describe('ConfigurationRequestor', () => {
         // expect(banditVariationDetails.configFormat).toBe('SERVER');
 
         // Verify bandit model configuration
-        const banditVariations = config.getBanditVariations('test_flag');
+        const banditVariations = config.getFlagBanditVariations('test_flag');
         expect(banditVariations).toEqual([
           {
             allocationKey: 'analysis',

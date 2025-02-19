@@ -14,10 +14,12 @@ import {
 export interface IConfiguration {
   getFlag(key: string): Flag | ObfuscatedFlag | null;
   getFlags(): Record<string, Flag | ObfuscatedFlag>;
+  getBandits(): Record<string, BanditParameters>;
+  getBanditVariations(): Record<string, BanditVariation[]>;
+  getFlagBanditVariations(flagKey: string): BanditVariation[];
   getFlagVariationBandit(flagKey: string, variationValue: string): BanditParameters | null;
   getBandit(key: string): BanditParameters | null;
   getFlagConfigDetails(): ConfigDetails;
-  getBanditVariations(flagKey: string): BanditVariation[];
   getFlagKeys(): string[];
   isObfuscated(): boolean;
   isInitialized(): boolean;
@@ -133,7 +135,7 @@ export class StoreBackedConfiguration implements IConfiguration {
     };
   }
 
-  getBanditVariations(flagKey: string): BanditVariation[] {
+  getFlagBanditVariations(flagKey: string): BanditVariation[] {
     return this.banditVariationConfigurationStore?.get(flagKey) ?? [];
   }
 
@@ -157,4 +159,16 @@ export class StoreBackedConfiguration implements IConfiguration {
       (!this.banditModelConfigurationStore || this.banditModelConfigurationStore.isInitialized())
     );
   }
+
+  getBandits(): Record<string, BanditParameters> {
+    return this.banditModelConfigurationStore?.entries() ?? {};
+  }
+
+  getBanditVariations(): Record<string, BanditVariation[]> {
+    return this.banditVariationConfigurationStore?.entries() ?? {};
+  }
 }
+
+// export class ReadOnlyConfiguration implements IConfiguration {
+//   public static from(other: IConfiguration): ReadOnlyConfiguration {}
+// }

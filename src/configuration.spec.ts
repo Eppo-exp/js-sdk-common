@@ -1,6 +1,7 @@
 import { StoreBackedConfiguration } from './configuration';
 import { IConfigurationStore } from './configuration-store/configuration-store';
 import { BanditParameters, BanditVariation, Environment, Flag, ObfuscatedFlag } from './interfaces';
+import { BanditKey, FlagKey } from './types';
 
 describe('StoreBackedConfiguration', () => {
   let mockFlagStore: jest.Mocked<IConfigurationStore<Flag | ObfuscatedFlag>>;
@@ -213,7 +214,7 @@ describe('StoreBackedConfiguration', () => {
       ];
       mockBanditVariationStore.get.mockReturnValue(mockVariations);
 
-      const result = config.getBanditVariations('test-flag');
+      const result = config.getFlagBanditVariations('test-flag');
       expect(result).toEqual(mockVariations);
     });
 
@@ -221,7 +222,7 @@ describe('StoreBackedConfiguration', () => {
       const config = new StoreBackedConfiguration(mockFlagStore, mockBanditVariationStore);
       mockBanditVariationStore.get.mockReturnValue(null);
 
-      const result = config.getBanditVariations('test-flag');
+      const result = config.getFlagBanditVariations('test-flag');
       expect(result).toEqual([]);
     });
   });
@@ -240,7 +241,7 @@ describe('StoreBackedConfiguration', () => {
   describe('getFlags', () => {
     it('should return all flags from store', () => {
       const config = new StoreBackedConfiguration(mockFlagStore);
-      const mockFlags: Record<string, Flag> = {
+      const mockFlags: Record<FlagKey, Flag> = {
         'flag-1': { key: 'flag-1' } as Flag,
         'flag-2': { key: 'flag-2' } as Flag,
       };
@@ -344,6 +345,87 @@ describe('StoreBackedConfiguration', () => {
       );
 
       expect(config.isInitialized()).toBe(false);
+    });
+  });
+
+  describe('getBandits', () => {
+    it('should return empty object when bandit store is null', () => {
+      const config = new StoreBackedConfiguration(mockFlagStore);
+      expect(config.getBandits()).toEqual({});
+    });
+
+    it('should return bandits from store', () => {
+      const mockBandits: Record<BanditKey, BanditParameters> = {
+        'bandit-1': {
+          banditKey: 'bandit-1',
+          modelName: 'falcon',
+          modelVersion: '123',
+          modelData: {
+            gamma: 0,
+            defaultActionScore: 0,
+            actionProbabilityFloor: 0,
+            coefficients: {},
+          },
+        },
+        'bandit-2': {
+          banditKey: 'bandit-2',
+          modelName: 'falcon',
+          modelVersion: '123',
+          modelData: {
+            gamma: 0,
+            defaultActionScore: 0,
+            actionProbabilityFloor: 0,
+            coefficients: {},
+          },
+        },
+      };
+
+      mockBanditModelStore.entries.mockReturnValue(mockBandits);
+
+      const config = new StoreBackedConfiguration(mockFlagStore, null, mockBanditModelStore);
+
+      expect(config.getBandits()).toEqual(mockBandits);
+    });
+  });
+
+  describe('getBanditVariations', () => {
+    it('should return empty variations when bandit variation store is null', () => {
+      const config = new StoreBackedConfiguration(mockFlagStore);
+      expect(config.getBanditVariations()).toEqual({});
+    });
+
+    it('should return flag variations from store', () => {
+      const mockVariations: Record<BanditKey, BanditVariation[]> = {
+        'bandit-1': [
+          {
+            key: 'bandit-1',
+            variationValue: 'true',
+            flagKey: 'flag_with_bandit',
+            variationKey: 'bandit-1',
+          },
+        ],
+        'bandit-2': [
+          {
+            key: 'bandit-2',
+            variationValue: 'true',
+            flagKey: 'flag_with_bandit2',
+            variationKey: 'bandit-2',
+          },
+        ],
+      };
+
+      mockBanditVariationStore.entries.mockReturnValue(mockVariations);
+
+      const config = new StoreBackedConfiguration(mockFlagStore, mockBanditVariationStore);
+
+      expect(config.getBanditVariations()['bandit-1']).toEqual([
+        {
+          key: 'bandit-1',
+          variationValue: 'true',
+          flagKey: 'flag_with_bandit',
+          variationKey: 'bandit-1',
+        },
+      ]);
     });
   });
 });
