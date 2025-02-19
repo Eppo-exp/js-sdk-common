@@ -280,4 +280,70 @@ describe('StoreBackedConfiguration', () => {
       expect(config.isObfuscated()).toBe(false);
     });
   });
+
+  describe('isInitialized', () => {
+    it('should return false when no stores are initialized', () => {
+      mockFlagStore.isInitialized.mockReturnValue(false);
+      mockBanditVariationStore.isInitialized.mockReturnValue(false);
+      mockBanditModelStore.isInitialized.mockReturnValue(false);
+
+      const config = new StoreBackedConfiguration(
+        mockFlagStore,
+        mockBanditVariationStore,
+        mockBanditModelStore,
+      );
+
+      expect(config.isInitialized()).toBe(false);
+    });
+
+    it('should return true when all stores are initialized', () => {
+      mockFlagStore.isInitialized.mockReturnValue(true);
+      mockBanditVariationStore.isInitialized.mockReturnValue(true);
+      mockBanditModelStore.isInitialized.mockReturnValue(true);
+
+      const config = new StoreBackedConfiguration(
+        mockFlagStore,
+        mockBanditVariationStore,
+        mockBanditModelStore,
+      );
+
+      expect(config.isInitialized()).toBe(true);
+    });
+
+    it('should return true when flag store is initialized and no bandit stores are provided', () => {
+      mockFlagStore.isInitialized.mockReturnValue(true);
+
+      const config = new StoreBackedConfiguration(mockFlagStore);
+
+      expect(config.isInitialized()).toBe(true);
+    });
+
+    it('should return false if flag store is uninitialized even if bandit stores are initialized', () => {
+      mockFlagStore.isInitialized.mockReturnValue(false);
+      mockBanditVariationStore.isInitialized.mockReturnValue(true);
+      mockBanditModelStore.isInitialized.mockReturnValue(true);
+
+      const config = new StoreBackedConfiguration(
+        mockFlagStore,
+        mockBanditVariationStore,
+        mockBanditModelStore,
+      );
+
+      expect(config.isInitialized()).toBe(false);
+    });
+
+    it('should return false if any bandit store is uninitialized', () => {
+      mockFlagStore.isInitialized.mockReturnValue(true);
+      mockBanditVariationStore.isInitialized.mockReturnValue(true);
+      mockBanditModelStore.isInitialized.mockReturnValue(false);
+
+      const config = new StoreBackedConfiguration(
+        mockFlagStore,
+        mockBanditVariationStore,
+        mockBanditModelStore,
+      );
+
+      expect(config.isInitialized()).toBe(false);
+    });
+  });
 });

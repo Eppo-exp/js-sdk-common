@@ -20,6 +20,7 @@ export interface IConfiguration {
   getBanditVariations(flagKey: string): BanditVariation[];
   getFlagKeys(): string[];
   isObfuscated(): boolean;
+  isInitialized(): boolean;
 }
 
 type Entry =
@@ -146,5 +147,14 @@ export class StoreBackedConfiguration implements IConfiguration {
 
   isObfuscated(): boolean {
     return OBFUSCATED_FORMATS.includes(this.getFlagConfigDetails().configFormat ?? 'SERVER');
+  }
+
+  isInitialized() {
+    return (
+      this.flagConfigurationStore.isInitialized() &&
+      (!this.banditVariationConfigurationStore ||
+        this.banditVariationConfigurationStore.isInitialized()) &&
+      (!this.banditModelConfigurationStore || this.banditModelConfigurationStore.isInitialized())
+    );
   }
 }

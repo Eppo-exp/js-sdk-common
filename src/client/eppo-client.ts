@@ -1189,12 +1189,7 @@ export default class EppoClient {
   }
 
   isInitialized() {
-    return (
-      this.flagConfigurationStore.isInitialized() &&
-      (!this.banditVariationConfigurationStore ||
-        this.banditVariationConfigurationStore.isInitialized()) &&
-      (!this.banditModelConfigurationStore || this.banditModelConfigurationStore.isInitialized())
-    );
+    return this.getConfiguration().isInitialized();
   }
 
   /** @deprecated Use `setAssignmentLogger` */
