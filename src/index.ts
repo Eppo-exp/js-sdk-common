@@ -25,11 +25,6 @@ import EppoPrecomputedClient, {
   PrecomputedFlagsRequestParameters,
   Subject,
 } from './client/eppo-precomputed-client';
-import {
-  IConfigurationWire,
-  IObfuscatedPrecomputedConfigurationResponse,
-  IPrecomputedConfigurationResponse,
-} from './configuration';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -38,6 +33,11 @@ import {
 } from './configuration-store/configuration-store';
 import { HybridConfigurationStore } from './configuration-store/hybrid.store';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
+import {
+  IConfigurationWire,
+  IObfuscatedPrecomputedConfigurationResponse,
+  IPrecomputedConfigurationResponse,
+} from './configuration-wire-types';
 import * as constants from './constants';
 import { decodePrecomputedFlag } from './decoding';
 import BatchEventProcessor from './events/batch-event-processor';

@@ -14,13 +14,13 @@ import {
   validateTestAssignments,
 } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
+import { IConfigurationStore } from '../configuration-store/configuration-store';
+import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   ObfuscatedPrecomputedConfigurationResponse,
-} from '../configuration';
-import { IConfigurationStore } from '../configuration-store/configuration-store';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
+} from '../configuration-wire-types';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';

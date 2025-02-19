@@ -14,14 +14,14 @@ import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
+import ConfigurationRequestor from '../configuration-requestor';
+import { IConfigurationStore } from '../configuration-store/configuration-store';
 import {
   IConfigurationWire,
   ConfigurationWireV1,
   IPrecomputedConfiguration,
   PrecomputedConfiguration,
-} from '../configuration';
-import ConfigurationRequestor from '../configuration-requestor';
-import { IConfigurationStore } from '../configuration-store/configuration-store';
+} from '../configuration-wire-types';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,

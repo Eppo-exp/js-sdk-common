@@ -12,13 +12,13 @@ import ApiEndpoints from '../api-endpoints';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
+import ConfigurationRequestor from '../configuration-requestor';
+import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   IConfigurationWire,
   IPrecomputedConfiguration,
   IObfuscatedPrecomputedConfigurationResponse,
-} from '../configuration';
-import ConfigurationRequestor from '../configuration-requestor';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
+} from '../configuration-wire-types';
 import { Evaluator, FlagEvaluation } from '../evaluator';
 import {
   AllocationEvaluationCode,
