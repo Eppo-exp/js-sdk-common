@@ -22,6 +22,7 @@ import {
 } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
+import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -55,6 +56,7 @@ import {
   VariationType,
 } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
+import { OverridePayload, OverrideValidator } from '../override-validator';
 import initPoller, { IPoller } from '../poller';
 import {
   Attributes,
@@ -65,6 +67,7 @@ import {
   FlagKey,
   ValueType,
 } from '../types';
+import { shallowClone } from '../util';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
@@ -135,6 +138,7 @@ export default class EppoClient {
   private configObfuscatedCache?: boolean;
   private requestPoller?: IPoller;
   private readonly evaluator = new Evaluator();
+  private readonly overrideValidator = new OverrideValidator();
 
   constructor({
     eventDispatcher = new NoOpEventDispatcher(),
@@ -185,6 +189,35 @@ export default class EppoClient {
     }
     this.maybeWarnAboutObfuscationMismatch(this.configObfuscatedCache);
     return this.configObfuscatedCache;
+  }
+
+  /**
+   * Validates and parses x-eppo-overrides header sent by Eppo's Chrome extension
+   */
+  async parseOverrides(
+    overridePayload: string | undefined,
+  ): Promise<Record<FlagKey, Variation> | undefined> {
+    if (!overridePayload) {
+      return undefined;
+    }
+    const payload: OverridePayload = this.overrideValidator.parseOverridePayload(overridePayload);
+    await this.overrideValidator.validateOverrideApiKey(payload.apiKey);
+    return payload.overrides;
+  }
+
+  /**
+   * Creates an EppoClient instance that has the specified overrides applied
+   * to it without affecting the original EppoClient singleton. Useful for
+   * applying overrides in a shared Node instance, such as a web server.
+   */
+  withOverrides(overrides: Record<FlagKey, Variation>): EppoClient {
+    if (overrides && Object.keys(overrides).length) {
+      const copy = shallowClone(this);
+      copy.overrideStore = new MemoryOnlyConfigurationStore<Variation>();
+      copy.overrideStore.setEntries(overrides);
+      return copy;
+    }
+    return this;
   }
 
   setConfigurationRequestParameters(
