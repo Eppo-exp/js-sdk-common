@@ -15,8 +15,8 @@ import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-ca
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
 import {
-  IConfigurationWire,
   ConfigurationWireV1,
+  IConfigurationWire,
   IPrecomputedConfiguration,
   PrecomputedConfiguration,
 } from '../configuration';
@@ -27,6 +27,7 @@ import {
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_INTERVAL_MS,
   DEFAULT_REQUEST_TIMEOUT_MS,
+  OBFUSCATED_FORMATS,
 } from '../constants';
 import { decodeFlag } from '../decoding';
 import { EppoValue } from '../eppo_value';
@@ -46,6 +47,7 @@ import {
   BanditVariation,
   ConfigDetails,
   Flag,
+  FormatEnum,
   IPrecomputedBandit,
   ObfuscatedFlag,
   PrecomputedFlag,
@@ -101,6 +103,12 @@ export type EppoClientParameters = {
   banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
   banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
   configurationRequestParameters?: FlagConfigurationRequestParameters;
+  /**
+   * Setting this value will have no side effects other than triggering a warning when the actual
+   * configuration's obfuscated does not match the value set here.
+   *
+   * @deprecated obfuscation is determined by inspecting the `format` field of the UFC response.
+   */
   isObfuscated?: boolean;
 };
 
@@ -122,7 +130,9 @@ export default class EppoClient {
   private assignmentCache?: AssignmentCache;
   // whether to suppress any errors and return default values instead
   private isGracefulFailureMode = true;
-  private isObfuscated: boolean;
+  private expectObfuscated: boolean;
+  private obfuscationMismatchWarningIssued = false;
+  private configObfuscatedCache?: boolean;
   private requestPoller?: IPoller;
   private readonly evaluator = new Evaluator();
 
@@ -151,7 +161,30 @@ export default class EppoClient {
     this.banditModelConfigurationStore = banditModelConfigurationStore;
     this.overrideStore = overrideStore;
     this.configurationRequestParameters = configurationRequestParameters;
-    this.isObfuscated = isObfuscated;
+    this.expectObfuscated = isObfuscated;
+  }
+
+  private maybeWarnAboutObfuscationMismatch(configObfuscated: boolean) {
+    // Don't warn again if we did on the last check.
+    if (configObfuscated !== this.expectObfuscated && !this.obfuscationMismatchWarningIssued) {
+      this.obfuscationMismatchWarningIssued = true;
+      logger.warn(
+        `[Eppo SDK] configuration obfuscation [${configObfuscated}] does not match expected [${this.expectObfuscated}]`,
+      );
+    } else if (configObfuscated === this.expectObfuscated) {
+      // Reset the warning to false in case the client configuration (re-)enters a mismatched state.
+      this.obfuscationMismatchWarningIssued = false;
+    }
+  }
+
+  private isObfuscated() {
+    if (this.configObfuscatedCache === undefined) {
+      this.configObfuscatedCache = OBFUSCATED_FORMATS.includes(
+        this.flagConfigurationStore.getFormat() ?? FormatEnum.SERVER,
+      );
+    }
+    this.maybeWarnAboutObfuscationMismatch(this.configObfuscatedCache);
+    return this.configObfuscatedCache;
   }
 
   setConfigurationRequestParameters(
@@ -163,6 +196,7 @@ export default class EppoClient {
   // noinspection JSUnusedGlobalSymbols
   setFlagConfigurationStore(flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>) {
     this.flagConfigurationStore = flagConfigurationStore;
+    this.configObfuscatedCache = undefined;
   }
 
   // noinspection JSUnusedGlobalSymbols
@@ -201,8 +235,15 @@ export default class EppoClient {
   }
 
   // noinspection JSUnusedGlobalSymbols
+  /**
+   * Setting this value will have no side effects other than triggering a warning when the actual
+   * configuration's obfuscated does not match the value set here.
+   *
+   * @deprecated The client determines whether the configuration is obfuscated by inspection
+   * @param isObfuscated
+   */
   setIsObfuscated(isObfuscated: boolean) {
-    this.isObfuscated = isObfuscated;
+    this.expectObfuscated = isObfuscated;
   }
 
   setOverrideStore(store: ISyncStore<Variation>): void {
@@ -267,6 +308,7 @@ export default class EppoClient {
 
     const pollingCallback = async () => {
       if (await this.flagConfigurationStore.isExpired()) {
+        this.configObfuscatedCache = undefined;
         return configurationRequestor.fetchAndStoreConfigurations();
       }
     };
@@ -885,7 +927,7 @@ export default class EppoClient {
         configDetails,
         subjectKey,
         subjectAttributes,
-        this.isObfuscated,
+        this.isObfuscated(),
       );
 
       // allocationKey is set along with variation when there is a result. this check appeases typescript below
@@ -1035,15 +1077,16 @@ export default class EppoClient {
       );
     }
 
+    const isObfuscated = this.isObfuscated();
     const result = this.evaluator.evaluateFlag(
       flag,
       configDetails,
       subjectKey,
       subjectAttributes,
-      this.isObfuscated,
+      isObfuscated,
       expectedVariationType,
     );
-    if (this.isObfuscated) {
+    if (isObfuscated) {
       // flag.key is obfuscated, replace with requested flag key
       result.flagKey = flagKey;
     }
@@ -1094,7 +1137,7 @@ export default class EppoClient {
   }
 
   private getFlag(flagKey: string): Flag | null {
-    return this.isObfuscated
+    return this.isObfuscated()
       ? this.getObfuscatedFlag(flagKey)
       : this.flagConfigurationStore.get(flagKey);
   }
@@ -1262,7 +1305,7 @@ export default class EppoClient {
 
   private buildLoggerMetadata(): Record<string, unknown> {
     return {
-      obfuscated: this.isObfuscated,
+      obfuscated: this.isObfuscated(),
       sdkLanguage: 'javascript',
       sdkLibVersion: LIB_VERSION,
     };
