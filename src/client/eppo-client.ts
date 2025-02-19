@@ -14,7 +14,6 @@ import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
-import { IConfiguration, StoreBackedConfiguration } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
 import {
@@ -41,6 +40,7 @@ import {
 } from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
 import FetchHttpClient from '../http-client';
+import { IConfiguration, StoreBackedConfiguration } from '../i-configuration';
 import {
   BanditModelData,
   BanditParameters,

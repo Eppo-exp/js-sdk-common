@@ -6,7 +6,6 @@ import {
 } from '../test/testHelpers';
 
 import ApiEndpoints from './api-endpoints';
-import { StoreBackedConfiguration } from './configuration';
 import ConfigurationRequestor from './configuration-requestor';
 import { IConfigurationStore } from './configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
@@ -15,6 +14,7 @@ import FetchHttpClient, {
   IHttpClient,
   IUniversalFlagConfigResponse,
 } from './http-client';
+import { StoreBackedConfiguration } from './i-configuration';
 import { BanditParameters, BanditVariation, Flag } from './interfaces';
 
 describe('ConfigurationRequestor', () => {

@@ -1,10 +1,10 @@
+import { IConfigurationStore } from './configuration-store/configuration-store';
+import { IHttpClient } from './http-client';
 import {
   ConfigStoreHydrationPacket,
   IConfiguration,
   StoreBackedConfiguration,
-} from './configuration';
-import { IConfigurationStore } from './configuration-store/configuration-store';
-import { IHttpClient } from './http-client';
+} from './i-configuration';
 import { BanditVariation, BanditParameters, Flag, BanditReference } from './interfaces';
 
 // Requests AND stores flag configurations

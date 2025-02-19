@@ -18,7 +18,10 @@ export interface IConfiguration {
   getBandits(): Record<BanditKey, BanditParameters>;
   getBanditVariations(): Record<FlagKey | HashedFlagKey, BanditVariation[]>;
   getFlagBanditVariations(flagKey: FlagKey | HashedFlagKey): BanditVariation[];
-  getFlagVariationBandit(flagKey: FlagKey | HashedFlagKey, variationValue: string): BanditParameters | null;
+  getFlagVariationBandit(
+    flagKey: FlagKey | HashedFlagKey,
+    variationValue: string,
+  ): BanditParameters | null;
   getBandit(key: BanditKey): BanditParameters | null;
   getFlagConfigDetails(): ConfigDetails;
   getFlagKeys(): FlagKey[] | HashedFlagKey[];

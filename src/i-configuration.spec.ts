@@ -1,5 +1,5 @@
-import { StoreBackedConfiguration } from './configuration';
 import { IConfigurationStore } from './configuration-store/configuration-store';
+import { StoreBackedConfiguration } from './i-configuration';
 import { BanditParameters, BanditVariation, Environment, Flag, ObfuscatedFlag } from './interfaces';
 import { BanditKey, FlagKey } from './types';
 
