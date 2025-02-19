@@ -45,7 +45,6 @@ import {
   BanditModelData,
   BanditParameters,
   BanditVariation,
-  ConfigDetails,
   Flag,
   IPrecomputedBandit,
   ObfuscatedFlag,
@@ -933,7 +932,7 @@ export default class EppoClient {
     subjectAttributes: Attributes = {},
   ): Record<FlagKey, PrecomputedFlag> {
     const config = this.getConfiguration();
-    const configDetails = this.getConfigDetails();
+    const configDetails = config.getFlagConfigDetails();
     const flagKeys = this.getFlagKeys();
     const flags: Record<FlagKey, PrecomputedFlag> = {};
 
@@ -1051,7 +1050,7 @@ export default class EppoClient {
       );
     }
 
-    const configDetails = this.getConfigDetails();
+    const configDetails = config.getFlagConfigDetails();
     const flag = this.getNormalizedFlag(config, flagKey);
 
     if (flag === null) {
@@ -1153,17 +1152,6 @@ export default class EppoClient {
       configDetails.configFetchedAt,
       configDetails.configPublishedAt,
     );
-  }
-
-  private getConfigDetails(): ConfigDetails {
-    return {
-      configFetchedAt: this.flagConfigurationStore.getConfigFetchedAt() ?? '',
-      configPublishedAt: this.flagConfigurationStore.getConfigPublishedAt() ?? '',
-      configEnvironment: this.flagConfigurationStore.getEnvironment() ?? {
-        name: '',
-      },
-      configFormat: this.flagConfigurationStore.getFormat() ?? '',
-    };
   }
 
   private getNormalizedFlag(config: IConfiguration, flagKey: string): Flag | null {
