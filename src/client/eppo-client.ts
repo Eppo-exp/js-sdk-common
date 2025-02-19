@@ -703,7 +703,7 @@ export default class EppoClient {
       // Check if the assigned variation is an active bandit
       // Note: the reason for non-bandit assignments include the subject being bucketed into a non-bandit variation or
       // a rollout having been done.
-      const bandit = this.findBanditByVariation(flagKey, variation);
+      const bandit = config.getFlagVariationBandit(flagKey, variation);
 
       if (!bandit) {
         return { variation, action: null, evaluationDetails };
@@ -988,13 +988,15 @@ export default class EppoClient {
     banditActions: Record<FlagKey, BanditActions> = {},
     salt?: string,
   ): string {
-    const configDetails = this.getConfigDetails();
+    const config = this.getConfiguration();
+    const configDetails = config.getFlagConfigDetails();
 
     const subjectContextualAttributes = ensureContextualSubjectAttributes(subjectAttributes);
     const subjectFlatAttributes = ensureNonContextualSubjectAttributes(subjectAttributes);
     const flags = this.getAllAssignments(subjectKey, subjectFlatAttributes);
 
     const bandits = this.computeBanditsForFlags(
+      config,
       subjectKey,
       subjectContextualAttributes,
       banditActions,
@@ -1337,6 +1339,7 @@ export default class EppoClient {
   }
 
   private computeBanditsForFlags(
+    config: IConfiguration,
     subjectKey: string,
     subjectAttributes: ContextAttributes,
     banditActions: Record<FlagKey, BanditActions>,
@@ -1350,6 +1353,7 @@ export default class EppoClient {
       if (flagVariation) {
         // Precompute a bandit, if there is one matching this variation.
         const precomputedResult = this.getPrecomputedBandit(
+          config,
           flagKey,
           flagVariation.variationValue,
           subjectKey,
@@ -1364,27 +1368,15 @@ export default class EppoClient {
     return banditResults;
   }
 
-  private findBanditByVariation(flagKey: string, variationValue: string): BanditParameters | null {
-    const banditVariations = this.banditVariationConfigurationStore?.get(flagKey);
-    const banditKey = banditVariations?.find(
-      (banditVariation) => banditVariation.variationValue === variationValue,
-    )?.key;
-
-    if (banditKey) {
-      // Retrieve the model parameters for the bandit
-      return this.getBandit(banditKey);
-    }
-    return null;
-  }
-
   private getPrecomputedBandit(
+    config: IConfiguration,
     flagKey: string,
     variationValue: string,
     subjectKey: string,
     subjectAttributes: ContextAttributes,
     banditActions: BanditActions,
   ): IPrecomputedBandit | null {
-    const bandit = this.findBanditByVariation(flagKey, variationValue);
+    const bandit = config.getFlagVariationBandit(flagKey, variationValue);
     if (!bandit) {
       return null;
     }
