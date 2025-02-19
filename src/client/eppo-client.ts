@@ -1255,7 +1255,7 @@ export default class EppoClient {
   }
 
   getFlagConfigurations(): Record<string, Flag> {
-    return this.flagConfigurationStore.entries();
+    return this.getConfiguration().getFlags();
   }
 
   private flushQueuedEvents<T>(eventQueue: BoundedEventQueue<T>, logFunction?: (event: T) => void) {
