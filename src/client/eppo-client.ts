@@ -669,11 +669,13 @@ export default class EppoClient {
     actions: BanditActions,
     defaultValue: string,
   ): IAssignmentDetails<string> {
+    const config = this.getConfiguration();
     let variation = defaultValue;
     let action: string | null = null;
 
     // Initialize with a generic evaluation details. This will mutate as the function progresses.
     let evaluationDetails: IFlagEvaluationDetails = this.newFlagEvaluationDetailsBuilder(
+      config,
       flagKey,
     ).buildForNoneResult(
       'ASSIGNMENT_ERROR',
@@ -932,7 +934,7 @@ export default class EppoClient {
 
     // Evaluate all the enabled flags for the user
     flagKeys.forEach((flagKey) => {
-      const flag = this.getFlag(flagKey);
+      const flag = this.getNormalizedFlag(config, flagKey);
       if (!flag) {
         logger.debug(`${loggerPrefix} No assigned variation. Flag does not exist.`);
         return;
@@ -1030,7 +1032,7 @@ export default class EppoClient {
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
     const config = this.getConfiguration();
 
-    const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
+    const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(config, flagKey);
     const overrideVariation = this.overrideStore?.get(flagKey);
     if (overrideVariation) {
       return overrideResult(
@@ -1043,7 +1045,7 @@ export default class EppoClient {
     }
 
     const configDetails = this.getConfigDetails();
-    const flag = this.getFlag(flagKey);
+    const flag = this.getNormalizedFlag(config, flagKey);
 
     if (flag === null) {
       logger.warn(`${loggerPrefix} No assigned variation. Flag not found: ${flagKey}`);
@@ -1132,9 +1134,12 @@ export default class EppoClient {
     });
   }
 
-  private newFlagEvaluationDetailsBuilder(flagKey: string): FlagEvaluationDetailsBuilder {
-    const flag = this.getFlag(flagKey);
-    const configDetails = this.getConfigDetails();
+  private newFlagEvaluationDetailsBuilder(
+    config: IConfiguration,
+    flagKey: string,
+  ): FlagEvaluationDetailsBuilder {
+    const flag = this.getNormalizedFlag(config, flagKey);
+    const configDetails = config.getFlagConfigDetails();
     return new FlagEvaluationDetailsBuilder(
       configDetails.configEnvironment.name,
       flag?.allocations ?? [],
@@ -1154,16 +1159,14 @@ export default class EppoClient {
     };
   }
 
-  private getFlag(flagKey: string): Flag | null {
-    return this.isObfuscated(this.getConfiguration())
-      ? this.getObfuscatedFlag(flagKey)
-      : this.flagConfigurationStore.get(flagKey);
+  private getNormalizedFlag(config: IConfiguration, flagKey: string): Flag | null {
+    return this.isObfuscated(config)
+      ? this.getObfuscatedFlag(config, flagKey)
+      : config.getFlag(flagKey);
   }
 
-  private getObfuscatedFlag(flagKey: string): Flag | null {
-    const flag: ObfuscatedFlag | null = this.flagConfigurationStore.get(
-      getMD5Hash(flagKey),
-    ) as ObfuscatedFlag;
+  private getObfuscatedFlag(config: IConfiguration, flagKey: string): Flag | null {
+    const flag: ObfuscatedFlag | null = config.getFlag(getMD5Hash(flagKey)) as ObfuscatedFlag;
     return flag ? decodeFlag(flag) : null;
   }
 
