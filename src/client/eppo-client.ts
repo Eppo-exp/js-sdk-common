@@ -1180,7 +1180,7 @@ export default class EppoClient {
      *
      * Note that it is generally not a good idea to preload all flag configurations.
      */
-    return this.flagConfigurationStore.getKeys();
+    return this.getConfiguration().getFlagKeys();
   }
 
   isInitialized() {
