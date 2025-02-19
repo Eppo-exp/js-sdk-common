@@ -644,13 +644,14 @@ export default class EppoClient {
     actions: BanditActions,
     defaultAction: string,
   ): string {
+    const config = this.getConfiguration();
     let result: string | null = null;
 
     const flagBanditVariations = this.banditVariationConfigurationStore?.get(flagKey);
     const banditKey = flagBanditVariations?.at(0)?.key;
 
     if (banditKey) {
-      const banditParameters = this.getBandit(banditKey);
+      const banditParameters = config.getBandit(banditKey);
       if (banditParameters) {
         const contextualSubjectAttributes = ensureContextualSubjectAttributes(subjectAttributes);
         const actionsWithContextualAttributes = ensureActionsWithContextualAttributes(actions);
@@ -1174,11 +1175,6 @@ export default class EppoClient {
   private getObfuscatedFlag(config: IConfiguration, flagKey: string): Flag | null {
     const flag: ObfuscatedFlag | null = config.getFlag(getMD5Hash(flagKey)) as ObfuscatedFlag;
     return flag ? decodeFlag(flag) : null;
-  }
-
-  private getBandit(banditKey: string): BanditParameters | null {
-    // Upstreams for this SDK do not yet support obfuscating bandits, so no `isObfuscated` check here.
-    return this.banditModelConfigurationStore?.get(banditKey) ?? null;
   }
 
   // noinspection JSUnusedGlobalSymbols
