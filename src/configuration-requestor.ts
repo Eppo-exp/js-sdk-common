@@ -92,7 +92,7 @@ export default class ConfigurationRequestor {
         banditModelPacket,
       )
     ) {
-      // Notify that config updated.
+      // TODO: Notify that config updated.
     }
   }
 
