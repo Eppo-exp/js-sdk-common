@@ -326,7 +326,7 @@ export default class EppoClient {
     );
 
     const pollingCallback = async () => {
-      if (await this.flagConfigurationStore.isExpired()) {
+      if (await configurationRequestor.isFlagConfigExpired()) {
         this.configObfuscatedCache = undefined;
         return configurationRequestor.fetchAndStoreConfigurations();
       }

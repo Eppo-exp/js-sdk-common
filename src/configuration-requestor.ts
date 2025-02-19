@@ -27,6 +27,9 @@ export default class ConfigurationRequestor {
     );
   }
 
+  public isFlagConfigExpired(): Promise<boolean> {
+    return this.flagConfigurationStore.isExpired();
+  }
   public getConfiguration(): IConfiguration {
     return this.configuration;
   }
