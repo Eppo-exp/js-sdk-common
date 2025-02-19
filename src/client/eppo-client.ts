@@ -14,6 +14,7 @@ import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
+import { IConfiguration, StoreBackedConfiguration } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
 import {
@@ -27,7 +28,6 @@ import {
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_INTERVAL_MS,
   DEFAULT_REQUEST_TIMEOUT_MS,
-  OBFUSCATED_FORMATS,
 } from '../constants';
 import { decodeFlag } from '../decoding';
 import { EppoValue } from '../eppo_value';
@@ -47,7 +47,6 @@ import {
   BanditVariation,
   ConfigDetails,
   Flag,
-  FormatEnum,
   IPrecomputedBandit,
   ObfuscatedFlag,
   PrecomputedFlag,
@@ -135,6 +134,7 @@ export default class EppoClient {
   private configObfuscatedCache?: boolean;
   private requestPoller?: IPoller;
   private readonly evaluator = new Evaluator();
+  private configurationRequestor?: ConfigurationRequestor;
 
   constructor({
     eventDispatcher = new NoOpEventDispatcher(),
@@ -164,6 +164,12 @@ export default class EppoClient {
     this.expectObfuscated = isObfuscated;
   }
 
+  private getConfiguration(): IConfiguration {
+    return this.configurationRequestor
+      ? this.configurationRequestor.getConfiguration()
+      : new StoreBackedConfiguration(this.flagConfigurationStore);
+  }
+
   private maybeWarnAboutObfuscationMismatch(configObfuscated: boolean) {
     // Don't warn again if we did on the last check.
     if (configObfuscated !== this.expectObfuscated && !this.obfuscationMismatchWarningIssued) {
@@ -177,11 +183,9 @@ export default class EppoClient {
     }
   }
 
-  private isObfuscated() {
+  private isObfuscated(config: IConfiguration) {
     if (this.configObfuscatedCache === undefined) {
-      this.configObfuscatedCache = OBFUSCATED_FORMATS.includes(
-        this.flagConfigurationStore.getFormat() ?? FormatEnum.SERVER,
-      );
+      this.configObfuscatedCache = config.isObfuscated();
     }
     this.maybeWarnAboutObfuscationMismatch(this.configObfuscatedCache);
     return this.configObfuscatedCache;
@@ -921,6 +925,7 @@ export default class EppoClient {
     subjectKey: string,
     subjectAttributes: Attributes = {},
   ): Record<FlagKey, PrecomputedFlag> {
+    const config = this.getConfiguration();
     const configDetails = this.getConfigDetails();
     const flagKeys = this.getFlagKeys();
     const flags: Record<FlagKey, PrecomputedFlag> = {};
@@ -939,7 +944,7 @@ export default class EppoClient {
         configDetails,
         subjectKey,
         subjectAttributes,
-        this.isObfuscated(),
+        this.isObfuscated(config),
       );
 
       // allocationKey is set along with variation when there is a result. this check appeases typescript below
@@ -1023,6 +1028,7 @@ export default class EppoClient {
   ): FlagEvaluation {
     validateNotBlank(subjectKey, 'Invalid argument: subjectKey cannot be blank');
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
+    const config = this.getConfiguration();
 
     const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(flagKey);
     const overrideVariation = this.overrideStore?.get(flagKey);
@@ -1089,7 +1095,7 @@ export default class EppoClient {
       );
     }
 
-    const isObfuscated = this.isObfuscated();
+    const isObfuscated = this.isObfuscated(config);
     const result = this.evaluator.evaluateFlag(
       flag,
       configDetails,
@@ -1149,7 +1155,7 @@ export default class EppoClient {
   }
 
   private getFlag(flagKey: string): Flag | null {
-    return this.isObfuscated()
+    return this.isObfuscated(this.getConfiguration())
       ? this.getObfuscatedFlag(flagKey)
       : this.flagConfigurationStore.get(flagKey);
   }
@@ -1317,7 +1323,7 @@ export default class EppoClient {
 
   private buildLoggerMetadata(): Record<string, unknown> {
     return {
-      obfuscated: this.isObfuscated(),
+      obfuscated: this.isObfuscated(this.getConfiguration()),
       sdkLanguage: 'javascript',
       sdkLibVersion: LIB_VERSION,
     };
