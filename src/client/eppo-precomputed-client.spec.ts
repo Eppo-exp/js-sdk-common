@@ -12,7 +12,7 @@ import {
   ensureNonContextualSubjectAttributes,
 } from '../attributes';
 import { IPrecomputedConfigurationResponse } from '../configuration';
-import { IConfigurationStore } from '../configuration-store/configuration-store';
+import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { DEFAULT_POLL_INTERVAL_MS, MAX_EVENT_QUEUE_SIZE, POLL_JITTER_PCT } from '../constants';
 import FetchHttpClient from '../http-client';
@@ -20,6 +20,7 @@ import {
   FormatEnum,
   IObfuscatedPrecomputedBandit,
   PrecomputedFlag,
+  Variation,
   VariationType,
 } from '../interfaces';
 import { decodeBase64, encodeBase64, getMD5Hash } from '../obfuscation';
@@ -1025,5 +1026,251 @@ describe('Precomputed Bandit Store', () => {
 
     loggerErrorSpy.mockRestore();
     loggerWarnSpy.mockRestore();
+  });
+});
+
+describe('flag overrides', () => {
+  let client: EppoPrecomputedClient;
+  let mockLogger: IAssignmentLogger;
+  let overrideStore: ISyncStore<Variation>;
+  let flagStorage: IConfigurationStore<PrecomputedFlag>;
+  let subject: Subject;
+
+  const precomputedFlagKey = 'mock-flag';
+  const hashedPrecomputedFlagKey = getMD5Hash(precomputedFlagKey);
+
+  const mockPrecomputedFlag: PrecomputedFlag = {
+    flagKey: hashedPrecomputedFlagKey,
+    variationKey: encodeBase64('a'),
+    variationValue: encodeBase64('variation-a'),
+    allocationKey: encodeBase64('allocation-a'),
+    doLog: true,
+    variationType: VariationType.STRING,
+    extraLogging: {},
+  };
+
+  beforeEach(() => {
+    flagStorage = new MemoryOnlyConfigurationStore();
+    flagStorage.setEntries({ [hashedPrecomputedFlagKey]: mockPrecomputedFlag });
+    mockLogger = td.object<IAssignmentLogger>();
+    overrideStore = new MemoryOnlyConfigurationStore<Variation>();
+    subject = {
+      subjectKey: 'test-subject',
+      subjectAttributes: { attr1: 'value1' },
+    };
+
+    client = new EppoPrecomputedClient({
+      precomputedFlagStore: flagStorage,
+      subject,
+      overrideStore,
+    });
+    client.setAssignmentLogger(mockLogger);
+  });
+
+  it('returns override values for all supported types', () => {
+    overrideStore.setEntries({
+      'string-flag': {
+        key: 'override-variation',
+        value: 'override-string',
+      },
+      'boolean-flag': {
+        key: 'override-variation',
+        value: true,
+      },
+      'numeric-flag': {
+        key: 'override-variation',
+        value: 42.5,
+      },
+      'json-flag': {
+        key: 'override-variation',
+        value: '{"foo": "bar"}',
+      },
+    });
+
+    expect(client.getStringAssignment('string-flag', 'default')).toBe('override-string');
+    expect(client.getBooleanAssignment('boolean-flag', false)).toBe(true);
+    expect(client.getNumericAssignment('numeric-flag', 0)).toBe(42.5);
+    expect(client.getJSONAssignment('json-flag', {})).toEqual({ foo: 'bar' });
+  });
+
+  it('does not log assignments when override is applied', () => {
+    overrideStore.setEntries({
+      [precomputedFlagKey]: {
+        key: 'override-variation',
+        value: 'override-value',
+      },
+    });
+
+    client.getStringAssignment(precomputedFlagKey, 'default');
+
+    expect(td.explain(mockLogger.logAssignment).callCount).toBe(0);
+  });
+
+  it('uses normal assignment when no override exists for flag', () => {
+    // Set override for a different flag
+    overrideStore.setEntries({
+      'other-flag': {
+        key: 'override-variation',
+        value: 'override-value',
+      },
+    });
+
+    const result = client.getStringAssignment(precomputedFlagKey, 'default');
+
+    // Should get the normal assignment value from mockPrecomputedFlag
+    expect(result).toBe('variation-a');
+    expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+  });
+
+  it('uses normal assignment when no overrides store is configured', () => {
+    // Create client without overrides store
+    const clientWithoutOverrides = new EppoPrecomputedClient({
+      precomputedFlagStore: flagStorage,
+      subject,
+    });
+    clientWithoutOverrides.setAssignmentLogger(mockLogger);
+
+    const result = clientWithoutOverrides.getStringAssignment(precomputedFlagKey, 'default');
+
+    // Should get the normal assignment value from mockPrecomputedFlag
+    expect(result).toBe('variation-a');
+    expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+  });
+
+  it('respects override after initial assignment without override', () => {
+    // First call without override
+    const initialAssignment = client.getStringAssignment(precomputedFlagKey, 'default');
+    expect(initialAssignment).toBe('variation-a');
+    expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+
+    // Set override and make second call
+    overrideStore.setEntries({
+      [precomputedFlagKey]: {
+        key: 'override-variation',
+        value: 'override-value',
+      },
+    });
+
+    const overriddenAssignment = client.getStringAssignment(precomputedFlagKey, 'default');
+    expect(overriddenAssignment).toBe('override-value');
+    // No additional logging should occur when using override
+    expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+  });
+
+  it('reverts to normal assignment after removing override', () => {
+    // Set initial override
+    overrideStore.setEntries({
+      [precomputedFlagKey]: {
+        key: 'override-variation',
+        value: 'override-value',
+      },
+    });
+
+    const overriddenAssignment = client.getStringAssignment(precomputedFlagKey, 'default');
+    expect(overriddenAssignment).toBe('override-value');
+    expect(td.explain(mockLogger.logAssignment).callCount).toBe(0);
+
+    // Remove override and make second call
+    overrideStore.setEntries({});
+
+    const normalAssignment = client.getStringAssignment(precomputedFlagKey, 'default');
+    expect(normalAssignment).toBe('variation-a');
+    // Should log the normal assignment
+    expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+  });
+
+  describe('setOverrideStore', () => {
+    it('applies overrides after setting store', () => {
+      // Create client without overrides store
+      const clientWithoutOverrides = new EppoPrecomputedClient({
+        precomputedFlagStore: flagStorage,
+        subject,
+      });
+      clientWithoutOverrides.setAssignmentLogger(mockLogger);
+
+      // Initial call without override store
+      const initialAssignment = clientWithoutOverrides.getStringAssignment(
+        precomputedFlagKey,
+        'default',
+      );
+      expect(initialAssignment).toBe('variation-a');
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+
+      // Set overrides store with override
+      overrideStore.setEntries({
+        [precomputedFlagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+      clientWithoutOverrides.setOverrideStore(overrideStore);
+
+      // Call after setting override store
+      const overriddenAssignment = clientWithoutOverrides.getStringAssignment(
+        precomputedFlagKey,
+        'default',
+      );
+      expect(overriddenAssignment).toBe('override-value');
+      // No additional logging should occur when using override
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+    });
+
+    it('reverts to normal assignment after unsetting store', () => {
+      // Set initial override
+      overrideStore.setEntries({
+        [precomputedFlagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+
+      client.getStringAssignment(precomputedFlagKey, 'default');
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(0);
+
+      // Unset overrides store
+      client.unsetOverrideStore();
+
+      const normalAssignment = client.getStringAssignment(precomputedFlagKey, 'default');
+      expect(normalAssignment).toBe('variation-a');
+      // Should log the normal assignment
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+    });
+
+    it('switches between different override stores', () => {
+      // Create a second override store
+      const secondOverrideStore = new MemoryOnlyConfigurationStore<Variation>();
+
+      // Set up different overrides in each store
+      overrideStore.setEntries({
+        [precomputedFlagKey]: {
+          key: 'override-1',
+          value: 'value-1',
+        },
+      });
+
+      secondOverrideStore.setEntries({
+        [precomputedFlagKey]: {
+          key: 'override-2',
+          value: 'value-2',
+        },
+      });
+
+      // Start with first override store
+      const firstOverride = client.getStringAssignment(precomputedFlagKey, 'default');
+      expect(firstOverride).toBe('value-1');
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(0);
+
+      // Switch to second override store
+      client.setOverrideStore(secondOverrideStore);
+      const secondOverride = client.getStringAssignment(precomputedFlagKey, 'default');
+      expect(secondOverride).toBe('value-2');
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(0);
+
+      // Switch back to first override store
+      client.setOverrideStore(overrideStore);
+      const backToFirst = client.getStringAssignment(precomputedFlagKey, 'default');
+      expect(backToFirst).toBe('value-1');
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(0);
+    });
   });
 });
