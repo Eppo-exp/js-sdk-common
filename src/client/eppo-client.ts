@@ -646,7 +646,7 @@ export default class EppoClient {
     const config = this.getConfiguration();
     let result: string | null = null;
 
-    const flagBanditVariations = this.banditVariationConfigurationStore?.get(flagKey);
+    const flagBanditVariations = config.getFlagBanditVariations(flagKey);
     const banditKey = flagBanditVariations?.at(0)?.key;
 
     if (banditKey) {
