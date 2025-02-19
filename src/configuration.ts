@@ -10,17 +10,18 @@ import {
   ObfuscatedFlag,
   PrecomputedFlag,
 } from './interfaces';
+import { BanditKey, FlagKey, HashedFlagKey } from './types';
 
 export interface IConfiguration {
-  getFlag(key: string): Flag | ObfuscatedFlag | null;
-  getFlags(): Record<string, Flag | ObfuscatedFlag>;
-  getBandits(): Record<string, BanditParameters>;
-  getBanditVariations(): Record<string, BanditVariation[]>;
-  getFlagBanditVariations(flagKey: string): BanditVariation[];
-  getFlagVariationBandit(flagKey: string, variationValue: string): BanditParameters | null;
-  getBandit(key: string): BanditParameters | null;
+  getFlag(key: FlagKey | HashedFlagKey): Flag | ObfuscatedFlag | null;
+  getFlags(): Record<FlagKey | HashedFlagKey, Flag | ObfuscatedFlag>;
+  getBandits(): Record<BanditKey, BanditParameters>;
+  getBanditVariations(): Record<FlagKey | HashedFlagKey, BanditVariation[]>;
+  getFlagBanditVariations(flagKey: FlagKey | HashedFlagKey): BanditVariation[];
+  getFlagVariationBandit(flagKey: FlagKey | HashedFlagKey, variationValue: string): BanditParameters | null;
+  getBandit(key: BanditKey): BanditParameters | null;
   getFlagConfigDetails(): ConfigDetails;
-  getFlagKeys(): string[];
+  getFlagKeys(): FlagKey[] | HashedFlagKey[];
   isObfuscated(): boolean;
   isInitialized(): boolean;
 }
@@ -168,7 +169,3 @@ export class StoreBackedConfiguration implements IConfiguration {
     return this.banditVariationConfigurationStore?.entries() ?? {};
   }
 }
-
-// export class ReadOnlyConfiguration implements IConfiguration {
-//   public static from(other: IConfiguration): ReadOnlyConfiguration {}
-// }
