@@ -167,7 +167,11 @@ export default class EppoClient {
   private getConfiguration(): IConfiguration {
     return this.configurationRequestor
       ? this.configurationRequestor.getConfiguration()
-      : new StoreBackedConfiguration(this.flagConfigurationStore);
+      : new StoreBackedConfiguration(
+          this.flagConfigurationStore,
+          this.banditVariationConfigurationStore,
+          this.banditModelConfigurationStore,
+        );
   }
 
   private maybeWarnAboutObfuscationMismatch(configObfuscated: boolean) {
