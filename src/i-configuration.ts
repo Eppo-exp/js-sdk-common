@@ -1,4 +1,5 @@
 import { IConfigurationStore } from './configuration-store/configuration-store';
+import { Entry, hydrateConfigurationStore } from './configuration-store/configuration-store-utils';
 import { OBFUSCATED_FORMATS } from './constants';
 import {
   BanditParameters,
@@ -6,9 +7,7 @@ import {
   ConfigDetails,
   Environment,
   Flag,
-  IObfuscatedPrecomputedBandit,
   ObfuscatedFlag,
-  PrecomputedFlag,
 } from './interfaces';
 import { BanditKey, FlagKey, HashedFlagKey } from './types';
 
@@ -28,13 +27,6 @@ export interface IConfiguration {
   isObfuscated(): boolean;
   isInitialized(): boolean;
 }
-
-type Entry =
-  | Flag
-  | BanditVariation[]
-  | BanditParameters
-  | PrecomputedFlag
-  | IObfuscatedPrecomputedBandit;
 
 export type ConfigStoreHydrationPacket<T extends Entry> = {
   entries: Record<string, T>;
@@ -58,53 +50,20 @@ export class StoreBackedConfiguration implements IConfiguration {
     banditVariationConfig?: ConfigStoreHydrationPacket<BanditVariation[]>,
     banditModelConfig?: ConfigStoreHydrationPacket<BanditParameters>,
   ) {
-    const didUpdateFlags = await StoreBackedConfiguration.hydrateConfigurationStore(
-      this.flagConfigurationStore,
-      flagConfig,
-    );
+    const didUpdateFlags = await hydrateConfigurationStore(this.flagConfigurationStore, flagConfig);
     const promises: Promise<boolean>[] = [];
     if (this.banditVariationConfigurationStore && banditVariationConfig) {
       promises.push(
-        StoreBackedConfiguration.hydrateConfigurationStore(
-          this.banditVariationConfigurationStore,
-          banditVariationConfig,
-        ),
+        hydrateConfigurationStore(this.banditVariationConfigurationStore, banditVariationConfig),
       );
     }
     if (this.banditModelConfigurationStore && banditModelConfig) {
       promises.push(
-        StoreBackedConfiguration.hydrateConfigurationStore(
-          this.banditModelConfigurationStore,
-          banditModelConfig,
-        ),
+        hydrateConfigurationStore(this.banditModelConfigurationStore, banditModelConfig),
       );
     }
     await Promise.all(promises);
     return didUpdateFlags;
-  }
-
-  private static async hydrateConfigurationStore<T extends Entry>(
-    configurationStore: IConfigurationStore<T> | null,
-    response: {
-      entries: Record<string, T>;
-      environment: Environment;
-      createdAt: string;
-      format: string;
-      salt?: string;
-    },
-  ): Promise<boolean> {
-    if (configurationStore) {
-      const didUpdate = await configurationStore.setEntries(response.entries);
-      if (didUpdate) {
-        configurationStore.setEnvironment(response.environment);
-        configurationStore.setConfigFetchedAt(new Date().toISOString());
-        configurationStore.setConfigPublishedAt(response.createdAt);
-        configurationStore.setFormat(response.format);
-        configurationStore.salt = response.salt;
-      }
-      return didUpdate;
-    }
-    return false;
   }
 
   getBandit(key: string): BanditParameters | null {

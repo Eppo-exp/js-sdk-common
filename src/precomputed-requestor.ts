@@ -30,7 +30,7 @@ export default class PrecomputedFlagRequestor {
       return;
     }
 
-    const promises: Promise<void>[] = [];
+    const promises: Promise<boolean>[] = [];
     promises.push(
       hydrateConfigurationStore(this.precomputedFlagStore, {
         entries: precomputedResponse.flags,
@@ -51,5 +51,6 @@ export default class PrecomputedFlagRequestor {
         }),
       );
     }
+    await Promise.all(promises);
   }
 }
