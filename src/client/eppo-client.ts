@@ -271,18 +271,6 @@ export default class EppoClient {
     );
   }
 
-  /**
-   * Attempts to fetch Eppo configuration and start polling, depending on the `FlagConfigurationRequestParameters`
-   * provided.
-   * @return a promise that resolves when the poller has completed the first fetch and/or begun to periodically poll.
-   */
-  async startPolling() {
-    return this.fetchFlagConfigurations();
-  }
-
-  /**
-   * @deprecated use startPolling instead.
-   */
   async fetchFlagConfigurations() {
     if (!this.configurationRequestParameters) {
       throw new Error(
