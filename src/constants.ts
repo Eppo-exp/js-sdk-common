@@ -17,4 +17,11 @@ export const NULL_SENTINEL = 'EPPO_NULL';
 export const MAX_EVENT_QUEUE_SIZE = 100;
 export const BANDIT_ASSIGNMENT_SHARDS = 10000;
 export const DEFAULT_TLRU_TTL_MS = 600_000;
+
+/**
+ * UFC Configuration formats which are obfuscated.
+ *
+ * We use string[] instead of FormatEnum[] to allow easy interaction with this value in its wire type (string).
+ * Converting from string to enum requires a map lookup or array iteration and is much more awkward than the inverse.
+ */
 export const OBFUSCATED_FORMATS: string[] = [FormatEnum.CLIENT, FormatEnum.PRECOMPUTED];

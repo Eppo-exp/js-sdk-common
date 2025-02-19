@@ -4,16 +4,17 @@ import * as td from 'testdouble';
 
 import {
   ASSIGNMENT_TEST_DATA_DIR,
+  getTestAssignments,
   IAssignmentTestCase,
   MOCK_UFC_RESPONSE_FILE,
   OBFUSCATED_MOCK_UFC_RESPONSE_FILE,
-  SubjectTestCase,
-  getTestAssignments,
   readMockUFCResponse,
+  SubjectTestCase,
   testCasesByFileName,
   validateTestAssignments,
 } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
+import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
@@ -23,11 +24,11 @@ import {
 } from '../configuration-wire-types';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
-import { Flag, ObfuscatedFlag, VariationType } from '../interfaces';
+import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import { AttributeType } from '../types';
 
-import EppoClient, { FlagConfigurationRequestParameters, checkTypeMatch } from './eppo-client';
+import EppoClient, { checkTypeMatch, FlagConfigurationRequestParameters } from './eppo-client';
 import { initConfiguration } from './test-utils';
 
 // Use a known salt to produce deterministic hashes
@@ -44,6 +45,18 @@ describe('EppoClient E2E test', () => {
     });
   }) as jest.Mock;
   const storage = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
+
+  /**
+   * Use this helper instead of directly setting entries on the `storage` ConfigurationStore.
+   * This method ensures the format field is set as it is required for parsing.
+   * @param entries
+   */
+  function setUnobfuscatedFlagEntries(
+    entries: Record<string, Flag | ObfuscatedFlag>,
+  ): Promise<boolean> {
+    storage.setFormat(FormatEnum.SERVER);
+    return storage.setEntries(entries);
+  }
 
   beforeAll(async () => {
     await initConfiguration(storage);
@@ -87,8 +100,8 @@ describe('EppoClient E2E test', () => {
   describe('error encountered', () => {
     let client: EppoClient;
 
-    beforeAll(() => {
-      storage.setEntries({ [flagKey]: mockFlag });
+    beforeAll(async () => {
+      await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
       client = new EppoClient({ flagConfigurationStore: storage });
 
       td.replace(EppoClient.prototype, 'getAssignmentDetail', function () {
@@ -143,8 +156,8 @@ describe('EppoClient E2E test', () => {
   });
 
   describe('setLogger', () => {
-    beforeAll(() => {
-      storage.setEntries({ [flagKey]: mockFlag });
+    beforeAll(async () => {
+      await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
     });
 
     it('Invokes logger for queued events', () => {
@@ -191,8 +204,8 @@ describe('EppoClient E2E test', () => {
   });
 
   describe('precomputed flags', () => {
-    beforeAll(() => {
-      storage.setEntries({
+    beforeAll(async () => {
+      await setUnobfuscatedFlagEntries({
         [flagKey]: mockFlag,
         disabledFlag: { ...mockFlag, enabled: false },
         anotherFlag: {
@@ -424,10 +437,10 @@ describe('EppoClient E2E test', () => {
     );
   });
 
-  it('logs variation assignment and experiment key', () => {
+  it('logs variation assignment and experiment key', async () => {
     const mockLogger = td.object<IAssignmentLogger>();
 
-    storage.setEntries({ [flagKey]: mockFlag });
+    await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
     const client = new EppoClient({ flagConfigurationStore: storage });
     client.setAssignmentLogger(mockLogger);
 
@@ -449,11 +462,11 @@ describe('EppoClient E2E test', () => {
     expect(loggedAssignmentEvent.allocation).toEqual(mockFlag.allocations[0].key);
   });
 
-  it('handles logging exception', () => {
+  it('handles logging exception', async () => {
     const mockLogger = td.object<IAssignmentLogger>();
     td.when(mockLogger.logAssignment(td.matchers.anything())).thenThrow(new Error('logging error'));
 
-    storage.setEntries({ [flagKey]: mockFlag });
+    await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
     const client = new EppoClient({ flagConfigurationStore: storage });
     client.setAssignmentLogger(mockLogger);
 
@@ -468,8 +481,8 @@ describe('EppoClient E2E test', () => {
     expect(assignment).toEqual('variation-a');
   });
 
-  it('exports flag configuration', () => {
-    storage.setEntries({ [flagKey]: mockFlag });
+  it('exports flag configuration', async () => {
+    await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
     const client = new EppoClient({ flagConfigurationStore: storage });
     expect(client.getFlagConfigurations()).toEqual({ [flagKey]: mockFlag });
   });
@@ -478,10 +491,10 @@ describe('EppoClient E2E test', () => {
     let client: EppoClient;
     let mockLogger: IAssignmentLogger;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       mockLogger = td.object<IAssignmentLogger>();
 
-      storage.setEntries({ [flagKey]: mockFlag });
+      await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
       client = new EppoClient({ flagConfigurationStore: storage });
       client.setAssignmentLogger(mockLogger);
     });
@@ -536,7 +549,7 @@ describe('EppoClient E2E test', () => {
     });
 
     it('logs for each unique flag', async () => {
-      await storage.setEntries({
+      await setUnobfuscatedFlagEntries({
         [flagKey]: mockFlag,
         'flag-2': {
           ...mockFlag,
@@ -563,10 +576,10 @@ describe('EppoClient E2E test', () => {
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(3);
     });
 
-    it('logs twice for the same flag when allocations change', () => {
+    it('logs twice for the same flag when allocations change', async () => {
       client.useNonExpiringInMemoryAssignmentCache();
 
-      storage.setEntries({
+      await setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
 
@@ -587,7 +600,7 @@ describe('EppoClient E2E test', () => {
       });
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
 
-      storage.setEntries({
+      await setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
           allocations: [
@@ -609,17 +622,17 @@ describe('EppoClient E2E test', () => {
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(2);
     });
 
-    it('logs the same subject/flag/variation after two changes', () => {
+    it('logs the same subject/flag/variation after two changes', async () => {
       client.useNonExpiringInMemoryAssignmentCache();
 
       // original configuration version
-      storage.setEntries({ [flagKey]: mockFlag });
+      await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
 
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // log this assignment
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
 
       // change the variation
-      storage.setEntries({
+      await setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
           allocations: [
@@ -642,13 +655,13 @@ describe('EppoClient E2E test', () => {
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
 
       // change the flag again, back to the original
-      storage.setEntries({ [flagKey]: mockFlag });
+      await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
 
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // important: log this assignment
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
 
       // change the allocation
-      storage.setEntries({
+      await setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
           allocations: [
@@ -943,6 +956,227 @@ describe('EppoClient E2E test', () => {
       expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(
         pollAfterFailedInitialization ? pi : 0.0,
       );
+    });
+  });
+
+  describe('flag overrides', () => {
+    let client: EppoClient;
+    let mockLogger: IAssignmentLogger;
+    let overrideStore: IConfigurationStore<Variation>;
+
+    beforeEach(() => {
+      storage.setEntries({ [flagKey]: mockFlag });
+      mockLogger = td.object<IAssignmentLogger>();
+      overrideStore = new MemoryOnlyConfigurationStore<Variation>();
+      client = new EppoClient({
+        flagConfigurationStore: storage,
+        overrideStore: overrideStore,
+      });
+      client.setAssignmentLogger(mockLogger);
+      client.useNonExpiringInMemoryAssignmentCache();
+    });
+
+    it('returns override values for all supported types', () => {
+      overrideStore.setEntries({
+        'string-flag': {
+          key: 'override-variation',
+          value: 'override-string',
+        },
+        'boolean-flag': {
+          key: 'override-variation',
+          value: true,
+        },
+        'numeric-flag': {
+          key: 'override-variation',
+          value: 42.5,
+        },
+        'json-flag': {
+          key: 'override-variation',
+          value: '{"foo": "bar"}',
+        },
+      });
+
+      expect(client.getStringAssignment('string-flag', 'subject-10', {}, 'default')).toBe(
+        'override-string',
+      );
+      expect(client.getBooleanAssignment('boolean-flag', 'subject-10', {}, false)).toBe(true);
+      expect(client.getNumericAssignment('numeric-flag', 'subject-10', {}, 0)).toBe(42.5);
+      expect(client.getJSONAssignment('json-flag', 'subject-10', {}, {})).toEqual({ foo: 'bar' });
+    });
+
+    it('does not log assignments when override is applied', () => {
+      overrideStore.setEntries({
+        [flagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+
+      client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(0);
+    });
+
+    it('includes override details in assignment details', () => {
+      overrideStore.setEntries({
+        [flagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+
+      const result = client.getStringAssignmentDetails(
+        flagKey,
+        'subject-10',
+        { foo: 3 },
+        'default',
+      );
+
+      expect(result).toMatchObject({
+        variation: 'override-value',
+        evaluationDetails: {
+          flagEvaluationCode: 'MATCH',
+          flagEvaluationDescription: 'Flag override applied',
+        },
+      });
+    });
+
+    it('does not update assignment cache when override is applied', () => {
+      const mockAssignmentCache = td.object<AssignmentCache>();
+      td.when(mockAssignmentCache.has(td.matchers.anything())).thenReturn(false);
+      td.when(mockAssignmentCache.set(td.matchers.anything())).thenReturn();
+      client.useCustomAssignmentCache(mockAssignmentCache);
+
+      overrideStore.setEntries({
+        [flagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+
+      // First call with override
+      client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+
+      // Verify cache was not used at all
+      expect(td.explain(mockAssignmentCache.set).callCount).toBe(0);
+
+      // Remove override
+      overrideStore.setEntries({});
+
+      // Second call without override
+      client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+
+      // Now cache should be used
+      expect(td.explain(mockAssignmentCache.set).callCount).toBe(1);
+    });
+
+    it('uses normal assignment when no override exists for flag', () => {
+      // Set override for a different flag
+      overrideStore.setEntries({
+        'other-flag': {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+
+      const result = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+
+      // Should get the normal assignment value from mockFlag
+      expect(result).toBe(variationA.value);
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+    });
+
+    it('uses normal assignment when no overrides store is configured', () => {
+      // Create client without overrides store
+      const clientWithoutOverrides = new EppoClient({
+        flagConfigurationStore: storage,
+      });
+      clientWithoutOverrides.setAssignmentLogger(mockLogger);
+
+      const result = clientWithoutOverrides.getStringAssignment(
+        flagKey,
+        'subject-10',
+        {},
+        'default',
+      );
+
+      // Should get the normal assignment value from mockFlag
+      expect(result).toBe(variationA.value);
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+    });
+
+    it('respects override after initial assignment without override', () => {
+      // First call without override
+      const initialAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+      expect(initialAssignment).toBe(variationA.value);
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+
+      // Set override and make second call
+      overrideStore.setEntries({
+        [flagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+
+      const overriddenAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+      expect(overriddenAssignment).toBe('override-value');
+      // No additional logging should occur when using override
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+    });
+
+    it('reverts to normal assignment after removing override', () => {
+      // Set initial override
+      overrideStore.setEntries({
+        [flagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+
+      const overriddenAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+      expect(overriddenAssignment).toBe('override-value');
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(0);
+
+      // Remove override and make second call
+      overrideStore.setEntries({});
+
+      const normalAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+      expect(normalAssignment).toBe(variationA.value);
+      // Should log the normal assignment
+      expect(td.explain(mockLogger.logAssignment).callCount).toBe(1);
+    });
+
+    it('reverts to normal assignment after unsetting overrides store', () => {
+      overrideStore.setEntries({
+        [flagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+      });
+
+      client.unsetOverrideStore();
+
+      const normalAssignment = client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+      expect(normalAssignment).toBe(variationA.value);
+    });
+
+    it('returns a mapping of flag key to variation key for all active overrides', () => {
+      overrideStore.setEntries({
+        [flagKey]: {
+          key: 'override-variation',
+          value: 'override-value',
+        },
+        'other-flag': {
+          key: 'other-variation',
+          value: 'other-value',
+        },
+      });
+
+      expect(client.getOverrideVariationKeys()).toEqual({
+        [flagKey]: 'override-variation',
+        'other-flag': 'other-variation',
+      });
     });
   });
 });
