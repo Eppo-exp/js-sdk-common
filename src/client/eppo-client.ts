@@ -47,7 +47,7 @@ import {
   BanditVariation,
   ConfigDetails,
   Flag,
-  getFormatFromString,
+  FormatEnum,
   IPrecomputedBandit,
   ObfuscatedFlag,
   PrecomputedFlag,
@@ -180,7 +180,7 @@ export default class EppoClient {
   private isObfuscated() {
     if (this.configObfuscatedCache === undefined) {
       this.configObfuscatedCache = OBFUSCATED_FORMATS.includes(
-        getFormatFromString(this.flagConfigurationStore.getFormat()),
+        this.flagConfigurationStore.getFormat() ?? FormatEnum.SERVER,
       );
     }
     this.maybeWarnAboutObfuscationMismatch(this.configObfuscatedCache);

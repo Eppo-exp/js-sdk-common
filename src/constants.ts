@@ -21,4 +21,4 @@ export const DEFAULT_TLRU_TTL_MS = 600_000;
 /**
  * UFC Configuration formats which are obfuscated.
  */
-export const OBFUSCATED_FORMATS = [FormatEnum.CLIENT, FormatEnum.PRECOMPUTED];
+export const OBFUSCATED_FORMATS: string[] = [FormatEnum.CLIENT, FormatEnum.PRECOMPUTED];

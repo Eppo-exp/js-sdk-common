@@ -149,11 +149,6 @@ export enum FormatEnum {
   PRECOMPUTED = 'PRECOMPUTED',
 }
 
-export function getFormatFromString(str: string | null): FormatEnum {
-  // default to SERVER. Should always be set, but the ConfigurationStore allows null.
-  return FormatEnum[str as keyof typeof FormatEnum] ?? FormatEnum.SERVER;
-}
-
 export type BasePrecomputedFlag = {
   flagKey?: string;
   allocationKey?: string;
