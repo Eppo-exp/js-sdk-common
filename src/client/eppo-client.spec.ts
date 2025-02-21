@@ -15,14 +15,14 @@ import {
 } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
+import { IConfigurationStore } from '../configuration-store/configuration-store';
+import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   ObfuscatedPrecomputedConfigurationResponse,
-} from '../configuration';
-import { IConfigurationStore } from '../configuration-store/configuration-store';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
-import { DEFAULT_POLL_INTERVAL_MS, MAX_EVENT_QUEUE_SIZE, POLL_JITTER_PCT } from '../constants';
+} from '../configuration-wire-types';
+import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';

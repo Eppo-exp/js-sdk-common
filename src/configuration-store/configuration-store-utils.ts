@@ -9,7 +9,7 @@ import {
 
 import { IConfigurationStore } from './configuration-store';
 
-type Entry =
+export type Entry =
   | Flag
   | BanditVariation[]
   | BanditParameters
@@ -25,7 +25,7 @@ export async function hydrateConfigurationStore<T extends Entry>(
     format: string;
     salt?: string;
   },
-): Promise<void> {
+): Promise<boolean> {
   if (configurationStore) {
     const didUpdate = await configurationStore.setEntries(response.entries);
     if (didUpdate) {
@@ -35,5 +35,7 @@ export async function hydrateConfigurationStore<T extends Entry>(
       configurationStore.setFormat(response.format);
       configurationStore.salt = response.salt;
     }
+    return didUpdate;
   }
+  return false;
 }
