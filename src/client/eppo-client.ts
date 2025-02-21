@@ -186,6 +186,11 @@ export default class EppoClient {
     }
   }
 
+  /**
+   * This method delegates to the configuration to determine whether  it is obfuscated, then caches the actual
+   * obfuscation state and issues a warning if it hasn't already.
+   * This method can be removed with the next major update when the @deprecated setIsObfuscated is removed
+   */
   private isObfuscated(config: IConfiguration) {
     if (this.configObfuscatedCache === undefined) {
       this.configObfuscatedCache = config.isObfuscated();
