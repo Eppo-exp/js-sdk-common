@@ -213,7 +213,8 @@ export default class EppoClient {
       return undefined;
     }
     const payload: OverridePayload = this.overrideValidator.parseOverridePayload(overridePayload);
-    await this.overrideValidator.validateKey(payload.browserExtensionKey);
+    const baseUrl = this.configurationRequestParameters?.baseUrl;
+    await this.overrideValidator.validateKey(payload.browserExtensionKey, baseUrl);
     return payload.overrides;
   }
 
@@ -222,7 +223,7 @@ export default class EppoClient {
    * to it without affecting the original EppoClient singleton. Useful for
    * applying overrides in a shared Node instance, such as a web server.
    */
-  withOverrides(overrides: Record<FlagKey, Variation>): EppoClient {
+  withOverrides(overrides: Record<FlagKey, Variation> | undefined): EppoClient {
     if (overrides && Object.keys(overrides).length) {
       const copy = shallowClone(this);
       copy.overrideStore = new MemoryOnlyConfigurationStore<Variation>();
