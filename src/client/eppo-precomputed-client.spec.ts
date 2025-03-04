@@ -137,7 +137,7 @@ describe('EppoPrecomputedClient E2E test', () => {
       );
     });
 
-    it('logs error when initialized with store without salt', () => {
+    it('logs errors when constructor receives an uninitialized store without a salt', () => {
       const nonemptyStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
       // Incorrectly initialized: no salt, not set to initialized
       jest.spyOn(nonemptyStore, 'getKeys').mockReturnValue(['some-key']);
@@ -153,6 +153,27 @@ describe('EppoPrecomputedClient E2E test', () => {
         '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
       );
       expect(mockError).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+      );
+    });
+
+    it('only logs initialization error when constructor receives an uninitialized store with salt', () => {
+      const nonemptyStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+      nonemptyStore.salt = 'nacl';
+      // Incorrectly initialized: no salt, not set to initialized
+      jest.spyOn(nonemptyStore, 'getKeys').mockReturnValue(['some-key']);
+
+      new EppoPrecomputedClient({
+        precomputedFlagStore: nonemptyStore,
+        subject: {
+          subjectKey: '',
+          subjectAttributes: {},
+        },
+      });
+      expect(mockError).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+      );
+      expect(mockError).not.toHaveBeenCalledWith(
         '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
       );
     });
