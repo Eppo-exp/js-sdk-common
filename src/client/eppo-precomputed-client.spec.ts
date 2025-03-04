@@ -31,7 +31,6 @@ import EppoPrecomputedClient, {
   Subject,
 } from './eppo-precomputed-client';
 
-
 describe('EppoPrecomputedClient E2E test', () => {
   const precomputedConfigurationWire = readMockConfigurationWireResponse(
     MOCK_PRECOMPUTED_WIRE_FILE,
@@ -767,7 +766,6 @@ describe('EppoPrecomputedClient E2E test', () => {
 
     expect(loggedEvent.format).toEqual(FormatEnum.PRECOMPUTED);
   });
-
 
   describe('Constructor logs errors according to the store state', () => {
     let mockError: jest.SpyInstance;

@@ -123,7 +123,6 @@ export default class EppoPrecomputedClient {
         );
       }
 
-
       if (this.precomputedBanditStore && !this.precomputedBanditStore.salt) {
         logger.warn(
           `${loggerPrefix} EppoPrecomputedClient missing or empty salt for precomputedBanditStore`,
