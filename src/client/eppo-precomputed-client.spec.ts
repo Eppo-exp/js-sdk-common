@@ -112,73 +112,6 @@ describe('EppoPrecomputedClient E2E test', () => {
     });
   });
 
-  describe('store initialization logged errors', () => {
-    let mockError: jest.SpyInstance;
-
-    beforeEach(() => {
-      mockError = jest.spyOn(applicationLogger, 'error');
-    });
-
-    afterEach(() => {
-      mockError.mockRestore();
-    });
-
-    it('logs error when initialized with store without salt', () => {
-      const emptyStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
-      new EppoPrecomputedClient({
-        precomputedFlagStore: emptyStore,
-        subject: {
-          subjectKey: '',
-          subjectAttributes: {},
-        },
-      });
-      expect(mockError).not.toHaveBeenCalledWith(
-        'EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
-      );
-    });
-
-    it('logs errors when constructor receives an uninitialized store without a salt', () => {
-      const nonemptyStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
-      // Incorrectly initialized: no salt, not set to initialized
-      jest.spyOn(nonemptyStore, 'getKeys').mockReturnValue(['some-key']);
-
-      new EppoPrecomputedClient({
-        precomputedFlagStore: nonemptyStore,
-        subject: {
-          subjectKey: '',
-          subjectAttributes: {},
-        },
-      });
-      expect(mockError).toHaveBeenCalledWith(
-        '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
-      );
-      expect(mockError).toHaveBeenCalledWith(
-        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
-      );
-    });
-
-    it('only logs initialization error when constructor receives an uninitialized store with salt', () => {
-      const nonemptyStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
-      nonemptyStore.salt = 'nacl';
-      // Incorrectly initialized: no salt, not set to initialized
-      jest.spyOn(nonemptyStore, 'getKeys').mockReturnValue(['some-key']);
-
-      new EppoPrecomputedClient({
-        precomputedFlagStore: nonemptyStore,
-        subject: {
-          subjectKey: '',
-          subjectAttributes: {},
-        },
-      });
-      expect(mockError).toHaveBeenCalledWith(
-        '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
-      );
-      expect(mockError).not.toHaveBeenCalledWith(
-        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
-      );
-    });
-  });
-
   describe('setLogger', () => {
     let flagStorage: IConfigurationStore<PrecomputedFlag>;
     let subject: Subject;
@@ -835,6 +768,77 @@ describe('EppoPrecomputedClient E2E test', () => {
     expect(loggedEvent.format).toEqual(FormatEnum.PRECOMPUTED);
   });
 
+
+  describe('Constructor logs errors according to the store state', () => {
+    let mockError: jest.SpyInstance;
+
+    beforeEach(() => {
+      mockError = jest.spyOn(applicationLogger, 'error');
+    });
+
+    afterEach(() => {
+      mockError.mockRestore();
+    });
+
+    it('does not log errors when constructor receives an empty, uninitialized store', () => {
+      const emptyStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+      new EppoPrecomputedClient({
+        precomputedFlagStore: emptyStore,
+        subject: {
+          subjectKey: '',
+          subjectAttributes: {},
+        },
+      });
+      expect(mockError).not.toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+      );
+      expect(mockError).not.toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+      );
+    });
+
+    it('logs errors when constructor receives an uninitialized store without a salt', () => {
+      const nonemptyStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+      // Incorrectly initialized: no salt, not set to initialized
+      jest.spyOn(nonemptyStore, 'getKeys').mockReturnValue(['some-key']);
+
+      new EppoPrecomputedClient({
+        precomputedFlagStore: nonemptyStore,
+        subject: {
+          subjectKey: '',
+          subjectAttributes: {},
+        },
+      });
+      expect(mockError).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+      );
+      expect(mockError).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+      );
+    });
+
+    it('only logs initialization error when constructor receives an uninitialized store with salt', () => {
+      const nonemptyStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+      nonemptyStore.salt = 'nacl';
+      // Incorrectly initialized: no salt, not set to initialized
+      jest.spyOn(nonemptyStore, 'getKeys').mockReturnValue(['some-key']);
+
+      new EppoPrecomputedClient({
+        precomputedFlagStore: nonemptyStore,
+        subject: {
+          subjectKey: '',
+          subjectAttributes: {},
+        },
+      });
+      expect(mockError).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+      );
+      expect(mockError).not.toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+      );
+    });
+  });
+
   describe('EppoPrecomputedClient subject data and store initialization', () => {
     let client: EppoPrecomputedClient;
     let store: IConfigurationStore<PrecomputedFlag>;
@@ -853,13 +857,7 @@ describe('EppoPrecomputedClient E2E test', () => {
           subject,
         });
       }).not.toThrow();
-      expect(loggerErrorSpy).toHaveBeenCalledTimes(2);
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
-      );
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
-      );
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(0);
       loggerErrorSpy.mockRestore();
       expect(client.getStringAssignment('string-flag', 'default')).toBe('default');
     });
@@ -953,12 +951,6 @@ describe('Precomputed Bandit Store', () => {
       subject,
     });
 
-    expect(loggerErrorSpy).toHaveBeenCalledWith(
-      '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
-    );
-    expect(loggerErrorSpy).toHaveBeenCalledWith(
-      '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
-    );
     expect(loggerErrorSpy).toHaveBeenCalledWith(
       '[Eppo SDK] Passing banditOptions without requestParameters requires an initialized precomputedBanditStore',
     );
