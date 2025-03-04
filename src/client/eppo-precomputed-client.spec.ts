@@ -30,6 +30,7 @@ import EppoPrecomputedClient, {
   PrecomputedFlagsRequestParameters,
   Subject,
 } from './eppo-precomputed-client';
+import { applicationLogger } from '..';
 
 describe('EppoPrecomputedClient E2E test', () => {
   const precomputedConfigurationWire = readMockConfigurationWireResponse(
@@ -52,6 +53,7 @@ describe('EppoPrecomputedClient E2E test', () => {
     subjectKey: 'test-subject',
     subjectAttributes: { attr1: 'value1' },
   };
+
   beforeEach(async () => {
     storage = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
     storage.setFormat(FormatEnum.PRECOMPUTED);
@@ -107,6 +109,52 @@ describe('EppoPrecomputedClient E2E test', () => {
 
     it('returns default value when flag not found', () => {
       expect(client.getStringAssignment('non-existent-flag', 'default')).toBe('default');
+    });
+  });
+
+  describe('store initialization logged errors', () => {
+    let mockError: jest.SpyInstance;
+
+    beforeEach(() => {
+      mockError = jest.spyOn(applicationLogger, 'error');
+    });
+
+    afterEach(() => {
+      mockError.mockRestore();
+    });
+
+    it('logs error when initialized with store without salt', () => {
+      const emptyStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+      new EppoPrecomputedClient({
+        precomputedFlagStore: emptyStore,
+        subject: {
+          subjectKey: '',
+          subjectAttributes: {},
+        },
+      });
+      expect(mockError).not.toHaveBeenCalledWith(
+        'EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+      );
+    });
+
+    it('logs error when initialized with store without salt', () => {
+      const nonemptyStore = new MemoryOnlyConfigurationStore<PrecomputedFlag>();
+      // Incorrectly initialized: no salt, not set to initialized
+      jest.spyOn(nonemptyStore, 'getKeys').mockReturnValue(['some-key']);
+
+      new EppoPrecomputedClient({
+        precomputedFlagStore: nonemptyStore,
+        subject: {
+          subjectKey: '',
+          subjectAttributes: {},
+        },
+      });
+      expect(mockError).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided',
+      );
+      expect(mockError).toHaveBeenCalledWith(
+        '[Eppo SDK] EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided',
+      );
     });
   });
 

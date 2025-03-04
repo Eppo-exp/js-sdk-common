@@ -100,13 +100,21 @@ export default class EppoPrecomputedClient {
       // Online-mode
       this.requestParameters = options.requestParameters;
     } else {
-      // Offline-mode
+      // Offline-mode -- depends on pre-populated IConfigurationStores (flags and bandits) to source configuration.
 
-      // Offline mode depends on pre-populated IConfigurationStores (flags and bandits) to source configuration.
-      if (!this.precomputedFlagStore.isInitialized()) {
-        logger.error(
-          `${loggerPrefix} EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided`,
-        );
+      // Allow an empty precomputedFlagStore to be passed in, but if it has items, ensure it was initialized properly.
+      if (this.precomputedFlagStore.getKeys().length > 0) {
+        if (!this.precomputedFlagStore.isInitialized()) {
+          logger.error(
+            `${loggerPrefix} EppoPrecomputedClient requires an initialized precomputedFlagStore if requestParameters are not provided`,
+          );
+        }
+
+        if (!this.precomputedFlagStore.salt) {
+          logger.error(
+            `${loggerPrefix} EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided`,
+          );
+        }
       }
 
       if (this.precomputedBanditStore && !this.precomputedBanditStore.isInitialized()) {
@@ -115,11 +123,6 @@ export default class EppoPrecomputedClient {
         );
       }
 
-      if (!this.precomputedFlagStore.salt) {
-        logger.error(
-          `${loggerPrefix} EppoPrecomputedClient requires a precomputedFlagStore with a salt if requestParameters are not provided`,
-        );
-      }
 
       if (this.precomputedBanditStore && !this.precomputedBanditStore.salt) {
         logger.warn(
