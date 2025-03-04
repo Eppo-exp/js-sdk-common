@@ -30,7 +30,7 @@ import EppoPrecomputedClient, {
   PrecomputedFlagsRequestParameters,
   Subject,
 } from './eppo-precomputed-client';
-import { applicationLogger } from '..';
+
 
 describe('EppoPrecomputedClient E2E test', () => {
   const precomputedConfigurationWire = readMockConfigurationWireResponse(
@@ -773,7 +773,7 @@ describe('EppoPrecomputedClient E2E test', () => {
     let mockError: jest.SpyInstance;
 
     beforeEach(() => {
-      mockError = jest.spyOn(applicationLogger, 'error');
+      mockError = jest.spyOn(logger, 'error');
     });
 
     afterEach(() => {
