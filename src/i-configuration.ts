@@ -100,7 +100,7 @@ export class StoreBackedConfiguration implements IConfiguration {
   }
 
   copy(): IConfiguration {
-    return new ImmuatableConfiguration(
+    return new ImmutableConfiguration(
       this.flagConfigurationStore.entries(),
       this.isInitialized(),
       this.isObfuscated(),
@@ -176,7 +176,7 @@ export class StoreBackedConfiguration implements IConfiguration {
   }
 }
 
-export class ImmuatableConfiguration implements IConfiguration {
+export class ImmutableConfiguration implements IConfiguration {
   private readonly flags: Record<FlagKey, Flag | ObfuscatedFlag>;
   private readonly banditVariations?: Record<FlagKey, BanditVariation[]>;
   private readonly bandits?: Record<string, BanditParameters>;
