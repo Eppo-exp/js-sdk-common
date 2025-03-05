@@ -3,8 +3,6 @@ import { StoreBackedConfiguration } from './i-configuration';
 import { BanditParameters, BanditVariation, Environment, Flag, ObfuscatedFlag } from './interfaces';
 import { BanditKey, FlagKey } from './types';
 
-import mock = jest.mock;
-
 describe('StoreBackedConfiguration', () => {
   let mockFlagStore: jest.Mocked<IConfigurationStore<Flag | ObfuscatedFlag>>;
   let mockBanditVariationStore: jest.Mocked<IConfigurationStore<BanditVariation[]>>;
@@ -432,7 +430,7 @@ describe('StoreBackedConfiguration', () => {
   });
 });
 
-describe('ReadOnlyConfiguration', () => {
+describe('ImmutableConfiguration', () => {
   let mockFlagStore: jest.Mocked<IConfigurationStore<Flag | ObfuscatedFlag>>;
   let mockBanditVariationStore: jest.Mocked<IConfigurationStore<BanditVariation[]>>;
   let mockBanditModelStore: jest.Mocked<IConfigurationStore<BanditParameters>>;
