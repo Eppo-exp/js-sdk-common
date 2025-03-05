@@ -1288,7 +1288,7 @@ export default class EppoClient {
     });
   }
 
-  private maybeLogAssignment(result: FlagEvaluation) {
+  private maybeLogAssignment(result: FlagEvaluation & { entityId?: number }) {
     const {
       flagKey,
       format,
@@ -1298,6 +1298,7 @@ export default class EppoClient {
       variation,
       flagEvaluationDetails,
       extraLogging = {},
+      entityId,
     } = result;
     const event: IAssignmentEvent = {
       ...extraLogging,
@@ -1311,6 +1312,7 @@ export default class EppoClient {
       subjectAttributes,
       metaData: this.buildLoggerMetadata(),
       evaluationDetails: flagEvaluationDetails,
+      entityId,
     };
 
     if (variation && allocationKey) {

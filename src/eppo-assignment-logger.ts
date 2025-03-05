@@ -1,26 +1,30 @@
 import { IAssignmentEvent, IAssignmentLogger } from './assignment-logger';
 import EppoClient from './client/eppo-client';
 
-/** TODO docs */
+/**
+ * Tracks an assignment event by submitting it to the Eppo Ingestion API.
+ * Events are queued up for delivery according to the EppoClient's `EventDispatcher` implementation.
+ */
 export class EppoAssignmentLogger implements IAssignmentLogger {
   constructor(private readonly eppoClient: EppoClient) {}
 
   logAssignment(event: IAssignmentEvent): void {
-    const entity = event.subjectAttributes.entity;
     const {
+      entityId: entity_id,
+      experiment,
       holdoutKey: holdout,
       holdoutVariation: holdout_variant,
       subject: subject_id,
-      experiment,
       variant,
     } = event;
-    this.eppoClient.track('__eppo_assignment', {
-      subject_id,
+    const payload = {
+      entity_id,
       experiment,
-      variant,
-      entity,
-      holdout,
       holdout_variant,
-    });
+      holdout,
+      subject_id,
+      variant,
+    };
+    this.eppoClient.track('__eppo_assignment', payload);
   }
 }
