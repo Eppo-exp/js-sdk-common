@@ -44,7 +44,7 @@ export interface IAssignmentEvent {
   evaluationDetails: IFlagEvaluationDetails | null;
 
   /** * The entity ID of the subject, if present. */
-  entityId?: number;
+  entityId?: number | null;
 }
 
 /**

@@ -12,11 +12,18 @@ export class EppoAssignmentLogger implements IAssignmentLogger {
     const {
       entityId: entity_id,
       experiment,
+      // holdout and holdout_variant come from `extraLogging` in FlagEvaluation
       holdoutKey: holdout,
       holdoutVariation: holdout_variant,
       subject: subject_id,
       variant,
     } = event;
+
+    // Skip tracking if no entityId
+    if (!entity_id) {
+      return;
+    }
+
     const payload = {
       entity_id,
       experiment,

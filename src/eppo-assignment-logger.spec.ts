@@ -25,16 +25,14 @@ describe('EppoAssignmentLogger', () => {
       subject: 'user-123',
       experiment: 'experiment-abc',
       variant: 'control',
-      entityId: 456, // Changed to number
+      entityId: 456,
       holdoutKey: 'holdout-xyz',
       holdoutVariation: 'holdout-variant-1',
-      // Add required properties based on the IAssignmentEvent interface
       allocation: 'allocation-1',
       featureFlag: 'feature-flag-1',
       variation: 'variation-1',
       timestamp: new Date().toISOString(),
       subjectAttributes: {},
-      flagKey: 'flag-key-1',
       format: 'json',
       evaluationDetails: null,
     };
@@ -60,13 +58,12 @@ describe('EppoAssignmentLogger', () => {
       subject: 'user-123',
       experiment: 'experiment-abc',
       variant: 'control',
-      // Add required properties based on the IAssignmentEvent interface
+      entityId: 789,
       allocation: 'allocation-1',
       featureFlag: 'feature-flag-1',
       variation: 'variation-1',
       timestamp: new Date().toISOString(),
       subjectAttributes: {},
-      flagKey: 'flag-key-1',
       format: 'json',
       evaluationDetails: null,
     };
@@ -80,9 +77,54 @@ describe('EppoAssignmentLogger', () => {
       subject_id: 'user-123',
       experiment: 'experiment-abc',
       variant: 'control',
-      entity_id: undefined,
+      entity_id: 789,
       holdout: undefined,
       holdout_variant: undefined,
     });
+  });
+
+  it('should skip tracking when entityId is null', () => {
+    // Arrange
+    const assignmentEvent: IAssignmentEvent = {
+      subject: 'user-123',
+      experiment: 'experiment-abc',
+      variant: 'control',
+      entityId: null,
+      allocation: 'allocation-1',
+      featureFlag: 'feature-flag-1',
+      variation: 'variation-1',
+      timestamp: new Date().toISOString(),
+      subjectAttributes: {},
+      format: 'json',
+      evaluationDetails: null,
+    };
+
+    // Act
+    logger.logAssignment(assignmentEvent);
+
+    // Assert
+    expect(mockEppoClient.track).not.toHaveBeenCalled();
+  });
+
+  it('should skip tracking when entityId is undefined', () => {
+    // Arrange
+    const assignmentEvent: IAssignmentEvent = {
+      subject: 'user-123',
+      experiment: 'experiment-abc',
+      variant: 'control',
+      allocation: 'allocation-1',
+      featureFlag: 'feature-flag-1',
+      variation: 'variation-1',
+      timestamp: new Date().toISOString(),
+      subjectAttributes: {},
+      format: 'json',
+      evaluationDetails: null,
+    };
+
+    // Act
+    logger.logAssignment(assignmentEvent);
+
+    // Assert
+    expect(mockEppoClient.track).not.toHaveBeenCalled();
   });
 });
