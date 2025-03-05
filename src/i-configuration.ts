@@ -1,5 +1,5 @@
 import { IConfigurationStore } from './configuration-store/configuration-store';
-import { Entry, hydrateConfigurationStore } from './configuration-store/configuration-store-utils';
+import { Entry } from './configuration-store/configuration-store-utils';
 import { OBFUSCATED_FORMATS } from './constants';
 import {
   BanditParameters,
@@ -99,6 +99,17 @@ export class StoreBackedConfiguration implements IConfiguration {
     return false;
   }
 
+  copy(): IConfiguration {
+    return new ReadOnlyConfiguration(
+      this.flagConfigurationStore.entries(),
+      this.isInitialized(),
+      this.isObfuscated(),
+      this.getFlagConfigDetails(),
+      this.banditVariationConfigurationStore?.entries(),
+      this.banditModelConfigurationStore?.entries(),
+    );
+  }
+
   getBandit(key: string): BanditParameters | null {
     return this.banditModelConfigurationStore?.get(key) ?? null;
   }
@@ -170,7 +181,7 @@ export class ReadOnlyConfiguration implements IConfiguration {
   private readonly banditVariations?: Record<FlagKey, BanditVariation[]>;
   private readonly bandits?: Record<string, BanditParameters>;
 
-  private constructor(
+  constructor(
     flags: Record<FlagKey, Flag | ObfuscatedFlag>,
     private readonly initialized: boolean,
     private readonly obfuscated: boolean,
@@ -183,16 +194,6 @@ export class ReadOnlyConfiguration implements IConfiguration {
       ? JSON.parse(JSON.stringify(banditVariations))
       : undefined;
     this.bandits = bandits ? JSON.parse(JSON.stringify(bandits || {})) : undefined;
-  }
-  public static from(other: IConfiguration): ReadOnlyConfiguration {
-    return new ReadOnlyConfiguration(
-      other.getFlags(),
-      other.isInitialized(),
-      other.isObfuscated(),
-      other.getFlagConfigDetails(),
-      other.getBanditVariations(),
-      other.getBandits(),
-    );
   }
 
   getFlag(key: string): Flag | ObfuscatedFlag | null {

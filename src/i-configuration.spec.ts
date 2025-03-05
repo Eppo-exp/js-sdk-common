@@ -1,15 +1,9 @@
-import { StoreBackedConfiguration, ReadOnlyConfiguration } from './configuration';
 import { IConfigurationStore } from './configuration-store/configuration-store';
-import {
-  BanditParameters,
-  BanditVariation,
-  Environment,
-  Flag,
-  ObfuscatedFlag,
-} from './interfaces';
 import { StoreBackedConfiguration } from './i-configuration';
 import { BanditParameters, BanditVariation, Environment, Flag, ObfuscatedFlag } from './interfaces';
 import { BanditKey, FlagKey } from './types';
+
+import mock = jest.mock;
 
 describe('StoreBackedConfiguration', () => {
   let mockFlagStore: jest.Mocked<IConfigurationStore<Flag | ObfuscatedFlag>>;
@@ -502,18 +496,43 @@ describe('ReadOnlyConfiguration', () => {
     };
   });
 
+  describe('copy', () => {
+    it('should prevent modification of stored config', () => {
+      const config = new StoreBackedConfiguration(mockFlagStore);
+      const mockFlag: Flag = { key: 'test-flag', enabled: true } as Flag;
+      mockFlagStore.get.mockReturnValue(mockFlag);
+      mockFlagStore.entries.mockReturnValue({ [mockFlag.key]: mockFlag });
+
+      const storedFlag = config.getFlag('test-flag');
+      expect(storedFlag?.enabled).toBeTruthy();
+
+      const roConfig = config.copy();
+      const flag = roConfig.getFlag('test-flag');
+      expect(flag).toBeTruthy();
+      if (flag) {
+        flag.enabled = false;
+      } else {
+        fail('flag is null');
+      }
+
+      expect(flag?.enabled).toBeFalsy();
+      expect(storedFlag?.enabled).toBeTruthy();
+    });
+  });
 
   describe('getFlag', () => {
     it('should return flag when it exists', () => {
       const config = new StoreBackedConfiguration(mockFlagStore);
       const mockFlag: Flag = { key: 'test-flag' } as Flag;
       mockFlagStore.get.mockReturnValue(mockFlag);
+      mockFlagStore.entries.mockReturnValue({ [mockFlag.key]: mockFlag });
 
-      const roConfig = ReadOnlyConfiguration.from(config);
+      expect(config.getFlag('test-flag')).toEqual(mockFlag);
+
+      const roConfig = config.copy();
       const result = roConfig.getFlag('test-flag');
       expect(result).toEqual(mockFlag);
     });
-
   });
 
   describe('getFlagVariationBandit', () => {
