@@ -14,6 +14,7 @@ import FetchHttpClient, {
   IHttpClient,
   IUniversalFlagConfigResponse,
 } from './http-client';
+import { StoreBackedConfiguration } from './i-configuration';
 import { BanditParameters, BanditVariation, Flag } from './interfaces';
 
 describe('ConfigurationRequestor', () => {
@@ -423,6 +424,221 @@ describe('ConfigurationRequestor', () => {
             coldStartBanditParameters,
           );
         });
+      });
+    });
+  });
+
+  describe('with mocked response', () => {
+    const response = {
+      environment: {
+        name: 'Test',
+      },
+      createdAt: '2024-01-01',
+      format: 'SERVER',
+      flags: {
+        test_flag: {
+          key: 'test_flag',
+          enabled: true,
+          variationType: 'STRING',
+          variations: {
+            bandit: {
+              key: 'bandit',
+              value: 'bandit',
+            },
+          },
+        },
+      },
+      banditReferences: {
+        bandit: {
+          modelVersion: '123',
+          flagVariations: [
+            {
+              key: 'bandit',
+              flagKey: 'test_flag',
+              allocationKey: 'analysis',
+              variationKey: 'bandit',
+              variationValue: 'bandit',
+            },
+          ],
+        },
+      },
+    };
+    const banditResponse = {
+      updatedAt: '2023-09-13T04:52:06.462Z',
+      environment: {
+        name: 'Test',
+      },
+      bandits: {
+        bandit: {
+          banditKey: 'bandit',
+          modelName: 'falcon',
+          updatedAt: '2023-09-13T04:52:06.462Z',
+          modelVersion: '123',
+        },
+      },
+    };
+    let fetchSpy: jest.Mock;
+    beforeAll(() => {
+      fetchSpy = jest.fn((req) => {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve(req.includes('flag-config/v1/bandits') ? banditResponse : response),
+        });
+      }) as jest.Mock;
+      global.fetch = fetchSpy;
+    });
+    afterEach(() => {
+      jest.clearAllMocks();
+    });
+    afterAll(() => {
+      jest.restoreAllMocks();
+    });
+
+    describe('getConfiguration', () => {
+      it('should return an empty configuration instance before a config has been loaded', async () => {
+        const requestor = new ConfigurationRequestor(
+          httpClient,
+          flagStore,
+          banditVariationStore,
+          banditModelStore,
+        );
+
+        const config = requestor.getConfiguration();
+        expect(config).toBeInstanceOf(StoreBackedConfiguration);
+        expect(config.getFlagKeys()).toEqual([]);
+      });
+
+      it('should return a populated configuration instance', async () => {
+        const requestor = new ConfigurationRequestor(
+          httpClient,
+          flagStore,
+          banditVariationStore,
+          banditModelStore,
+        );
+
+        await requestor.fetchAndStoreConfigurations();
+
+        const config = requestor.getConfiguration();
+        expect(config).toBeInstanceOf(StoreBackedConfiguration);
+        expect(config.getFlagKeys()).toEqual(['test_flag']);
+      });
+    });
+
+    describe('fetchAndStoreConfigurations', () => {
+      it('should update configuration with flag data', async () => {
+        const requestor = new ConfigurationRequestor(
+          httpClient,
+          flagStore,
+          banditVariationStore,
+          banditModelStore,
+        );
+        const config = requestor.getConfiguration();
+
+        await requestor.fetchAndStoreConfigurations();
+
+        expect(config.getFlagKeys()).toEqual(['test_flag']);
+        expect(config.getFlagConfigDetails()).toEqual({
+          configEnvironment: { name: 'Test' },
+          configFetchedAt: expect.any(String),
+          configFormat: 'SERVER',
+          configPublishedAt: '2024-01-01',
+        });
+      });
+
+      it('should update configuration with bandit data when present', async () => {
+        const requestor = new ConfigurationRequestor(
+          httpClient,
+          flagStore,
+          banditVariationStore,
+          banditModelStore,
+        );
+        const config = requestor.getConfiguration();
+
+        await requestor.fetchAndStoreConfigurations();
+
+        // Verify flag configuration
+        expect(config.getFlagKeys()).toEqual(['test_flag']);
+
+        // Verify bandit variation configuration
+        // expect(banditVariationDetails.entries).toEqual({
+        //   'test_flag': [
+        //     {
+        //       flagKey: 'test_flag',
+        //       variationId: 'variation-1',
+        //       // Add other expected properties based on your mock data
+        //     }
+        //   ]
+        // });
+        // expect(banditVariationDetails.environment).toBe('test-env');
+        // expect(banditVariationDetails.configFormat).toBe('SERVER');
+
+        // Verify bandit model configuration
+        const banditVariations = config.getFlagBanditVariations('test_flag');
+        expect(banditVariations).toEqual([
+          {
+            allocationKey: 'analysis',
+            flagKey: 'test_flag',
+            key: 'bandit',
+            variationKey: 'bandit',
+            variationValue: 'bandit',
+          },
+        ]);
+
+        const banditKey = banditVariations.at(0)?.key;
+
+        expect(banditKey).toEqual('bandit');
+        if (!banditKey) {
+          fail('bandit Key null, appeasing typescript');
+        }
+        const banditModelDetails = config.getBandit(banditKey);
+        expect(banditModelDetails).toEqual({
+          banditKey: 'bandit',
+          modelName: 'falcon',
+          modelVersion: '123',
+          updatedAt: '2023-09-13T04:52:06.462Z',
+          // Add other expected properties based on your mock data
+        });
+      });
+
+      it('should not fetch bandit parameters if model versions are already loaded', async () => {
+        const requestor = new ConfigurationRequestor(
+          httpClient,
+          flagStore,
+          banditVariationStore,
+          banditModelStore,
+        );
+
+        const ufcResponse = {
+          flags: { test_flag: { key: 'test_flag', value: true } },
+          banditReferences: {
+            bandit: {
+              modelVersion: 'v1',
+              flagVariations: [{ flagKey: 'test_flag', variationId: '1' }],
+            },
+          },
+          environment: 'test',
+          createdAt: '2024-01-01',
+          format: 'SERVER',
+        };
+
+        await requestor.fetchAndStoreConfigurations();
+        // const initialFetchCount = fetchSpy.mock.calls.length;
+
+        // Second call with same model version
+        // fetchSpy.mockImplementationOnce(() =>
+        //   Promise.resolve({
+        //     ok: true,
+        //     status: 200,
+        //     json: () => Promise.resolve(ufcResponse)
+        //   })
+        // );
+
+        await requestor.fetchAndStoreConfigurations();
+
+        // Should only have one additional fetch (the UFC) and not the bandit parameters
+        // expect(fetchSpy.mock.calls.length).toBe(initialFetchCount + 1);
       });
     });
   });

@@ -3,6 +3,7 @@ import {
   UFC_ENDPOINT,
   BANDIT_ENDPOINT,
   PRECOMPUTED_FLAGS_ENDPOINT,
+  FLAG_OVERRIDES_KEY_VALIDATION_URL,
 } from './constants';
 import { IQueryParams, IQueryParamsWithSubject } from './http-client';
 
@@ -35,5 +36,9 @@ export default class ApiEndpoints {
 
   precomputedFlagsEndpoint(): URL {
     return this.endpoint(PRECOMPUTED_FLAGS_ENDPOINT);
+  }
+
+  flagOverridesKeyValidationEndpoint(): URL {
+    return this.endpoint(FLAG_OVERRIDES_KEY_VALIDATION_URL);
   }
 }
