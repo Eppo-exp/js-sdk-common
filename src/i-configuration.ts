@@ -100,7 +100,7 @@ export class StoreBackedConfiguration implements IConfiguration {
   }
 
   copy(): IConfiguration {
-    return new ReadOnlyConfiguration(
+    return new ImmuatableConfiguration(
       this.flagConfigurationStore.entries(),
       this.isInitialized(),
       this.isObfuscated(),
@@ -176,20 +176,22 @@ export class StoreBackedConfiguration implements IConfiguration {
   }
 }
 
-export class ReadOnlyConfiguration implements IConfiguration {
+export class ImmuatableConfiguration implements IConfiguration {
   private readonly flags: Record<FlagKey, Flag | ObfuscatedFlag>;
   private readonly banditVariations?: Record<FlagKey, BanditVariation[]>;
   private readonly bandits?: Record<string, BanditParameters>;
+  private readonly flagConfigDetails: ConfigDetails;
 
   constructor(
     flags: Record<FlagKey, Flag | ObfuscatedFlag>,
     private readonly initialized: boolean,
     private readonly obfuscated: boolean,
-    private readonly flagConfigDetails: ConfigDetails,
+    flagConfigDetails: ConfigDetails,
     banditVariations?: Record<FlagKey, BanditVariation[]>,
     bandits?: Record<string, BanditParameters>,
   ) {
     this.flags = JSON.parse(JSON.stringify(flags));
+    this.flagConfigDetails = JSON.parse(JSON.stringify(flagConfigDetails));
     this.banditVariations = banditVariations
       ? JSON.parse(JSON.stringify(banditVariations))
       : undefined;

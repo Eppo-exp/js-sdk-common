@@ -14,7 +14,7 @@ import FetchHttpClient, {
   IHttpClient,
   IUniversalFlagConfigResponse,
 } from './http-client';
-import { ReadOnlyConfiguration, StoreBackedConfiguration } from './i-configuration';
+import { ImmuatableConfiguration } from './i-configuration';
 import { BanditParameters, BanditVariation, Flag } from './interfaces';
 
 describe('ConfigurationRequestor', () => {
@@ -506,7 +506,7 @@ describe('ConfigurationRequestor', () => {
         );
 
         const config = requestor.getConfiguration();
-        expect(config).toBeInstanceOf(ReadOnlyConfiguration);
+        expect(config).toBeInstanceOf(ImmuatableConfiguration);
         expect(config.getFlagKeys()).toEqual([]);
       });
 
@@ -521,7 +521,7 @@ describe('ConfigurationRequestor', () => {
         await requestor.fetchAndStoreConfigurations();
 
         const config = requestor.getConfiguration();
-        expect(config).toBeInstanceOf(ReadOnlyConfiguration);
+        expect(config).toBeInstanceOf(ImmuatableConfiguration);
         expect(config.getFlagKeys()).toEqual(['test_flag']);
       });
     });
