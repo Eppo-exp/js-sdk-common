@@ -50,20 +50,53 @@ export class StoreBackedConfiguration implements IConfiguration {
     banditVariationConfig?: ConfigStoreHydrationPacket<BanditVariation[]>,
     banditModelConfig?: ConfigStoreHydrationPacket<BanditParameters>,
   ) {
-    const didUpdateFlags = await hydrateConfigurationStore(this.flagConfigurationStore, flagConfig);
+    const didUpdateFlags = await StoreBackedConfiguration.hydrateConfigurationStore(
+      this.flagConfigurationStore,
+      flagConfig,
+    );
     const promises: Promise<boolean>[] = [];
     if (this.banditVariationConfigurationStore && banditVariationConfig) {
       promises.push(
-        hydrateConfigurationStore(this.banditVariationConfigurationStore, banditVariationConfig),
+        StoreBackedConfiguration.hydrateConfigurationStore(
+          this.banditVariationConfigurationStore,
+          banditVariationConfig,
+        ),
       );
     }
     if (this.banditModelConfigurationStore && banditModelConfig) {
       promises.push(
-        hydrateConfigurationStore(this.banditModelConfigurationStore, banditModelConfig),
+        StoreBackedConfiguration.hydrateConfigurationStore(
+          this.banditModelConfigurationStore,
+          banditModelConfig,
+        ),
       );
     }
     await Promise.all(promises);
     return didUpdateFlags;
+  }
+
+  private static async hydrateConfigurationStore<T extends Entry>(
+    configurationStore: IConfigurationStore<T> | null,
+    response: {
+      entries: Record<string, T>;
+      environment: Environment;
+      createdAt: string;
+      format: string;
+      salt?: string;
+    },
+  ): Promise<boolean> {
+    if (configurationStore) {
+      const didUpdate = await configurationStore.setEntries(response.entries);
+      if (didUpdate) {
+        configurationStore.setEnvironment(response.environment);
+        configurationStore.setConfigFetchedAt(new Date().toISOString());
+        configurationStore.setConfigPublishedAt(response.createdAt);
+        configurationStore.setFormat(response.format);
+        configurationStore.salt = response.salt;
+      }
+      return didUpdate;
+    }
+    return false;
   }
 
   getBandit(key: string): BanditParameters | null {
@@ -129,5 +162,82 @@ export class StoreBackedConfiguration implements IConfiguration {
 
   getBanditVariations(): Record<string, BanditVariation[]> {
     return this.banditVariationConfigurationStore?.entries() ?? {};
+  }
+}
+
+export class ReadOnlyConfiguration implements IConfiguration {
+  private readonly flags: Record<FlagKey, Flag | ObfuscatedFlag>;
+  private readonly banditVariations?: Record<FlagKey, BanditVariation[]>;
+  private readonly bandits?: Record<string, BanditParameters>;
+
+  private constructor(
+    flags: Record<FlagKey, Flag | ObfuscatedFlag>,
+    private readonly initialized: boolean,
+    private readonly obfuscated: boolean,
+    private readonly flagConfigDetails: ConfigDetails,
+    banditVariations?: Record<FlagKey, BanditVariation[]>,
+    bandits?: Record<string, BanditParameters>,
+  ) {
+    this.flags = JSON.parse(JSON.stringify(flags));
+    this.banditVariations = banditVariations
+      ? JSON.parse(JSON.stringify(banditVariations))
+      : undefined;
+    this.bandits = bandits ? JSON.parse(JSON.stringify(bandits || {})) : undefined;
+  }
+  public static from(other: IConfiguration): ReadOnlyConfiguration {
+    return new ReadOnlyConfiguration(
+      other.getFlags(),
+      other.isInitialized(),
+      other.isObfuscated(),
+      other.getFlagConfigDetails(),
+      other.getBanditVariations(),
+      other.getBandits(),
+    );
+  }
+
+  getFlag(key: string): Flag | ObfuscatedFlag | null {
+    return this.flags[key] ?? null;
+  }
+
+  getFlags(): Record<string, Flag | ObfuscatedFlag> {
+    return this.flags;
+  }
+
+  getBandits(): Record<string, BanditParameters> {
+    return this.bandits ?? {};
+  }
+
+  getBanditVariations(): Record<string, BanditVariation[]> {
+    return this.banditVariations ?? {};
+  }
+
+  getFlagBanditVariations(flagKey: string): BanditVariation[] {
+    return this.banditVariations?.[flagKey] ?? [];
+  }
+
+  getFlagVariationBandit(flagKey: string, variationValue: string): BanditParameters | null {
+    const variations = this.getFlagBanditVariations(flagKey);
+    const banditKey = variations.find((v) => v.variationValue === variationValue)?.key;
+    return banditKey ? this.getBandit(banditKey) : null;
+  }
+
+  getBandit(key: string): BanditParameters | null {
+    return this.bandits?.[key] ?? null;
+  }
+
+  getFlagConfigDetails(): ConfigDetails {
+    return this.flagConfigDetails;
+  }
+
+  getFlagKeys(): string[] {
+    return Object.keys(this.flags);
+  }
+
+  isObfuscated(): boolean {
+    return this.obfuscated;
+  }
+
+  isInitialized(): boolean {
+    return this.initialized;
   }
 }
