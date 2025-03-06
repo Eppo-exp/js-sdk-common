@@ -59,6 +59,7 @@ export interface Flag {
   variations: Record<string, Variation>;
   allocations: Allocation[];
   totalShards: number;
+  entityId?: number;
 }
 
 export interface ObfuscatedFlag {

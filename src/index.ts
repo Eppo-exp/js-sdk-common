@@ -40,6 +40,7 @@ import {
 } from './configuration-wire-types';
 import * as constants from './constants';
 import { decodePrecomputedFlag } from './decoding';
+import { EppoAssignmentLogger } from './eppo-assignment-logger';
 import BatchEventProcessor from './events/batch-event-processor';
 import { BoundedEventQueue } from './events/bounded-event-queue';
 import DefaultEventDispatcher, {
@@ -82,6 +83,7 @@ export {
   IAssignmentDetails,
   IAssignmentHooks,
   IAssignmentLogger,
+  EppoAssignmentLogger,
   IAssignmentEvent,
   IBanditLogger,
   IBanditEvent,
