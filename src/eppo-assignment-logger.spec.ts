@@ -43,12 +43,12 @@ describe('EppoAssignmentLogger', () => {
     // Assert
     expect(mockEppoClient.track).toHaveBeenCalledTimes(1);
     expect(mockEppoClient.track).toHaveBeenCalledWith('__eppo_assignment', {
-      subject_id: 'user-123',
+      subject: 'user-123',
       experiment: 'experiment-abc',
-      variant: 'control',
+      variation: 'variation-1',
       entity_id: 456,
       holdout: 'holdout-xyz',
-      holdout_variant: 'holdout-variant-1',
+      holdout_variation: 'holdout-variant-1',
     });
   });
 
@@ -57,7 +57,6 @@ describe('EppoAssignmentLogger', () => {
     const assignmentEvent: IAssignmentEvent = {
       subject: 'user-123',
       experiment: 'experiment-abc',
-      variant: 'control',
       entityId: 789,
       allocation: 'allocation-1',
       featureFlag: 'feature-flag-1',
@@ -74,12 +73,12 @@ describe('EppoAssignmentLogger', () => {
     // Assert
     expect(mockEppoClient.track).toHaveBeenCalledTimes(1);
     expect(mockEppoClient.track).toHaveBeenCalledWith('__eppo_assignment', {
-      subject_id: 'user-123',
+      subject: 'user-123',
       experiment: 'experiment-abc',
-      variant: 'control',
+      variation: 'variation-1',
       entity_id: 789,
       holdout: undefined,
-      holdout_variant: undefined,
+      holdout_variation: undefined,
     });
   });
 
