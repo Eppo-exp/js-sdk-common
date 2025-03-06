@@ -27,10 +27,10 @@ export class EppoAssignmentLogger implements IAssignmentLogger {
     const payload = {
       entity_id,
       experiment,
-      holdout_variant,
+      holdout_variation,
       holdout,
-      subject_id,
-      variant,
+      subject,
+      variation,
     };
     this.eppoClient.track('__eppo_assignment', payload);
   }
