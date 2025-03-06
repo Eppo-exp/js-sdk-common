@@ -16,7 +16,7 @@ export class EppoAssignmentLogger implements IAssignmentLogger {
       holdoutKey: holdout,
       holdoutVariation: holdout_variant,
       subject: subject_id,
-      variant,
+      variation,
     } = event;
 
     // Skip tracking if no entityId
