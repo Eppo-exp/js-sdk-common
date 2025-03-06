@@ -14,7 +14,7 @@ export class EppoAssignmentLogger implements IAssignmentLogger {
       experiment,
       // holdout and holdout_variant come from `extraLogging` in FlagEvaluation
       holdoutKey: holdout,
-      holdoutVariation: holdout_variant,
+      holdoutVariation: holdout_variation,
       subject,
       variation,
     } = event;
