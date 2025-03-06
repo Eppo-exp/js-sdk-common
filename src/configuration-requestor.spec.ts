@@ -14,7 +14,7 @@ import FetchHttpClient, {
   IHttpClient,
   IUniversalFlagConfigResponse,
 } from './http-client';
-import { StoreBackedConfiguration } from './i-configuration';
+import { ImmutableConfiguration } from './i-configuration';
 import { BanditParameters, BanditVariation, Flag } from './interfaces';
 
 describe('ConfigurationRequestor', () => {
@@ -506,7 +506,7 @@ describe('ConfigurationRequestor', () => {
         );
 
         const config = requestor.getConfiguration();
-        expect(config).toBeInstanceOf(StoreBackedConfiguration);
+        expect(config).toBeInstanceOf(ImmutableConfiguration);
         expect(config.getFlagKeys()).toEqual([]);
       });
 
@@ -521,7 +521,7 @@ describe('ConfigurationRequestor', () => {
         await requestor.fetchAndStoreConfigurations();
 
         const config = requestor.getConfiguration();
-        expect(config).toBeInstanceOf(StoreBackedConfiguration);
+        expect(config).toBeInstanceOf(ImmutableConfiguration);
         expect(config.getFlagKeys()).toEqual(['test_flag']);
       });
     });
@@ -534,9 +534,10 @@ describe('ConfigurationRequestor', () => {
           banditVariationStore,
           banditModelStore,
         );
-        const config = requestor.getConfiguration();
 
         await requestor.fetchAndStoreConfigurations();
+
+        const config = requestor.getConfiguration();
 
         expect(config.getFlagKeys()).toEqual(['test_flag']);
         expect(config.getFlagConfigDetails()).toEqual({
@@ -554,9 +555,10 @@ describe('ConfigurationRequestor', () => {
           banditVariationStore,
           banditModelStore,
         );
-        const config = requestor.getConfiguration();
 
         await requestor.fetchAndStoreConfigurations();
+
+        const config = requestor.getConfiguration();
 
         // Verify flag configuration
         expect(config.getFlagKeys()).toEqual(['test_flag']);

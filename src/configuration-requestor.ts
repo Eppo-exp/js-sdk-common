@@ -11,6 +11,7 @@ import { BanditVariation, BanditParameters, Flag, BanditReference } from './inte
 export default class ConfigurationRequestor {
   private banditModelVersions: string[] = [];
   private readonly configuration: StoreBackedConfiguration;
+  private configurationCopy: IConfiguration;
 
   constructor(
     private readonly httpClient: IHttpClient,
@@ -25,6 +26,7 @@ export default class ConfigurationRequestor {
       this.banditVariationConfigurationStore,
       this.banditModelConfigurationStore,
     );
+    this.configurationCopy = this.configuration.copy();
   }
 
   public isFlagConfigExpired(): Promise<boolean> {
@@ -32,7 +34,7 @@ export default class ConfigurationRequestor {
   }
 
   public getConfiguration(): IConfiguration {
-    return this.configuration;
+    return this.configurationCopy;
   }
 
   async fetchAndStoreConfigurations(): Promise<void> {
@@ -92,6 +94,7 @@ export default class ConfigurationRequestor {
         banditModelPacket,
       )
     ) {
+      this.configurationCopy = this.configuration.copy();
       // TODO: Notify that config updated.
     }
   }
