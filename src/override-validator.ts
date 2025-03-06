@@ -1,20 +1,17 @@
-import ApiEndpoints from './api-endpoints';
 import { TLRUCache } from './cache/tlru-cache';
 import { Variation } from './interfaces';
 import { FlagKey } from './types';
 
 const FIVE_MINUTES_IN_MS = 5 * 3600 * 1000;
+const KEY_VALIDATION_URL = 'https://eppo.cloud/api/flag-overrides/v1/validate-key';
 
 export interface OverridePayload {
   browserExtensionKey: string;
   overrides: Record<FlagKey, Variation>;
 }
 
-export const sendValidationRequest = async (
-  browserExtensionKey: string,
-  validationEndpoint: string,
-) => {
-  const response = await fetch(validationEndpoint, {
+export const sendValidationRequest = async (browserExtensionKey: string) => {
+  const response = await fetch(KEY_VALIDATION_URL, {
     method: 'POST',
     body: JSON.stringify({
       key: browserExtensionKey,
@@ -66,12 +63,11 @@ export class OverrideValidator {
     }
   }
 
-  async validateKey(browserExtensionKey: string, baseUrl: string | undefined) {
+  async validateKey(browserExtensionKey: string) {
     if (this.validKeyCache.get(browserExtensionKey) === 'true') {
       return true;
     }
-    const endpoint = new ApiEndpoints({ baseUrl }).flagOverridesKeyValidationEndpoint().toString();
-    await sendValidationRequest(browserExtensionKey, endpoint);
+    await sendValidationRequest(browserExtensionKey);
     this.validKeyCache.set(browserExtensionKey, 'true');
   }
 }
