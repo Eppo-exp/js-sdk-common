@@ -213,8 +213,7 @@ export default class EppoClient {
       return undefined;
     }
     const payload: OverridePayload = this.overrideValidator.parseOverridePayload(overridePayload);
-    const baseUrl = this.configurationRequestParameters?.baseUrl;
-    await this.overrideValidator.validateKey(payload.browserExtensionKey, baseUrl);
+    await this.overrideValidator.validateKey(payload.browserExtensionKey);
     return payload.overrides;
   }
 
