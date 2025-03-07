@@ -1287,7 +1287,7 @@ export default class EppoClient {
     });
   }
 
-  private maybeLogAssignment(result: FlagEvaluation & { entityId?: number }) {
+  private maybeLogAssignment(result: FlagEvaluation) {
     const {
       flagKey,
       format,
