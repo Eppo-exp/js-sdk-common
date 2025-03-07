@@ -237,6 +237,7 @@ export default class EppoPrecomputedClient {
       allocationKey: precomputedFlag.allocationKey ?? '',
       extraLogging: precomputedFlag.extraLogging ?? {},
       doLog: precomputedFlag.doLog,
+      entityId: null,
     };
 
     try {
