@@ -30,6 +30,7 @@ export interface FlagEvaluationWithoutDetails {
   extraLogging: Record<string, string>;
   // whether to log assignment event
   doLog: boolean;
+  entityId: number | null;
 }
 
 export interface FlagEvaluation extends FlagEvaluationWithoutDetails {
@@ -122,6 +123,7 @@ export class Evaluator {
                 extraLogging: split.extraLogging ?? {},
                 doLog: allocation.doLog,
                 flagEvaluationDetails,
+                entityId: flag.entityId ?? null,
               };
             }
           }
@@ -227,6 +229,7 @@ export function noneResult(
     extraLogging: {},
     doLog: false,
     flagEvaluationDetails,
+    entityId: null,
   };
 }
 
@@ -288,5 +291,6 @@ export function overrideResult(
     format: '',
     allocationKey: overrideAllocationKey,
     extraLogging: {},
+    entityId: null,
   };
 }
