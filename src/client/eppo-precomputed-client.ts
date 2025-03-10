@@ -327,7 +327,7 @@ export default class EppoPrecomputedClient {
 
     if (banditEvaluation == null) {
       logger.warn(`${loggerPrefix} No assigned variation. Bandit not found: ${flagKey}`);
-      return { variation: defaultValue, action: null };
+      return { variation: this.getStringAssignment(flagKey, defaultValue), action: null };
     }
 
     const assignedVariation = this.getStringAssignment(flagKey, defaultValue);
