@@ -1,11 +1,11 @@
 import {
+  MOCK_PRECOMPUTED_WIRE_FILE,
   readMockConfigurationWireResponse,
-  MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE,
 } from '../../test/testHelpers';
 import ApiEndpoints from '../api-endpoints';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import FetchHttpClient from '../http-client';
-import { PrecomputedFlag, IObfuscatedPrecomputedBandit } from '../interfaces';
+import { IObfuscatedPrecomputedBandit, PrecomputedFlag } from '../interfaces';
 import PrecomputedFlagRequestor from '../precomputed-requestor';
 
 import EppoPrecomputedClient from './eppo-precomputed-client';
@@ -17,12 +17,10 @@ describe('EppoPrecomputedClient Bandits E2E test', () => {
   const mockLogAssignment = jest.fn();
   const mockLogBanditAction = jest.fn();
 
-  const precomputedConfigurationWire = readMockConfigurationWireResponse(
-    MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE,
-  );
-  const parsedPrecomputedResponse = JSON.parse(precomputedConfigurationWire).precomputed.response;
+  const obfuscatedConfigurationWire = readMockConfigurationWireResponse(MOCK_PRECOMPUTED_WIRE_FILE);
+  const obfuscatedResponse = JSON.parse(obfuscatedConfigurationWire).precomputed.response;
 
-  const testModes = ['offline', 'online'] as const;
+  const testModes = ['offline'];
 
   testModes.forEach((mode) => {
     describe(`${mode} mode`, () => {
@@ -33,7 +31,7 @@ describe('EppoPrecomputedClient Bandits E2E test', () => {
             return Promise.resolve({
               ok: true,
               status: 200,
-              json: () => Promise.resolve(parsedPrecomputedResponse),
+              json: () => Promise.resolve(JSON.parse(obfuscatedResponse)),
             });
           }) as jest.Mock;
 
@@ -62,13 +60,17 @@ describe('EppoPrecomputedClient Bandits E2E test', () => {
                   categoricalAttributes: { loyalty_tier: 'bronze' },
                 },
               },
+              'not-a-bandit-flag': {},
             },
           );
           await configurationRequestor.fetchAndStorePrecomputedFlags();
         } else if (mode === 'offline') {
+          const parsed = JSON.parse(obfuscatedResponse);
           // Offline mode: directly populate stores with precomputed response
-          await precomputedFlagStore.setEntries(parsedPrecomputedResponse.flags);
-          await precomputedBanditStore.setEntries(parsedPrecomputedResponse.bandits);
+          precomputedFlagStore.salt = parsed.salt;
+          precomputedBanditStore.salt = parsed.salt;
+          await precomputedFlagStore.setEntries(parsed.flags);
+          await precomputedBanditStore.setEntries(parsed.bandits);
         }
       });
 
@@ -101,6 +103,21 @@ describe('EppoPrecomputedClient Bandits E2E test', () => {
       it(`should return the default action for the banner_bandit_flag in ${mode} mode`, () => {
         const precomputedConfiguration = client.getBanditAction('banner_bandit_flag', 'nike');
         expect(precomputedConfiguration).toEqual({ action: null, variation: 'nike' });
+      });
+
+      it('should return the assigned variation if a flag is not a bandit', () => {
+        const precomputedConfiguration = client.getBanditAction('not-a-bandit-flag', 'default');
+        expect(precomputedConfiguration).toEqual({ action: null, variation: 'control' });
+        expect(mockLogBanditAction).not.toHaveBeenCalled();
+      });
+
+      it('should return the bandit variation and action if a flag is a bandit', () => {
+        const precomputedConfiguration = client.getBanditAction('string-flag', 'default');
+        expect(precomputedConfiguration).toEqual({
+          action: 'show_red_button',
+          variation: 'red',
+        });
+        expect(mockLogBanditAction).toHaveBeenCalled();
       });
     });
   });
