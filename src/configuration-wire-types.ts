@@ -1,3 +1,4 @@
+import { IUniversalFlagConfigResponse, IBanditParametersResponse } from './http-client';
 import {
   Environment,
   FormatEnum,
@@ -151,11 +152,79 @@ export interface IConfigurationWire {
    */
   readonly version: number;
 
-  // TODO: Add flags and bandits for offline/non-precomputed initialization
+  /**
+   * Wrapper around an IUniversalFlagConfig payload
+   */
+  readonly config?: IConfigResponse<IUniversalFlagConfigResponse>;
+
+  /**
+   * Wrapper around an IBanditParametersResponse payload.
+   */
+  readonly bandits?: IConfigResponse<IBanditParametersResponse>;
+
   readonly precomputed?: IPrecomputedConfiguration;
+}
+
+// We treat these two responses as a "whole" configuration - that is, the set of data required to compute flags and bandits.
+type UfcResponseType = IUniversalFlagConfigResponse | IBanditParametersResponse;
+
+// The UFC responses are JSON-encoded strings so we can treat them as opaque blobs, but we also want to enforce type safety.
+type ResponseString<T extends UfcResponseType> = string & {
+  readonly __brand: unique symbol;
+  readonly __type: T;
+};
+
+export function inflateResponse<T extends UfcResponseType>(response: ResponseString<T>): T {
+  return JSON.parse(response) as T;
+}
+
+export function deflateResponse<T extends UfcResponseType>(value: T): ResponseString<T> {
+  return JSON.stringify(value) as ResponseString<T>;
+}
+
+interface IConfigResponse<T extends UfcResponseType> {
+  readonly response: ResponseString<T>; // JSON-encoded server response
+  readonly etag?: string; // Entity Tag - denotes a snapshot or version of the config.
+  readonly fetchedAt?: string; // ISO timestamp for when this config was fetched
 }
 
 export class ConfigurationWireV1 implements IConfigurationWire {
   public readonly version = 1;
-  constructor(readonly precomputed?: IPrecomputedConfiguration) {}
+
+  private constructor(
+    readonly precomputed?: IPrecomputedConfiguration,
+    readonly config?: IConfigResponse<IUniversalFlagConfigResponse>,
+    readonly bandits?: IConfigResponse<IBanditParametersResponse>,
+  ) {}
+
+  public static fromResponses(
+    flagConfig: IUniversalFlagConfigResponse,
+    banditConfig?: IBanditParametersResponse,
+    flagConfigEtag?: string,
+    banditConfigEtag?: string,
+  ): ConfigurationWireV1 {
+    return new ConfigurationWireV1(
+      undefined,
+      {
+        response: deflateResponse(flagConfig),
+        fetchedAt: new Date().toISOString(),
+        etag: flagConfigEtag,
+      },
+      banditConfig
+        ? {
+            response: deflateResponse(banditConfig),
+            fetchedAt: new Date().toISOString(),
+            etag: banditConfigEtag,
+          }
+        : undefined,
+    );
+  }
+
+  public static precomputed(precomputedConfig: IPrecomputedConfiguration) {
+    return new ConfigurationWireV1(precomputedConfig);
+  }
+
+  static empty() {
+    return new ConfigurationWireV1();
+  }
 }

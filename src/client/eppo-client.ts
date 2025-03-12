@@ -1038,7 +1038,7 @@ export default class EppoClient {
       configDetails.configEnvironment,
     );
 
-    const configWire: IConfigurationWire = new ConfigurationWireV1(precomputedConfig);
+    const configWire: IConfigurationWire = ConfigurationWireV1.precomputed(precomputedConfig);
     return JSON.stringify(configWire);
   }
 
