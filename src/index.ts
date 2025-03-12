@@ -33,6 +33,7 @@ import {
 } from './configuration-store/configuration-store';
 import { HybridConfigurationStore } from './configuration-store/hybrid.store';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
+import { ConfigurationWireHelper } from './configuration-wire/configuration-wire-helper';
 import {
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
@@ -155,6 +156,7 @@ export {
   IPrecomputedConfigurationResponse,
   PrecomputedFlag,
   FlagKey,
+  ConfigurationWireHelper,
 
   // Test helpers
   decodePrecomputedFlag,
