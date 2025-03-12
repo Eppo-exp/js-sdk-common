@@ -46,9 +46,16 @@ export interface IBanditParametersResponse {
   bandits: Record<string, BanditParameters>;
 }
 
+/**
+ * Fixes issues with url.toString() in older React Native versions
+ * that leaves a trailing slash in pathname
+ * @param url URL to stringify
+ * @returns stringified url
+ */
 const urlWithNoTrailingSlash = (url: URL) => {
-  url.pathname = url.pathname.replace(/\/$/, '');
-  return url.toString();
+  // Note: URL.pathname does not exist in some React Native JS runtime
+  //       so we have to do string manipulation on the stringified URL
+  return url.toString().replace(/\/\?/, '?').replace(/\/$/, '');
 };
 
 export interface IHttpClient {
