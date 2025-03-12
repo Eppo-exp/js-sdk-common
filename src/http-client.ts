@@ -46,6 +46,11 @@ export interface IBanditParametersResponse {
   bandits: Record<string, BanditParameters>;
 }
 
+const urlWithNoTrailingSlash = (url: URL) => {
+  url.pathname = url.pathname.replace(/\/$/, '');
+  return url.toString();
+};
+
 export interface IHttpClient {
   getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined>;
   getBanditParameters(): Promise<IBanditParametersResponse | undefined>;
@@ -89,7 +94,7 @@ export default class FetchHttpClient implements IHttpClient {
       const controller = new AbortController();
       const signal = controller.signal;
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-      const response = await fetch(url.toString(), { signal });
+      const response = await fetch(urlWithNoTrailingSlash(url), { signal });
       // Clear timeout when response is received within the budget.
       clearTimeout(timeoutId);
 
@@ -114,7 +119,7 @@ export default class FetchHttpClient implements IHttpClient {
       const signal = controller.signal;
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-      const response = await fetch(url.toString(), {
+      const response = await fetch(urlWithNoTrailingSlash(url), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
