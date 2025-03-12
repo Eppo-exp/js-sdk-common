@@ -165,7 +165,7 @@ export interface IConfigurationWire {
   readonly precomputed?: IPrecomputedConfiguration;
 }
 
-// We treat these two responses as a "whole" configuration - that is, the set of data required to compute flags and bandits.
+// These response types are stringified in the wire format.
 type UfcResponseType = IUniversalFlagConfigResponse | IBanditParametersResponse;
 
 // The UFC responses are JSON-encoded strings so we can treat them as opaque blobs, but we also want to enforce type safety.
