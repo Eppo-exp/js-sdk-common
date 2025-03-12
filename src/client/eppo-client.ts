@@ -22,7 +22,7 @@ import {
   IConfigurationWire,
   IPrecomputedConfiguration,
   PrecomputedConfiguration,
-} from '../configuration-wire-types';
+} from '../configuration-wire/configuration-wire-types';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,

@@ -37,7 +37,7 @@ import {
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   IPrecomputedConfigurationResponse,
-} from './configuration-wire-types';
+} from './configuration-wire/configuration-wire-types';
 import * as constants from './constants';
 import { decodePrecomputedFlag } from './decoding';
 import { EppoAssignmentLogger } from './eppo-assignment-logger';

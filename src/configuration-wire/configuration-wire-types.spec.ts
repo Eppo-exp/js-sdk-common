@@ -2,11 +2,11 @@ import {
   MOCK_BANDIT_MODELS_RESPONSE_FILE,
   MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE,
   readMockUFCResponse,
-} from '../test/testHelpers';
+} from '../../test/testHelpers';
 
 import { ConfigurationWireV1, deflateResponse, inflateResponse } from './configuration-wire-types';
-import { IUniversalFlagConfigResponse, IBanditParametersResponse } from './http-client';
-import { FormatEnum } from './interfaces';
+import { IUniversalFlagConfigResponse, IBanditParametersResponse } from '../http-client';
+import { FormatEnum } from '../interfaces';
 
 describe('Response String Type Safety', () => {
   const mockFlagConfig: IUniversalFlagConfigResponse = readMockUFCResponse(
