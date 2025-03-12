@@ -1,3 +1,4 @@
+import { IUniversalFlagConfigResponse, IBanditParametersResponse } from './http-client';
 import {
   Environment,
   FormatEnum,
@@ -15,6 +16,8 @@ interface IBasePrecomputedConfigurationResponse {
   readonly createdAt: string;
   readonly environment?: Environment;
 }
+
+const t = new EventTarget();
 
 export interface IPrecomputedConfigurationResponse extends IBasePrecomputedConfigurationResponse {
   readonly obfuscated: false; // Always false
@@ -151,11 +154,51 @@ export interface IConfigurationWire {
    */
   readonly version: number;
 
+  readonly config?: IConfigResponse;
+  readonly bandits?: IConfigResponse;
+
+  /**
+   *
+   */
+
   // TODO: Add flags and bandits for offline/non-precomputed initialization
   readonly precomputed?: IPrecomputedConfiguration;
 }
 
+export interface IConfigResponse {
+  response: string; // JSON-encoded server response
+  etag?: string;
+  fetchedAt?: string; // ISO timestamp
+}
+
 export class ConfigurationWireV1 implements IConfigurationWire {
   public readonly version = 1;
-  constructor(readonly precomputed?: IPrecomputedConfiguration) {}
+
+  constructor(
+    readonly config?: IConfigResponse,
+    readonly bandits?: IConfigResponse,
+    readonly precomputed?: IPrecomputedConfiguration,
+  ) {}
+
+  public static fromResponses(
+    flagConfig: IUniversalFlagConfigResponse,
+    banditConfig?: IBanditParametersResponse,
+    flagConfigEtag?: string,
+    banditConfigEtag?: string,
+  ): ConfigurationWireV1 {
+    return new ConfigurationWireV1(
+      {
+        response: JSON.stringify(flagConfig),
+        fetchedAt: new Date().toISOString(),
+        etag: flagConfigEtag,
+      },
+      banditConfig
+        ? {
+            response: JSON.stringify(banditConfig),
+            fetchedAt: new Date().toISOString(),
+            etag: banditConfigEtag,
+          }
+        : undefined,
+    );
+  }
 }
