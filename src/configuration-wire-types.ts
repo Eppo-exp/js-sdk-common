@@ -174,18 +174,21 @@ type ResponseString<T extends UfcResponseType> = string & {
   readonly __type: T;
 };
 
+/**
+ * A wrapper around a server response that includes the response, etag, and fetchedAt timestamp.
+ */
+interface IConfigResponse<T extends UfcResponseType> {
+  readonly response: ResponseString<T>; // JSON-encoded server response
+  readonly etag?: string; // Entity Tag - denotes a snapshot or version of the config.
+  readonly fetchedAt?: string; // ISO timestamp for when this config was fetched
+}
+
 export function inflateResponse<T extends UfcResponseType>(response: ResponseString<T>): T {
   return JSON.parse(response) as T;
 }
 
 export function deflateResponse<T extends UfcResponseType>(value: T): ResponseString<T> {
   return JSON.stringify(value) as ResponseString<T>;
-}
-
-interface IConfigResponse<T extends UfcResponseType> {
-  readonly response: ResponseString<T>; // JSON-encoded server response
-  readonly etag?: string; // Entity Tag - denotes a snapshot or version of the config.
-  readonly fetchedAt?: string; // ISO timestamp for when this config was fetched
 }
 
 export class ConfigurationWireV1 implements IConfigurationWire {
