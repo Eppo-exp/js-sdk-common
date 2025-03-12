@@ -17,8 +17,6 @@ interface IBasePrecomputedConfigurationResponse {
   readonly environment?: Environment;
 }
 
-const t = new EventTarget();
-
 export interface IPrecomputedConfigurationResponse extends IBasePrecomputedConfigurationResponse {
   readonly obfuscated: false; // Always false
   readonly flags: Record<FlagKey, PrecomputedFlag>;
