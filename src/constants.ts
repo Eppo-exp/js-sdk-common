@@ -6,10 +6,11 @@ export const DEFAULT_POLL_INTERVAL_MS = 30000;
 export const POLL_JITTER_PCT = 0.1;
 export const DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES = 1;
 export const DEFAULT_POLL_CONFIG_REQUEST_RETRIES = 7;
-export const BASE_URL = 'https://fscdn.eppo.cloud';
-export const UFC_ENDPOINT = '/api/flag-config/v1/config';
-export const BANDIT_ENDPOINT = '/api/flag-config/v1/bandits';
-export const PRECOMPUTED_FLAGS_ENDPOINT = '/edge/assignments';
+export const BASE_URL = 'https://fscdn.eppo.cloud/api';
+export const UFC_ENDPOINT = '/flag-config/v1/config';
+export const BANDIT_ENDPOINT = '/flag-config/v1/bandits';
+export const PRECOMPUTED_BASE_URL = 'https://fscdn.eppo.cloud/edge';
+export const PRECOMPUTED_FLAGS_ENDPOINT = '/assignments';
 export const SESSION_ASSIGNMENT_CONFIG_LOADED = 'eppo-session-assignment-config-loaded';
 export const NULL_SENTINEL = 'EPPO_NULL';
 // number of logging events that may be queued while waiting for initialization
