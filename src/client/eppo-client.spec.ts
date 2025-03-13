@@ -21,7 +21,7 @@ import {
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   ObfuscatedPrecomputedConfigurationResponse,
-} from '../configuration-wire-types';
+} from '../configuration-wire/configuration-wire-types';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../interfaces';

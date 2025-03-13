@@ -1,13 +1,13 @@
-import { IUniversalFlagConfigResponse, IBanditParametersResponse } from './http-client';
+import { IUniversalFlagConfigResponse, IBanditParametersResponse } from '../http-client';
 import {
   Environment,
   FormatEnum,
   IObfuscatedPrecomputedBandit,
   IPrecomputedBandit,
   PrecomputedFlag,
-} from './interfaces';
-import { obfuscatePrecomputedBanditMap, obfuscatePrecomputedFlags } from './obfuscation';
-import { ContextAttributes, FlagKey, HashedFlagKey } from './types';
+} from '../interfaces';
+import { obfuscatePrecomputedBanditMap, obfuscatePrecomputedFlags } from '../obfuscation';
+import { ContextAttributes, FlagKey, HashedFlagKey } from '../types';
 
 // Base interface for all configuration responses
 interface IBasePrecomputedConfigurationResponse {

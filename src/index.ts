@@ -33,11 +33,12 @@ import {
 } from './configuration-store/configuration-store';
 import { HybridConfigurationStore } from './configuration-store/hybrid.store';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
+import { ConfigurationWireHelper } from './configuration-wire/configuration-wire-helper';
 import {
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   IPrecomputedConfigurationResponse,
-} from './configuration-wire-types';
+} from './configuration-wire/configuration-wire-types';
 import * as constants from './constants';
 import { decodePrecomputedFlag } from './decoding';
 import { EppoAssignmentLogger } from './eppo-assignment-logger';
@@ -155,6 +156,7 @@ export {
   IPrecomputedConfigurationResponse,
   PrecomputedFlag,
   FlagKey,
+  ConfigurationWireHelper,
 
   // Test helpers
   decodePrecomputedFlag,
