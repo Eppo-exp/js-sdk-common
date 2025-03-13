@@ -49,12 +49,35 @@ describe('BoundedEventQueue', () => {
     spyLoggerWarn.mockRestore();
   });
 
-  it('splice should remove the specified number of events', () => {
-    const queue = new BoundedEventQueue<string>('testQueue', [], maxSize);
-    queue.push('event1', 'event2', 'event3');
-    const removed = queue.splice(2);
-    expect(removed).toEqual(['event3']);
-    expect([...queue]).toEqual(['event1', 'event2']);
+  describe('splice', () => {
+    it('should remove the specified number of events', () => {
+      const queue = new BoundedEventQueue<string>('testQueue', [], maxSize);
+      queue.push('event1', 'event2', 'event3');
+      const removed = queue.splice(2);
+      expect(removed).toEqual(['event1', 'event2']);
+      expect([...queue]).toEqual(['event3']);
+    });
+
+    it('should remove all events if count is greater than the number of events', () => {
+      const queue = new BoundedEventQueue<string>('testQueue', [], maxSize);
+      queue.push('event1', 'event2', 'event3');
+      const removed = queue.splice(10);
+      expect(removed).toEqual(['event1', 'event2', 'event3']);
+      expect(queue.isEmpty()).toBe(true);
+    });
+
+    it('should return an empty array if the queue is empty', () => {
+      const queue = new BoundedEventQueue<string>('testQueue', [], maxSize);
+      const removed = queue.splice(10);
+      expect(removed).toEqual([]);
+    });
+
+    it('should return an empty array if count is 0', () => {
+      const queue = new BoundedEventQueue<string>('testQueue', [], maxSize);
+      queue.push('event1', 'event2', 'event3');
+      const removed = queue.splice(0);
+      expect(removed).toEqual([]);
+    });
   });
 
   it('flush should clear the queue and return all events', () => {

@@ -16,7 +16,7 @@ export class BoundedEventQueue<T> implements NamedEventQueue<T> {
   }
 
   splice(count: number): T[] {
-    return this.queue.splice(count);
+    return this.queue.splice(0, count);
   }
 
   isEmpty(): boolean {
