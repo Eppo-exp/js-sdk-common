@@ -1,5 +1,5 @@
 import ApiEndpoints from './api-endpoints';
-import { IObfuscatedPrecomputedConfigurationResponse } from './configuration-wire-types';
+import { IObfuscatedPrecomputedConfigurationResponse } from './configuration-wire/configuration-wire-types';
 import {
   BanditParameters,
   BanditReference,
@@ -46,6 +46,18 @@ export interface IBanditParametersResponse {
   bandits: Record<string, BanditParameters>;
 }
 
+/**
+ * Fixes issues with url.toString() in older React Native versions
+ * that leaves a trailing slash in pathname
+ * @param url URL to stringify
+ * @returns stringified url
+ */
+const urlWithNoTrailingSlash = (url: URL) => {
+  // Note: URL.pathname does not exist in some React Native JS runtime
+  //       so we have to do string manipulation on the stringified URL
+  return url.toString().replace(/\/\?/, '?').replace(/\/$/, '');
+};
+
 export interface IHttpClient {
   getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined>;
   getBanditParameters(): Promise<IBanditParametersResponse | undefined>;
@@ -89,7 +101,7 @@ export default class FetchHttpClient implements IHttpClient {
       const controller = new AbortController();
       const signal = controller.signal;
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-      const response = await fetch(url.toString(), { signal });
+      const response = await fetch(urlWithNoTrailingSlash(url), { signal });
       // Clear timeout when response is received within the budget.
       clearTimeout(timeoutId);
 
@@ -114,7 +126,7 @@ export default class FetchHttpClient implements IHttpClient {
       const signal = controller.signal;
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-      const response = await fetch(url.toString(), {
+      const response = await fetch(urlWithNoTrailingSlash(url), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

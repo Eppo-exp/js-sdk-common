@@ -237,6 +237,7 @@ export default class EppoPrecomputedClient {
       allocationKey: precomputedFlag.allocationKey ?? '',
       extraLogging: precomputedFlag.extraLogging ?? {},
       doLog: precomputedFlag.doLog,
+      entityId: null,
     };
 
     try {
@@ -323,39 +324,38 @@ export default class EppoPrecomputedClient {
     flagKey: string,
     defaultValue: string,
   ): Omit<IAssignmentDetails<string>, 'evaluationDetails'> {
-    const banditEvaluation = this.getPrecomputedBandit(flagKey);
-
-    if (banditEvaluation == null) {
-      logger.warn(`${loggerPrefix} No assigned variation. Bandit not found: ${flagKey}`);
+    const precomputedFlag = this.getPrecomputedFlag(flagKey);
+    if (!precomputedFlag) {
+      logger.warn(`${loggerPrefix} No assigned variation. Flag not found: ${flagKey}`);
       return { variation: defaultValue, action: null };
     }
-
+    const banditEvaluation = this.getPrecomputedBandit(flagKey);
     const assignedVariation = this.getStringAssignment(flagKey, defaultValue);
-
-    const banditEvent: IBanditEvent = {
-      timestamp: new Date().toISOString(),
-      featureFlag: flagKey,
-      bandit: banditEvaluation.banditKey,
-      subject: this.subject.subjectKey ?? '',
-      action: banditEvaluation.action,
-      actionProbability: banditEvaluation.actionProbability,
-      optimalityGap: banditEvaluation.optimalityGap,
-      modelVersion: banditEvaluation.modelVersion,
-      subjectNumericAttributes: banditEvaluation.actionNumericAttributes,
-      subjectCategoricalAttributes: banditEvaluation.actionCategoricalAttributes,
-      actionNumericAttributes: banditEvaluation.actionNumericAttributes,
-      actionCategoricalAttributes: banditEvaluation.actionCategoricalAttributes,
-      metaData: this.buildLoggerMetadata(),
-      evaluationDetails: null,
-    };
-
-    try {
-      this.logBanditAction(banditEvent);
-    } catch (error) {
-      logger.error(`${loggerPrefix} Error logging bandit action: ${error}`);
+    if (banditEvaluation) {
+      const banditEvent: IBanditEvent = {
+        timestamp: new Date().toISOString(),
+        featureFlag: flagKey,
+        bandit: banditEvaluation.banditKey,
+        subject: this.subject.subjectKey ?? '',
+        action: banditEvaluation.action,
+        actionProbability: banditEvaluation.actionProbability,
+        optimalityGap: banditEvaluation.optimalityGap,
+        modelVersion: banditEvaluation.modelVersion,
+        subjectNumericAttributes: banditEvaluation.actionNumericAttributes,
+        subjectCategoricalAttributes: banditEvaluation.actionCategoricalAttributes,
+        actionNumericAttributes: banditEvaluation.actionNumericAttributes,
+        actionCategoricalAttributes: banditEvaluation.actionCategoricalAttributes,
+        metaData: this.buildLoggerMetadata(),
+        evaluationDetails: null,
+      };
+      try {
+        this.logBanditAction(banditEvent);
+      } catch (error) {
+        logger.error(`${loggerPrefix} Error logging bandit action: ${error}`);
+      }
+      return { variation: assignedVariation, action: banditEvent.action };
     }
-
-    return { variation: assignedVariation, action: banditEvent.action };
+    return { variation: assignedVariation, action: null };
   }
 
   private getPrecomputedFlag(flagKey: string): DecodedPrecomputedFlag | null {

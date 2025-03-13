@@ -21,7 +21,7 @@ import {
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   ObfuscatedPrecomputedConfigurationResponse,
-} from '../configuration-wire-types';
+} from '../configuration-wire/configuration-wire-types';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../interfaces';
@@ -79,6 +79,7 @@ describe('EppoClient E2E test', () => {
   const mockFlag: Flag = {
     key: flagKey,
     enabled: true,
+    entityId: 123,
     variationType: VariationType.STRING,
     variations: { a: variationA, b: variationB },
     allocations: [
@@ -194,6 +195,16 @@ describe('EppoClient E2E test', () => {
       );
       client.setAssignmentLogger(mockLogger);
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(MAX_EVENT_QUEUE_SIZE);
+    });
+
+    it('should log assignment event with entityId', () => {
+      const mockLogger = td.object<IAssignmentLogger>();
+      const client = new EppoClient({ flagConfigurationStore: storage });
+      client.setAssignmentLogger(mockLogger);
+      client.getStringAssignment(flagKey, 'subject-to-be-logged', {}, 'default-value');
+      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
+      const loggedAssignmentEvent = td.explain(mockLogger.logAssignment).calls[0].args[0];
+      expect(loggedAssignmentEvent.entityId).toEqual(123);
     });
   });
 

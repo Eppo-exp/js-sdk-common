@@ -22,7 +22,7 @@ import {
   IConfigurationWire,
   IPrecomputedConfiguration,
   PrecomputedConfiguration,
-} from '../configuration-wire-types';
+} from '../configuration-wire/configuration-wire-types';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -1076,7 +1076,7 @@ export default class EppoClient {
       configDetails.configEnvironment,
     );
 
-    const configWire: IConfigurationWire = new ConfigurationWireV1(precomputedConfig);
+    const configWire: IConfigurationWire = ConfigurationWireV1.precomputed(precomputedConfig);
     return JSON.stringify(configWire);
   }
 
@@ -1325,7 +1325,7 @@ export default class EppoClient {
     });
   }
 
-  private maybeLogAssignment(result: FlagEvaluation & { entityId?: number }) {
+  private maybeLogAssignment(result: FlagEvaluation) {
     const {
       flagKey,
       format,
