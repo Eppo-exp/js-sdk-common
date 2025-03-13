@@ -13,7 +13,7 @@ import {
 } from '../attributes';
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
-import { IPrecomputedConfigurationResponse } from '../configuration-wire-types';
+import { IPrecomputedConfigurationResponse } from '../configuration-wire/configuration-wire-types';
 import { DEFAULT_POLL_INTERVAL_MS, MAX_EVENT_QUEUE_SIZE, POLL_JITTER_PCT } from '../constants';
 import FetchHttpClient from '../http-client';
 import {

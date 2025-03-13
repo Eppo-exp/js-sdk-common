@@ -18,7 +18,7 @@ import {
   IConfigurationWire,
   IPrecomputedConfiguration,
   IObfuscatedPrecomputedConfigurationResponse,
-} from '../configuration-wire-types';
+} from '../configuration-wire/configuration-wire-types';
 import { Evaluator, FlagEvaluation } from '../evaluator';
 import {
   AllocationEvaluationCode,
