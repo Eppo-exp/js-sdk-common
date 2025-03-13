@@ -51,10 +51,10 @@ export class ConfigurationWireHelper {
   }
 
   /**
-   * Builds an `IConfigurationWire` object from flag and bandit API responses.
+   * Fetches configuration data from the API and build a Bootstrap Configuration (aka an `IConfigurationWire` object).
    * The IConfigurationWire instance can be used to bootstrap some SDKs.
    */
-  public async getBootstrapConfigurationFromApi(): Promise<IConfigurationWire> {
+  public async fetchBootstrapConfiguration(): Promise<IConfigurationWire> {
     // Get the configs
     let banditResponse: IBanditParametersResponse | undefined;
     const configResponse: IUniversalFlagConfigResponse | undefined =

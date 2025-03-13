@@ -19,7 +19,7 @@ describe('ConfigurationWireHelper', () => {
         baseUrl: TEST_BASE_URL,
       });
 
-      const wirePacket = await helper.getBootstrapConfigurationFromApi();
+      const wirePacket = await helper.fetchBootstrapConfiguration();
 
       expect(wirePacket.version).toBe(1);
       expect(wirePacket.config).toBeDefined();
@@ -49,7 +49,7 @@ describe('ConfigurationWireHelper', () => {
         baseUrl: TEST_BASE_URL,
       });
 
-      const wirePacket = await helper.getBootstrapConfigurationFromApi();
+      const wirePacket = await helper.fetchBootstrapConfiguration();
 
       expect(wirePacket.version).toBe(1);
       expect(wirePacket.config).toBeDefined();
@@ -81,7 +81,7 @@ describe('ConfigurationWireHelper', () => {
         baseUrl: TEST_BASE_URL,
       });
 
-      const wirePacket = await helper.getBootstrapConfigurationFromApi();
+      const wirePacket = await helper.fetchBootstrapConfiguration();
 
       if (!wirePacket.config) {
         throw new Error('Flag config not present in ConfigurationWire');
