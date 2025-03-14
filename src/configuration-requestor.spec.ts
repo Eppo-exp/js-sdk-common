@@ -578,7 +578,6 @@ describe('ConfigurationRequestor', () => {
       it('should not fetch bandit parameters if model versions are already loaded', async () => {
         // First call to load the initial data
         await configurationRequestor.fetchAndStoreConfigurations();
-        const initialFetchCount = fetchSpy.mock.calls.length;
 
         // Reset the mock call count
         fetchSpy.mockClear();
