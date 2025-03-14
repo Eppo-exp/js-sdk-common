@@ -13,6 +13,7 @@ import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
 import ConfigurationRequestor from '../configuration-requestor';
+import { ConfigurationManager } from '../configuration-store/configuration-manager';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   IConfigurationWire,
@@ -64,12 +65,12 @@ describe('EppoClient Bandits E2E test', () => {
       },
     });
     const httpClient = new FetchHttpClient(apiEndpoints, 1000);
-    const configurationRequestor = new ConfigurationRequestor(
-      httpClient,
+    const configManager = new ConfigurationManager(
       flagStore,
       banditVariationStore,
       banditModelStore,
     );
+    const configurationRequestor = new ConfigurationRequestor(httpClient, configManager, true);
     await configurationRequestor.fetchAndStoreConfigurations();
   });
 

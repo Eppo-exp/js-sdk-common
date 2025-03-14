@@ -15,7 +15,9 @@ import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-ca
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
 import ConfigurationRequestor from '../configuration-requestor';
+import { ConfigurationManager } from '../configuration-store/configuration-manager';
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
+import { IConfigurationManager } from '../configuration-store/i-configuration-manager';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   ConfigurationWireV1,
@@ -41,7 +43,7 @@ import {
 } from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
 import FetchHttpClient from '../http-client';
-import { IConfiguration, StoreBackedConfiguration } from '../i-configuration';
+import { IConfiguration } from '../i-configuration';
 import {
   BanditModelData,
   BanditParameters,
@@ -138,6 +140,7 @@ export default class EppoClient {
   private readonly evaluator = new Evaluator();
   private configurationRequestor?: ConfigurationRequestor;
   private readonly overrideValidator = new OverrideValidator();
+  private configurationManager: IConfigurationManager;
 
   constructor({
     eventDispatcher = new NoOpEventDispatcher(),
@@ -165,16 +168,18 @@ export default class EppoClient {
     this.overrideStore = overrideStore;
     this.configurationRequestParameters = configurationRequestParameters;
     this.expectObfuscated = isObfuscated;
+
+    // Initialize the configuration manager
+    this.configurationManager = new ConfigurationManager(
+      this.flagConfigurationStore,
+      this.banditVariationConfigurationStore ||
+        new MemoryOnlyConfigurationStore<BanditVariation[]>(),
+      this.banditModelConfigurationStore || new MemoryOnlyConfigurationStore<BanditParameters>(),
+    );
   }
 
   private getConfiguration(): IConfiguration {
-    return this.configurationRequestor
-      ? this.configurationRequestor.getConfiguration()
-      : new StoreBackedConfiguration(
-          this.flagConfigurationStore,
-          this.banditVariationConfigurationStore,
-          this.banditModelConfigurationStore,
-        );
+    return this.configurationManager.getConfiguration();
   }
 
   private maybeWarnAboutObfuscationMismatch(configObfuscated: boolean) {
@@ -238,21 +243,51 @@ export default class EppoClient {
     this.configurationRequestParameters = configurationRequestParameters;
   }
 
-  // noinspection JSUnusedGlobalSymbols
   setFlagConfigurationStore(flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>) {
     this.flagConfigurationStore = flagConfigurationStore;
     this.configObfuscatedCache = undefined;
+
+    // Update the configuration manager
+    this.configurationManager.setConfigurationStores({
+      flagConfigurationStore: this.flagConfigurationStore,
+      banditReferenceConfigurationStore:
+        this.banditVariationConfigurationStore ||
+        new MemoryOnlyConfigurationStore<BanditVariation[]>(),
+      banditConfigurationStore:
+        this.banditModelConfigurationStore || new MemoryOnlyConfigurationStore<BanditParameters>(),
+    });
   }
 
-  // noinspection JSUnusedGlobalSymbols
   setBanditVariationConfigurationStore(
     banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]>,
   ) {
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
+
+    // Update the configuration manager
+    this.configurationManager.setConfigurationStores({
+      flagConfigurationStore: this.flagConfigurationStore,
+      banditReferenceConfigurationStore: this.banditVariationConfigurationStore,
+      banditConfigurationStore:
+        this.banditModelConfigurationStore || new MemoryOnlyConfigurationStore<BanditParameters>(),
+    });
+  }
+
+  setBanditModelConfigurationStore(
+    banditModelConfigurationStore: IConfigurationStore<BanditParameters>,
+  ) {
+    this.banditModelConfigurationStore = banditModelConfigurationStore;
+
+    // Update the configuration manager
+    this.configurationManager.setConfigurationStores({
+      flagConfigurationStore: this.flagConfigurationStore,
+      banditReferenceConfigurationStore:
+        this.banditVariationConfigurationStore ||
+        new MemoryOnlyConfigurationStore<BanditVariation[]>(),
+      banditConfigurationStore: this.banditModelConfigurationStore,
+    });
   }
 
   /** Sets the EventDispatcher instance to use when tracking events with {@link track}. */
-  // noinspection JSUnusedGlobalSymbols
   setEventDispatcher(eventDispatcher: EventDispatcher) {
     this.eventDispatcher = eventDispatcher;
   }
@@ -270,25 +305,6 @@ export default class EppoClient {
    */
   setContext(key: string, value: string | number | boolean | null) {
     this.eventDispatcher?.attachContext(key, value);
-  }
-
-  // noinspection JSUnusedGlobalSymbols
-  setBanditModelConfigurationStore(
-    banditModelConfigurationStore: IConfigurationStore<BanditParameters>,
-  ) {
-    this.banditModelConfigurationStore = banditModelConfigurationStore;
-  }
-
-  // noinspection JSUnusedGlobalSymbols
-  /**
-   * Setting this value will have no side effects other than triggering a warning when the actual
-   * configuration's obfuscated does not match the value set here.
-   *
-   * @deprecated The client determines whether the configuration is obfuscated by inspection
-   * @param isObfuscated
-   */
-  setIsObfuscated(isObfuscated: boolean) {
-    this.expectObfuscated = isObfuscated;
   }
 
   setOverrideStore(store: ISyncStore<Variation>): void {
@@ -322,7 +338,7 @@ export default class EppoClient {
       apiKey,
       sdkName,
       sdkVersion,
-      baseUrl, // Default is set in ApiEndpoints constructor if undefined
+      baseUrl,
       requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
       numInitialRequestRetries = DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
       numPollRequestRetries = DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -338,22 +354,22 @@ export default class EppoClient {
       pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS;
     }
 
-    // todo: Inject the chain of dependencies below
     const apiEndpoints = new ApiEndpoints({
       baseUrl,
       queryParams: { apiKey, sdkName, sdkVersion },
     });
     const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
+
+    // Use the configuration manager when creating the requestor
     const configurationRequestor = new ConfigurationRequestor(
       httpClient,
-      this.flagConfigurationStore,
-      this.banditVariationConfigurationStore ?? null,
-      this.banditModelConfigurationStore ?? null,
+      this.configurationManager,
+      !!this.banditModelConfigurationStore && !!this.banditVariationConfigurationStore,
     );
     this.configurationRequestor = configurationRequestor;
 
     const pollingCallback = async () => {
-      if (await configurationRequestor.isFlagConfigExpired()) {
+      if (await this.flagConfigurationStore.isExpired()) {
         this.configObfuscatedCache = undefined;
         return configurationRequestor.fetchAndStoreConfigurations();
       }

@@ -1,5 +1,6 @@
 import ApiEndpoints from '../api-endpoints';
 import ConfigurationRequestor from '../configuration-requestor';
+import { ConfigurationManager } from '../configuration-store/configuration-manager';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import FetchHttpClient from '../http-client';
 import { Flag, ObfuscatedFlag } from '../interfaces';
@@ -18,9 +19,8 @@ export async function initConfiguration(
   const httpClient = new FetchHttpClient(apiEndpoints, 1000);
   const configurationRequestor = new ConfigurationRequestor(
     httpClient,
-    configurationStore,
-    null,
-    null,
+    new ConfigurationManager(configurationStore, null, null),
+    false,
   );
   await configurationRequestor.fetchAndStoreConfigurations();
 }
