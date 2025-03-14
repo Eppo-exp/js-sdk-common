@@ -1,13 +1,9 @@
-declare const process: {
-  exit: (code: number) => void;
-  env: { [key: string]: string | undefined };
-};
-
 import * as fs from 'fs';
 
 import type { CommandModule } from 'yargs';
 
 import { ConfigurationWireHelper } from '../../configuration-wire/configuration-wire-helper';
+import { process } from '../node-shim';
 
 export const bootstrapConfigCommand: CommandModule = {
   command: 'bootstrap-config',

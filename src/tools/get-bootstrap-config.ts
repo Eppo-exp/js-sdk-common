@@ -2,13 +2,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 import { bootstrapConfigCommand } from './commands/bootstrap-config';
-
-// Required type shape for `process`.
-declare const process: {
-  exit: (code: number) => void;
-  env: { [key: string]: string | undefined };
-  argv: string[];
-};
+import { process } from './node-shim';
 
 /**
  * Script to run the bootstrap-config command directly.
