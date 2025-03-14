@@ -55,53 +55,38 @@ When publishing releases, the following rules apply:
 
 ### Bootstrap Configuration
 
-You can generate a bootstrap configuration string using either the CLI tool or programmatically via the ConfigurationHelper class.
+You can generate a bootstrap configuration string from either the command line or programmatically via the
+ConfigurationWireHelper class.
 
-#### CLI Usage
+#### Command Line Usage
 
-The CLI tool can be used in several ways depending on how you've installed the package:
-
-**If installed globally:**
-```bash
-# Install globally
-npm install -g @eppo/js-client-sdk-common
-# or, with yarn
-yarn add -g @eppo/js-client-sdk-common
-
-# Use the command directly
-eppo sdk-tools bootstrap-config --key <sdkKey>
-```
-
-**If installed as a project dependency:**
+**Install as a project dependency:**
 ```bash
 # Install as a dependency
 npm install --save-dev @eppo/js-client-sdk-common
 # or, with yarn
 yarn add --dev @eppo/js-client-sdk-common
 
-# Use via npx
-npx eppo sdk-tools bootstrap-config --key <sdkKey>
-
 # Or via yarn
-yarn eppo sdk-tools bootstrap-config --key <sdkKey>
+yarn bootstrap-config --key <sdkKey>
 ```
 
 Common usage examples:
 ```bash
 # Basic usage
-eppo sdk-tools bootstrap-config --key <sdkKey>
+yarn bootstrap-config --key <sdkKey>
 
 # With custom SDK name (default is 'android')
-eppo sdk-tools bootstrap-config --key <sdkKey> --sdk js-client
+yarn bootstrap-config --key <sdkKey> --sdk js-client
 
 # With custom base URL
-eppo sdk-tools bootstrap-config --key <sdkKey> --base-url https://api.custom-domain.com
+yarn bootstrap-config --key <sdkKey> --base-url https://api.custom-domain.com
 
 # Save configuration to a file
-eppo sdk-tools bootstrap-config --key <sdkKey> --output bootstrap-config.json
+yarn bootstrap-config --key <sdkKey> --output bootstrap-config.json
 
 # Show help
-eppo sdk-tools bootstrap-config --help
+yarn bootstrap-config --help
 ```
 
 The tool accepts the following arguments:

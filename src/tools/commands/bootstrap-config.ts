@@ -7,7 +7,7 @@ import * as fs from 'fs';
 
 import type { CommandModule } from 'yargs';
 
-import { ConfigurationHelper } from '../bootstrap';
+import { ConfigurationWireHelper } from '../../configuration-wire/configuration-wire-helper';
 
 export const bootstrapConfigCommand: CommandModule = {
   command: 'bootstrap-config',
@@ -46,12 +46,12 @@ export const bootstrapConfigCommand: CommandModule = {
     }
 
     try {
-      const helper = ConfigurationHelper.build(
-        argv.key as string,
-        argv.sdk as string,
-        argv['base-url'] as string,
-      );
-      const config = await helper.getBootstrapConfigurationFromApi();
+      const helper = ConfigurationWireHelper.build(argv.key as string, {
+        sdkName: argv.sdk as string,
+        sdkVersion: 'v5.0.0',
+        baseUrl: argv['base-url'] as string,
+      });
+      const config = await helper.fetchBootstrapConfiguration();
 
       if (!config) {
         console.error('Error: Failed to fetch configuration');
