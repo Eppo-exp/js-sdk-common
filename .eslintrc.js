@@ -48,12 +48,16 @@ module.exports = {
       {
         name: 'atob',
         message:
-          "'atob' unavailable in React Native 0.72. Use 'decodeBase64' helper in src/obfuscation.ts instead",
+          "'atob' unavailable in React Native's Hermes JS engine. Use 'decodeBase64' helper in src/obfuscation.ts instead",
       },
       {
         name: 'btoa',
         message:
-          "'btoa' unavailable in React Native 0.72. Use 'encodeBase64' helper in src/obfuscation.ts instead",
+          "'btoa' unavailable in React Native's Hermes JS engine. Use 'encodeBase64' helper in src/obfuscation.ts instead",
+      },
+      {
+        name: 'URL',
+        message: "URL is improperly implemented in React Native's Hermes JS engine.",
       },
       {
         name: 'Buffer',

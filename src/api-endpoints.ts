@@ -17,23 +17,26 @@ export default class ApiEndpoints {
     this.params.baseUrl = params.baseUrl ?? DEFAULT_BASE_URL;
   }
 
-  endpoint(resource: string): URL {
-    const url = new URL(this.params.baseUrl + resource);
-    Object.entries(this.params.queryParams ?? {}).forEach(([key, value]) =>
-      url.searchParams.append(key, value),
-    );
-    return url;
+  endpoint(resource: string): string {
+    const endpointUrl = `${this.params.baseUrl}${resource}`;
+    const queryParams = this.params.queryParams;
+    if (!queryParams) {
+      return endpointUrl;
+    }
+    const urlSearchParams = new URLSearchParams();
+    Object.entries(queryParams).forEach(([key, value]) => urlSearchParams.append(key, value));
+    return `${endpointUrl}?${urlSearchParams}`;
   }
 
-  ufcEndpoint(): URL {
+  ufcEndpoint(): string {
     return this.endpoint(UFC_ENDPOINT);
   }
 
-  banditParametersEndpoint(): URL {
+  banditParametersEndpoint(): string {
     return this.endpoint(BANDIT_ENDPOINT);
   }
 
-  precomputedFlagsEndpoint(): URL {
+  precomputedFlagsEndpoint(): string {
     return this.endpoint(PRECOMPUTED_FLAGS_ENDPOINT);
   }
 }
