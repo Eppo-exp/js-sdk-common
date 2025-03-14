@@ -350,6 +350,7 @@ export default class EppoClient {
       this.banditVariationConfigurationStore ?? null,
       this.banditModelConfigurationStore ?? null,
     );
+    this.configurationRequestor = configurationRequestor;
 
     const pollingCallback = async () => {
       if (await configurationRequestor.isFlagConfigExpired()) {
