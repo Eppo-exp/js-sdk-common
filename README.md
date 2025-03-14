@@ -58,6 +58,9 @@ When publishing releases, the following rules apply:
 You can generate a bootstrap configuration string from either the command line or programmatically via the
 ConfigurationWireHelper class.
 
+The tool allows you to specify the target SDK this configuration will be used on. It is important to correctly specify
+the intended SDK, as this determines whether the configuration is obfuscated (for client SDKs) or not (for server SDKs).
+
 #### Command Line Usage
 
 **Install as a project dependency:**
@@ -117,4 +120,4 @@ async function getBootstrapConfig() {
 }
 ```
 
-The tool will output a JSON string containing the configuration wire format that can be used to initialize Eppo SDKs in offline mode.
+The tool will output a JSON string containing the configuration wire format that can be used to bootstrap Eppo SDKs.
