@@ -22,6 +22,7 @@ import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.stor
 import {
   ConfigurationWireV1,
   IConfigurationWire,
+  inflateResponse,
   IPrecomputedConfiguration,
   PrecomputedConfiguration,
 } from '../configuration-wire/configuration-wire-types';
@@ -325,7 +326,32 @@ export default class EppoClient {
     );
   }
 
+  bootstrap(configuration: IConfigurationWire) {
+    if (!configuration.config) {
+      throw new Error('Flag configuration not provided');
+    }
+    const flagConfigResponse = inflateResponse(configuration.config.response);
+    const banditParamResponse = configuration.bandits
+      ? inflateResponse(configuration.bandits.response)
+      : undefined;
+
+    this.configurationManager.hydrateConfigurationStoresFromUfc(
+      flagConfigResponse,
+      banditParamResponse,
+    );
+
+    // Still initialize the client in case polling is needed.
+    this.inititalize();
+  }
+
+  /**
+   * @deprecated use `initialize` instead.
+   */
   async fetchFlagConfigurations() {
+    return this.inititalize();
+  }
+
+  async inititalize() {
     if (!this.configurationRequestParameters) {
       throw new Error(
         'Eppo SDK unable to fetch flag configurations without configuration request parameters',
