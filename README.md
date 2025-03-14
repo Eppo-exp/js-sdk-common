@@ -50,3 +50,74 @@ When publishing releases, the following rules apply:
 **Note**: The release will not be published if:
 - A pre-release is marked as "latest"
 - A pre-release label is used without checking "Set as pre-release"
+
+## Tools
+
+### Bootstrap Configuration
+
+You can generate a bootstrap configuration string from either the command line or programmatically via the
+ConfigurationWireHelper class.
+
+The tool allows you to specify the target SDK this configuration will be used on. It is important to correctly specify
+the intended SDK, as this determines whether the configuration is obfuscated (for client SDKs) or not (for server SDKs).
+
+#### Command Line Usage
+
+**Install as a project dependency:**
+```bash
+# Install as a dependency
+npm install --save-dev @eppo/js-client-sdk-common
+# or, with yarn
+yarn add --dev @eppo/js-client-sdk-common
+
+# Or via yarn
+yarn bootstrap-config --key <sdkKey>
+```
+
+Common usage examples:
+```bash
+# Basic usage
+yarn bootstrap-config --key <sdkKey>
+
+# With custom SDK name (default is 'android')
+yarn bootstrap-config --key <sdkKey> --sdk js-client
+
+# With custom base URL
+yarn bootstrap-config --key <sdkKey> --base-url https://api.custom-domain.com
+
+# Save configuration to a file
+yarn bootstrap-config --key <sdkKey> --output bootstrap-config.json
+
+# Show help
+yarn bootstrap-config --help
+```
+
+The tool accepts the following arguments:
+- `--key, -k`: SDK key (required, can also be set via EPPO_SDK_KEY environment variable)
+- `--sdk`: Target SDK name (default: 'android')
+- `--base-url`: Custom base URL for the API
+- `--output, -o`: Output file path (if not specified, outputs to console)
+- `--help, -h`: Show help
+
+#### Programmatic Usage
+```typescript
+import { ConfigurationHelper } from '@eppo/js-client-sdk-common';
+
+async function getBootstrapConfig() {
+  // Initialize the helper
+  const helper = ConfigurationHelper.build(
+    'your-sdk-key',
+    'js-client', // optional: target SDK name (default: 'android')
+    'https://api.custom-domain.com' // optional: custom base URL
+  );
+
+  // Fetch the configuration
+  const configBuilder = await helper.getBootstrapConfigurationString();
+  const configString = configBuilder.toString();
+
+  // Use the configuration string to initialize your SDK
+  console.log(configString);
+}
+```
+
+The tool will output a JSON string containing the configuration wire format that can be used to bootstrap Eppo SDKs.
