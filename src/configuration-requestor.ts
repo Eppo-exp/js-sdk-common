@@ -1,5 +1,5 @@
 import { IConfigurationStore } from './configuration-store/configuration-store';
-import { IConfigurationWire } from './configuration-wire-types';
+import { IConfigurationWire } from './configuration-wire/configuration-wire-types';
 import {
   IBanditParametersResponse,
   IHttpClient,
