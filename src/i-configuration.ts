@@ -49,7 +49,7 @@ export class StoreBackedConfiguration implements IConfiguration {
     flagConfig: ConfigStoreHydrationPacket<Flag>,
     banditVariationConfig?: ConfigStoreHydrationPacket<BanditVariation[]>,
     banditModelConfig?: ConfigStoreHydrationPacket<BanditParameters>,
-  ): Promise<boolean> {
+  ) {
     const didUpdateFlags = await hydrateConfigurationStore(this.flagConfigurationStore, flagConfig);
     const promises: Promise<boolean>[] = [];
     if (this.banditVariationConfigurationStore && banditVariationConfig) {
