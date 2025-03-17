@@ -15,6 +15,7 @@ import {
 } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
+import { ConfigurationManager } from '../configuration-store/configuration-manager';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
@@ -24,7 +25,15 @@ import {
 } from '../configuration-wire/configuration-wire-types';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
-import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../interfaces';
+import {
+  Flag,
+  ObfuscatedFlag,
+  VariationType,
+  FormatEnum,
+  Variation,
+  BanditVariation,
+  BanditParameters,
+} from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import { AttributeType } from '../types';
 
@@ -1189,5 +1198,239 @@ describe('EppoClient E2E test', () => {
         'other-flag': 'other-variation',
       });
     });
+  });
+});
+
+describe('EppoClient ConfigurationManager Integration', () => {
+  let client: EppoClient;
+  let flagStore: MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>;
+  let banditVariationStore: MemoryOnlyConfigurationStore<BanditVariation[]>;
+  let banditModelStore: MemoryOnlyConfigurationStore<BanditParameters>;
+
+  // Sample flag with correct shape
+  const testFlag: Flag = {
+    key: 'test-flag',
+    enabled: true,
+    variationType: VariationType.STRING,
+    variations: {
+      control: { key: 'control', value: 'control-value' },
+      treatment: { key: 'treatment', value: 'treatment-value' },
+    },
+    allocations: [
+      {
+        key: 'allocation-1',
+        rules: [],
+        splits: [
+          {
+            shards: [],
+            variationKey: 'treatment',
+          },
+        ],
+        doLog: true,
+      },
+    ],
+    totalShards: 10000,
+  };
+
+  // Sample bandit variation with correct shape
+  const testBanditVariation: BanditVariation = {
+    key: 'test-bandit',
+    flagKey: 'test-flag',
+    variationKey: 'treatment',
+    variationValue: 'treatment-value',
+  };
+
+  // Sample bandit parameters with correct shape
+  const testBanditParameters: BanditParameters = {
+    banditKey: 'test-bandit',
+    modelName: 'test-model',
+    modelVersion: '1.0',
+    modelData: {
+      gamma: 0,
+      defaultActionScore: 0,
+      actionProbabilityFloor: 0,
+      coefficients: {},
+    },
+  };
+
+  beforeEach(() => {
+    // Reset mocks
+    jest.clearAllMocks();
+
+    // Create fresh stores for each test
+    flagStore = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
+    banditVariationStore = new MemoryOnlyConfigurationStore<BanditVariation[]>();
+    banditModelStore = new MemoryOnlyConfigurationStore<BanditParameters>();
+
+    // Create client with the stores
+    client = new EppoClient({
+      flagConfigurationStore: flagStore,
+      banditVariationConfigurationStore: banditVariationStore,
+      banditModelConfigurationStore: banditModelStore,
+    });
+  });
+
+  it('should initialize ConfigurationManager in constructor', () => {
+    // Access the private configurationManager field
+    const configManager = (client as any).configurationManager;
+
+    expect(configManager).toBeDefined();
+    expect(configManager).toBeInstanceOf(ConfigurationManager);
+  });
+
+  it('should use ConfigurationManager for getConfiguration', () => {
+    // Create a spy on the ConfigurationManager's getConfiguration method
+    const configManager = (client as any).configurationManager;
+    const getConfigSpy = jest.spyOn(configManager, 'getConfiguration');
+
+    // Call the client's getConfiguration method
+    const config = (client as any).getConfiguration();
+
+    // Verify the manager's method was called
+    expect(getConfigSpy).toHaveBeenCalled();
+    expect(config).toBe(configManager.getConfiguration());
+  });
+
+  it('should update ConfigurationManager when setFlagConfigurationStore is called', async () => {
+    // Create a new store
+    const newFlagStore = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
+
+    // Pre-populate with a test flag
+    await newFlagStore.setEntries({ 'test-flag': testFlag });
+    newFlagStore.setFormat(FormatEnum.SERVER);
+
+    // Create a spy on the ConfigurationManager's setConfigurationStores method
+    const configManager = (client as any).configurationManager;
+    const setStoresSpy = jest.spyOn(configManager, 'setConfigurationStores');
+
+    // Call the setter method
+    client.setFlagConfigurationStore(newFlagStore);
+
+    // Verify the manager's method was called with the correct arguments
+    expect(setStoresSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flagConfigurationStore: newFlagStore,
+      }),
+    );
+
+    // Verify the configuration was updated by checking if we can access the flag
+    const config = configManager.getConfiguration();
+    expect(config.getFlag('test-flag')).toEqual(testFlag);
+  });
+
+  it('should update ConfigurationManager when setBanditVariationConfigurationStore is called', async () => {
+    // Create a new store
+    const newBanditVariationStore = new MemoryOnlyConfigurationStore<BanditVariation[]>();
+
+    // Pre-populate with test data
+    await newBanditVariationStore.setEntries({
+      'test-flag': [testBanditVariation],
+    });
+    newBanditVariationStore.setFormat(FormatEnum.SERVER);
+
+    // Create a spy on the ConfigurationManager's setConfigurationStores method
+    const configManager = (client as any).configurationManager;
+    const setStoresSpy = jest.spyOn(configManager, 'setConfigurationStores');
+
+    // Call the setter method
+    client.setBanditVariationConfigurationStore(newBanditVariationStore);
+
+    // Verify the manager's method was called with the correct arguments
+    expect(setStoresSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        banditReferenceConfigurationStore: newBanditVariationStore,
+      }),
+    );
+
+    // Verify the configuration was updated
+    const config = configManager.getConfiguration();
+    expect(config.getBanditVariations()['test-flag']).toEqual([testBanditVariation]);
+  });
+
+  it('should update ConfigurationManager when setBanditModelConfigurationStore is called', async () => {
+    // Create a new store
+    const newBanditModelStore = new MemoryOnlyConfigurationStore<BanditParameters>();
+
+    // Pre-populate with test data
+    await newBanditModelStore.setEntries({
+      'test-bandit': testBanditParameters,
+    });
+    newBanditModelStore.setFormat(FormatEnum.SERVER);
+
+    // Create a spy on the ConfigurationManager's setConfigurationStores method
+    const configManager = (client as any).configurationManager;
+    const setStoresSpy = jest.spyOn(configManager, 'setConfigurationStores');
+
+    // Call the setter method
+    client.setBanditModelConfigurationStore(newBanditModelStore);
+
+    // Verify the manager's method was called with the correct arguments
+    expect(setStoresSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        banditConfigurationStore: newBanditModelStore,
+      }),
+    );
+
+    // Verify the configuration was updated
+    const config = configManager.getConfiguration();
+    expect(config.getBandits()['test-bandit']).toEqual(testBanditParameters);
+  });
+
+  it('should use configuration from ConfigurationManager for assignment decisions', async () => {
+    // Create a new flag store with a test flag
+    const newFlagStore = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
+    await newFlagStore.setEntries({ 'test-flag': testFlag });
+    newFlagStore.setFormat(FormatEnum.SERVER);
+
+    // Update the client's flag store
+    client.setFlagConfigurationStore(newFlagStore);
+
+    // Create a spy on the ConfigurationManager's getConfiguration method
+    const configManager = (client as any).configurationManager;
+    const getConfigSpy = jest.spyOn(configManager, 'getConfiguration');
+
+    // Get an assignment
+    const assignment = client.getStringAssignment('test-flag', 'subject-1', {}, 'default');
+
+    // Verify the manager's getConfiguration method was called
+    expect(getConfigSpy).toHaveBeenCalled();
+
+    // Verify we got the expected assignment (based on the test flag's configuration)
+    expect(assignment).toBe('treatment-value');
+  });
+
+  it('should reflect changes in ConfigurationManager immediately in assignments', async () => {
+    // First, set up a flag store with one variation
+    const initialFlagStore = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
+    const initialFlag = { ...testFlag };
+    await initialFlagStore.setEntries({ 'test-flag': initialFlag });
+    initialFlagStore.setFormat(FormatEnum.SERVER);
+
+    client.setFlagConfigurationStore(initialFlagStore);
+
+    // Get initial assignment
+    const initialAssignment = client.getStringAssignment('test-flag', 'subject-1', {}, 'default');
+    expect(initialAssignment).toBe('treatment-value');
+
+    // Now create a new flag store with a different variation
+    const updatedFlagStore = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
+    const updatedFlag = {
+      ...testFlag,
+      variations: {
+        control: { key: 'control', value: 'control-value' },
+        treatment: { key: 'treatment', value: 'new-treatment-value' },
+      },
+    };
+    await updatedFlagStore.setEntries({ 'test-flag': updatedFlag });
+    updatedFlagStore.setFormat(FormatEnum.SERVER);
+
+    // Update the client's flag store
+    client.setFlagConfigurationStore(updatedFlagStore);
+
+    // Get updated assignment
+    const updatedAssignment = client.getStringAssignment('test-flag', 'subject-1', {}, 'default');
+
+    // Verify the assignment reflects the updated configuration
+    expect(updatedAssignment).toBe('new-treatment-value');
   });
 });
