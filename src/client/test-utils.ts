@@ -19,7 +19,7 @@ export async function initConfiguration(
   const httpClient = new FetchHttpClient(apiEndpoints, 1000);
   const configurationRequestor = new ConfigurationRequestor(
     httpClient,
-    new ConfigurationManager(configurationStore, null, null),
+    new ConfigurationManager(configurationStore),
     false,
   );
   await configurationRequestor.fetchAndStoreConfigurations();

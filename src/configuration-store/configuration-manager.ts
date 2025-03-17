@@ -20,8 +20,8 @@ export class ConfigurationManager implements IConfigurationManager {
 
   constructor(
     private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>,
-    private banditReferenceConfigurationStore: IConfigurationStore<BanditVariation[]> | null,
-    private banditConfigurationStore: IConfigurationStore<BanditParameters> | null,
+    private banditReferenceConfigurationStore?: IConfigurationStore<BanditVariation[]>,
+    private banditConfigurationStore?: IConfigurationStore<BanditParameters>,
   ) {
     this.configuration = new StoreBackedConfiguration(
       this.flagConfigurationStore,
@@ -101,8 +101,8 @@ export class ConfigurationManager implements IConfigurationManager {
     banditConfigurationStore?: IConfigurationStore<BanditParameters>;
   }): void {
     this.flagConfigurationStore = configStores.flagConfigurationStore;
-    this.banditReferenceConfigurationStore = configStores.banditReferenceConfigurationStore ?? null;
-    this.banditConfigurationStore = configStores.banditConfigurationStore ?? null;
+    this.banditReferenceConfigurationStore = configStores.banditReferenceConfigurationStore;
+    this.banditConfigurationStore = configStores.banditConfigurationStore;
 
     // Recreate the configuration with the new stores
     this.configuration = new StoreBackedConfiguration(

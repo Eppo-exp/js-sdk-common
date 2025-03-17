@@ -17,7 +17,10 @@ import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-
 import ConfigurationRequestor from '../configuration-requestor';
 import { ConfigurationManager } from '../configuration-store/configuration-manager';
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
-import { IConfigurationManager } from '../configuration-store/i-configuration-manager';
+import {
+  ConfigurationStoreBundle,
+  IConfigurationManager,
+} from '../configuration-store/i-configuration-manager';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   ConfigurationWireV1,
@@ -43,7 +46,10 @@ import {
   IFlagEvaluationDetails,
 } from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
-import FetchHttpClient from '../http-client';
+import FetchHttpClient, {
+  IBanditParametersResponse,
+  IUniversalFlagConfigResponse,
+} from '../http-client';
 import { IConfiguration } from '../i-configuration';
 import {
   BanditModelData,
@@ -173,9 +179,8 @@ export default class EppoClient {
     // Initialize the configuration manager
     this.configurationManager = new ConfigurationManager(
       this.flagConfigurationStore,
-      this.banditVariationConfigurationStore ||
-        new MemoryOnlyConfigurationStore<BanditVariation[]>(),
-      this.banditModelConfigurationStore || new MemoryOnlyConfigurationStore<BanditParameters>(),
+      this.banditVariationConfigurationStore,
+      this.banditModelConfigurationStore,
     );
   }
 
@@ -244,46 +249,54 @@ export default class EppoClient {
     this.configurationRequestParameters = configurationRequestParameters;
   }
 
+  public setConfigurationStores(configStores: ConfigurationStoreBundle) {
+    // Update the configuration manager
+    this.configurationManager.setConfigurationStores(configStores);
+  }
+
+  // noinspection JSUnusedGlobalSymbols
+  /**
+   * @deprecated use `setConfigurationStores` instead
+   */
   setFlagConfigurationStore(flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>) {
     this.flagConfigurationStore = flagConfigurationStore;
     this.configObfuscatedCache = undefined;
 
     // Update the configuration manager
-    this.configurationManager.setConfigurationStores({
-      flagConfigurationStore: this.flagConfigurationStore,
-      banditReferenceConfigurationStore:
-        this.banditVariationConfigurationStore ||
-        new MemoryOnlyConfigurationStore<BanditVariation[]>(),
-      banditConfigurationStore:
-        this.banditModelConfigurationStore || new MemoryOnlyConfigurationStore<BanditParameters>(),
-    });
+    this.innerSetConfigurationStores();
   }
 
+  // noinspection JSUnusedGlobalSymbols
+  /**
+   * @deprecated use `setConfigurationStores` instead
+   */
   setBanditVariationConfigurationStore(
     banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]>,
   ) {
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
 
     // Update the configuration manager
-    this.configurationManager.setConfigurationStores({
-      flagConfigurationStore: this.flagConfigurationStore,
-      banditReferenceConfigurationStore: this.banditVariationConfigurationStore,
-      banditConfigurationStore:
-        this.banditModelConfigurationStore || new MemoryOnlyConfigurationStore<BanditParameters>(),
-    });
+    this.innerSetConfigurationStores();
   }
 
+  // noinspection JSUnusedGlobalSymbols
+  /**
+   * @deprecated use `setConfigurationStores` instead
+   */
   setBanditModelConfigurationStore(
     banditModelConfigurationStore: IConfigurationStore<BanditParameters>,
   ) {
     this.banditModelConfigurationStore = banditModelConfigurationStore;
 
     // Update the configuration manager
-    this.configurationManager.setConfigurationStores({
+    this.innerSetConfigurationStores();
+  }
+
+  private innerSetConfigurationStores() {
+    // Set the set of configuration stores to those owned by the `this`.
+    this.setConfigurationStores({
       flagConfigurationStore: this.flagConfigurationStore,
-      banditReferenceConfigurationStore:
-        this.banditVariationConfigurationStore ||
-        new MemoryOnlyConfigurationStore<BanditVariation[]>(),
+      banditReferenceConfigurationStore: this.banditVariationConfigurationStore,
       banditConfigurationStore: this.banditModelConfigurationStore,
     });
   }
@@ -326,32 +339,49 @@ export default class EppoClient {
     );
   }
 
-  bootstrap(configuration: IConfigurationWire) {
+  /**
+   * Initializes the `EppoClient` from the provided configuration. This method is async only to
+   * accommodate writing to a persistent store. For fastest initialization, (at the cost of persisting configuration),
+   * use `bootstrap` in conjunction with `MemoryOnlyConfigurationStore` instances which won't do an async write.
+   */
+  async bootstrap(configuration: IConfigurationWire): Promise<void> {
     if (!configuration.config) {
       throw new Error('Flag configuration not provided');
     }
-    const flagConfigResponse = inflateResponse(configuration.config.response);
-    const banditParamResponse = configuration.bandits
+    const flagConfigResponse: IUniversalFlagConfigResponse = inflateResponse(
+      configuration.config.response,
+    );
+    const banditParamResponse: IBanditParametersResponse | undefined = configuration.bandits
       ? inflateResponse(configuration.bandits.response)
       : undefined;
 
-    this.configurationManager.hydrateConfigurationStoresFromUfc(
+    // We need to run this method sync, but, because the configuration stores potentially have an async write at the end
+    // of updating the configuration, the method to do so it also async. Use an IIFE to wrap the async call.
+    await this.configurationManager.hydrateConfigurationStoresFromUfc(
       flagConfigResponse,
       banditParamResponse,
     );
 
     // Still initialize the client in case polling is needed.
-    this.inititalize();
+    // fire-and-forget so ignore the resolution of this promise.
+    this.initialize()
+      .then(() => {
+        logger.debug('Eppo SDK polling initialization complete');
+        return;
+      })
+      .catch((e) => {
+        logger.error('Eppo SDK Error initializing polling after bootstrap()', e);
+      });
   }
 
   /**
    * @deprecated use `initialize` instead.
    */
   async fetchFlagConfigurations() {
-    return this.inititalize();
+    return this.initialize();
   }
 
-  async inititalize() {
+  async initialize() {
     if (!this.configurationRequestParameters) {
       throw new Error(
         'Eppo SDK unable to fetch flag configurations without configuration request parameters',

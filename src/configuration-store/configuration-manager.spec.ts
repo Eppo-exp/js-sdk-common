@@ -39,7 +39,7 @@ describe('ConfigurationManager', () => {
     });
 
     it('should handle null bandit stores', () => {
-      const managerWithNullStores = new ConfigurationManager(flagStore, null, null);
+      const managerWithNullStores = new ConfigurationManager(flagStore);
       const config = managerWithNullStores.getConfiguration();
       expect(config).toBeInstanceOf(StoreBackedConfiguration);
       expect(config.getFlagKeys()).toEqual([]);

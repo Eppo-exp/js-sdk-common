@@ -4,6 +4,12 @@ import { BanditParameters, BanditVariation, Flag, ObfuscatedFlag } from '../inte
 
 import { IConfigurationStore } from './configuration-store';
 
+export type ConfigurationStoreBundle = {
+  flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
+  banditReferenceConfigurationStore?: IConfigurationStore<BanditVariation[]>;
+  banditConfigurationStore?: IConfigurationStore<BanditParameters>;
+};
+
 export interface IConfigurationManager {
   getConfiguration(): IConfiguration;
   hydrateConfigurationStores(
@@ -15,9 +21,5 @@ export interface IConfigurationManager {
     flags: IUniversalFlagConfigResponse,
     bandits?: IBanditParametersResponse,
   ): Promise<boolean>;
-  setConfigurationStores(configStores: {
-    flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
-    banditReferenceConfigurationStore?: IConfigurationStore<BanditVariation[]>;
-    banditConfigurationStore?: IConfigurationStore<BanditParameters>;
-  }): void;
+  setConfigurationStores(configStores: ConfigurationStoreBundle): void;
 }
