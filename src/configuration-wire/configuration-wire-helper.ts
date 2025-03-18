@@ -11,6 +11,7 @@ export type SdkOptions = {
   sdkName: string;
   sdkVersion: string;
   baseUrl?: string;
+  fetchBandits?: boolean;
 };
 
 /**
@@ -22,13 +23,14 @@ export class ConfigurationWireHelper {
   /**
    * Build a new ConfigurationHelper for the target SDK Key.
    * @param sdkKey
+   * @param opts
    */
   public static build(
     sdkKey: string,
     opts: SdkOptions = { sdkName: 'android', sdkVersion: '4.0.0' },
   ) {
-    const { sdkName, sdkVersion, baseUrl } = opts;
-    return new ConfigurationWireHelper(sdkKey, sdkName, sdkVersion, baseUrl);
+    const { sdkName, sdkVersion, baseUrl, fetchBandits } = opts;
+    return new ConfigurationWireHelper(sdkKey, sdkName, sdkVersion, baseUrl, fetchBandits);
   }
 
   private constructor(
@@ -36,6 +38,7 @@ export class ConfigurationWireHelper {
     targetSdkName = 'android',
     targetSdkVersion = '4.0.0',
     baseUrl?: string,
+    private readonly fetchBandits = false,
   ) {
     const queryParams = {
       sdkName: targetSdkName,
@@ -66,7 +69,7 @@ export class ConfigurationWireHelper {
     }
 
     const flagsHaveBandits = Object.keys(configResponse.banditReferences ?? {}).length > 0;
-    if (flagsHaveBandits) {
+    if (this.fetchBandits && flagsHaveBandits) {
       banditResponse = await this.httpClient.getBanditParameters();
     }
 

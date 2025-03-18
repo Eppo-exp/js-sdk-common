@@ -28,7 +28,7 @@
     "test": "yarn test:unit",
     "test:unit": "NODE_ENV=test jest '.*\\.spec\\.ts'",
     "obfuscate-mock-ufc": "ts-node test/writeObfuscatedMockUFC",
-    "bootstrap-config": "ts-node src/tools/get-bootstrap-config.ts"
+    "bootstrap-config": "ts-node src/tools/get-bootstrap-config"
   },
   "jsdelivr": "dist/eppo-sdk.js",
   "repository": {
@@ -77,7 +77,8 @@
     "pino": "^9.5.0",
     "semver": "^7.5.4",
     "spark-md5": "^3.0.2",
-    "uuid": "^11.0.5"
+    "uuid": "^11.0.5",
+    "yargs": "^17.7.2"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

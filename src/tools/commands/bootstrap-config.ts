@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import type { CommandModule } from 'yargs';
 
 import { ConfigurationWireHelper } from '../../configuration-wire/configuration-wire-helper';
-import { process } from '../node-shim';
 
 export const bootstrapConfigCommand: CommandModule = {
   command: 'bootstrap-config',
@@ -46,6 +45,7 @@ export const bootstrapConfigCommand: CommandModule = {
         sdkName: argv.sdk as string,
         sdkVersion: 'v5.0.0',
         baseUrl: argv['base-url'] as string,
+        fetchBandits: true,
       });
       const config = await helper.fetchBootstrapConfiguration();
 
@@ -54,7 +54,7 @@ export const bootstrapConfigCommand: CommandModule = {
         process.exit(1);
       }
 
-      const jsonConfig = JSON.stringify(config);
+      const jsonConfig = JSON.stringify(config, null, 2);
 
       if (argv.output && typeof argv.output === 'string') {
         fs.writeFileSync(argv.output, jsonConfig);

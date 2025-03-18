@@ -2,7 +2,6 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 import { bootstrapConfigCommand } from './commands/bootstrap-config';
-import { process } from './node-shim';
 
 /**
  * Script to run the bootstrap-config command directly.
