@@ -19,6 +19,9 @@ const TEST_CONFIGURATION_WIRE_DATA_DIR = './test/data/configuration-wire/';
 const MOCK_PRECOMPUTED_FILENAME = 'precomputed-v1';
 export const MOCK_PRECOMPUTED_WIRE_FILE = `${MOCK_PRECOMPUTED_FILENAME}.json`;
 export const MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE = `${MOCK_PRECOMPUTED_FILENAME}-deobfuscated.json`;
+export const SHARED_BOOTSTRAP_FLAGS_FILE = 'bootstrap-flags-v1.json';
+export const SHARED_BOOTSTRAP_FLAGS_OBFUSCATED_FILE = 'bootstrap-flags-obfuscated-v1.json';
+export const SHARED_BOOTSTRAP_BANDIT_FLAGS_FILE = 'bootstrap-bandit-flags-v1.json';
 
 export interface SubjectTestCase {
   subjectKey: string;

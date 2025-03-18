@@ -8,32 +8,27 @@ import {
   IAssignmentTestCase,
   MOCK_UFC_RESPONSE_FILE,
   OBFUSCATED_MOCK_UFC_RESPONSE_FILE,
+  readMockConfigurationWireResponse,
   readMockUFCResponse,
+  SHARED_BOOTSTRAP_FLAGS_FILE,
+  SHARED_BOOTSTRAP_FLAGS_OBFUSCATED_FILE,
   SubjectTestCase,
   testCasesByFileName,
   validateTestAssignments,
 } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
-import { ConfigurationManager } from '../configuration-store/configuration-manager';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
+  ConfigurationWireV1,
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   ObfuscatedPrecomputedConfigurationResponse,
 } from '../configuration-wire/configuration-wire-types';
 import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
-import {
-  Flag,
-  ObfuscatedFlag,
-  VariationType,
-  FormatEnum,
-  Variation,
-  BanditVariation,
-  BanditParameters,
-} from '../interfaces';
+import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import { AttributeType } from '../types';
 
@@ -326,109 +321,178 @@ describe('EppoClient E2E test', () => {
     });
   });
 
+  const testCases = testCasesByFileName<IAssignmentTestCase>(ASSIGNMENT_TEST_DATA_DIR);
+
+  function testCasesAgainstClient(client: EppoClient, testCase: IAssignmentTestCase) {
+    const { flag, variationType, defaultValue, subjects } = testCase;
+
+    let assignments: {
+      subject: SubjectTestCase;
+      assignment: string | boolean | number | null | object;
+    }[] = [];
+
+    const typeAssignmentFunctions = {
+      [VariationType.BOOLEAN]: client.getBooleanAssignment.bind(client),
+      [VariationType.NUMERIC]: client.getNumericAssignment.bind(client),
+      [VariationType.INTEGER]: client.getIntegerAssignment.bind(client),
+      [VariationType.STRING]: client.getStringAssignment.bind(client),
+      [VariationType.JSON]: client.getJSONAssignment.bind(client),
+    };
+
+    const assignmentFn = typeAssignmentFunctions[variationType] as (
+      flagKey: string,
+      subjectKey: string,
+      subjectAttributes: Record<string, AttributeType>,
+      defaultValue: boolean | string | number | object,
+    ) => never;
+    if (!assignmentFn) {
+      throw new Error(`Unknown variation type: ${variationType}`);
+    }
+
+    assignments = getTestAssignments({ flag, variationType, defaultValue, subjects }, assignmentFn);
+
+    validateTestAssignments(assignments, flag);
+  }
+
   describe('UFC Shared Test Cases', () => {
     const testCases = testCasesByFileName<IAssignmentTestCase>(ASSIGNMENT_TEST_DATA_DIR);
 
-    describe('Not obfuscated', () => {
-      beforeAll(async () => {
-        global.fetch = jest.fn(() => {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve(readMockUFCResponse(MOCK_UFC_RESPONSE_FILE)),
+    describe('boostrapped client', () => {
+      const bootstrapFlagsConfig = ConfigurationWireV1.fromString(
+        readMockConfigurationWireResponse(SHARED_BOOTSTRAP_FLAGS_FILE),
+      );
+      const bootstrapFlagsObfuscatedConfig = ConfigurationWireV1.fromString(
+        readMockConfigurationWireResponse(SHARED_BOOTSTRAP_FLAGS_OBFUSCATED_FILE),
+      );
+
+      describe('Not obfuscated', () => {
+        let client: EppoClient;
+        beforeAll(() => {
+          client = new EppoClient({
+            flagConfigurationStore: new MemoryOnlyConfigurationStore(),
           });
-        }) as jest.Mock;
+          client.setIsGracefulFailureMode(false);
 
-        await initConfiguration(storage);
+          // Bootstrap using the flags config.
+          client.bootstrap(bootstrapFlagsConfig);
+        });
+
+        it('contains some key flags', () => {
+          const flagKeys = client.getFlagConfigurations();
+
+          expect(Object.keys(flagKeys)).toContain('numeric_flag');
+          expect(Object.keys(flagKeys)).toContain('kill-switch');
+        });
+
+        it.each(Object.keys(testCases))('test variation assignment splits - %s', (fileName) => {
+          testCasesAgainstClient(client, testCases[fileName]);
+        });
       });
 
-      afterAll(() => {
-        jest.restoreAllMocks();
-      });
+      describe('Obfuscated', () => {
+        let client: EppoClient;
+        beforeAll(async () => {
+          client = new EppoClient({
+            flagConfigurationStore: new MemoryOnlyConfigurationStore(),
+          });
+          client.setIsGracefulFailureMode(false);
 
-      it.each(Object.keys(testCases))('test variation assignment splits - %s', async (fileName) => {
-        const { flag, variationType, defaultValue, subjects } = testCases[fileName];
-        const client = new EppoClient({ flagConfigurationStore: storage });
-        client.setIsGracefulFailureMode(false);
+          // Bootstrap using the obfuscated flags config.
+          await client.bootstrap(bootstrapFlagsObfuscatedConfig);
+        });
 
-        let assignments: {
-          subject: SubjectTestCase;
-          assignment: string | boolean | number | null | object;
-        }[] = [];
+        it('contains some key flags', () => {
+          const flagKeys = client.getFlagConfigurations();
 
-        const typeAssignmentFunctions = {
-          [VariationType.BOOLEAN]: client.getBooleanAssignment.bind(client),
-          [VariationType.NUMERIC]: client.getNumericAssignment.bind(client),
-          [VariationType.INTEGER]: client.getIntegerAssignment.bind(client),
-          [VariationType.STRING]: client.getStringAssignment.bind(client),
-          [VariationType.JSON]: client.getJSONAssignment.bind(client),
-        };
+          expect(Object.keys(flagKeys)).toContain('73fcc84c69e49e31fe16a29b2b1f803b');
+          expect(Object.keys(flagKeys)).toContain('69d2ea567a75b7b2da9648bf312dc3a5');
+        });
 
-        const assignmentFn = typeAssignmentFunctions[variationType] as (
-          flagKey: string,
-          subjectKey: string,
-          subjectAttributes: Record<string, AttributeType>,
-          defaultValue: boolean | string | number | object,
-        ) => never;
-        if (!assignmentFn) {
-          throw new Error(`Unknown variation type: ${variationType}`);
-        }
-
-        assignments = getTestAssignments(
-          { flag, variationType, defaultValue, subjects },
-          assignmentFn,
-        );
-
-        validateTestAssignments(assignments, flag);
+        it.each(Object.keys(testCases))('test variation assignment splits - %s', (fileName) => {
+          testCasesAgainstClient(client, testCases[fileName]);
+        });
       });
     });
 
-    describe('Obfuscated', () => {
-      beforeAll(async () => {
-        global.fetch = jest.fn(() => {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve(readMockUFCResponse(OBFUSCATED_MOCK_UFC_RESPONSE_FILE)),
-          });
-        }) as jest.Mock;
+    describe('traditional client', () => {
+      describe('Not obfuscated', () => {
+        beforeAll(async () => {
+          global.fetch = jest.fn(() => {
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: () => Promise.resolve(readMockUFCResponse(MOCK_UFC_RESPONSE_FILE)),
+            });
+          }) as jest.Mock;
 
-        await initConfiguration(storage);
-      });
+          await initConfiguration(storage);
+        });
 
-      afterAll(() => {
-        jest.restoreAllMocks();
-      });
+        afterAll(() => {
+          jest.restoreAllMocks();
+        });
 
-      it.each(Object.keys(testCases))('test variation assignment splits - %s', async (fileName) => {
-        const { flag, variationType, defaultValue, subjects } = testCases[fileName];
-        const client = new EppoClient({ flagConfigurationStore: storage, isObfuscated: true });
-        client.setIsGracefulFailureMode(false);
+        it.each(Object.keys(testCases))(
+          'test variation assignment splits - %s',
+          async (fileName) => {
+            const client = new EppoClient({ flagConfigurationStore: storage });
+            client.setIsGracefulFailureMode(false);
 
-        const typeAssignmentFunctions = {
-          [VariationType.BOOLEAN]: client.getBooleanAssignment.bind(client),
-          [VariationType.NUMERIC]: client.getNumericAssignment.bind(client),
-          [VariationType.INTEGER]: client.getIntegerAssignment.bind(client),
-          [VariationType.STRING]: client.getStringAssignment.bind(client),
-          [VariationType.JSON]: client.getJSONAssignment.bind(client),
-        };
-
-        const assignmentFn = typeAssignmentFunctions[variationType] as (
-          flagKey: string,
-          subjectKey: string,
-          subjectAttributes: Record<string, AttributeType>,
-          defaultValue: boolean | string | number | object,
-        ) => never;
-        if (!assignmentFn) {
-          throw new Error(`Unknown variation type: ${variationType}`);
-        }
-
-        const assignments = getTestAssignments(
-          { flag, variationType, defaultValue, subjects },
-          assignmentFn,
+            testCasesAgainstClient(client, testCases[fileName]);
+          },
         );
+      });
 
-        validateTestAssignments(assignments, flag);
+      describe('Obfuscated', () => {
+        beforeAll(async () => {
+          global.fetch = jest.fn(() => {
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: () => Promise.resolve(readMockUFCResponse(OBFUSCATED_MOCK_UFC_RESPONSE_FILE)),
+            });
+          }) as jest.Mock;
+
+          await initConfiguration(storage);
+        });
+
+        afterAll(() => {
+          jest.restoreAllMocks();
+        });
+
+        it.each(Object.keys(testCases))(
+          'test variation assignment splits - %s',
+          async (fileName) => {
+            const { flag, variationType, defaultValue, subjects } = testCases[fileName];
+            const client = new EppoClient({ flagConfigurationStore: storage, isObfuscated: true });
+            client.setIsGracefulFailureMode(false);
+
+            const typeAssignmentFunctions = {
+              [VariationType.BOOLEAN]: client.getBooleanAssignment.bind(client),
+              [VariationType.NUMERIC]: client.getNumericAssignment.bind(client),
+              [VariationType.INTEGER]: client.getIntegerAssignment.bind(client),
+              [VariationType.STRING]: client.getStringAssignment.bind(client),
+              [VariationType.JSON]: client.getJSONAssignment.bind(client),
+            };
+
+            const assignmentFn = typeAssignmentFunctions[variationType] as (
+              flagKey: string,
+              subjectKey: string,
+              subjectAttributes: Record<string, AttributeType>,
+              defaultValue: boolean | string | number | object,
+            ) => never;
+            if (!assignmentFn) {
+              throw new Error(`Unknown variation type: ${variationType}`);
+            }
+
+            const assignments = getTestAssignments(
+              { flag, variationType, defaultValue, subjects },
+              assignmentFn,
+            );
+
+            validateTestAssignments(assignments, flag);
+          },
+        );
       });
     });
   });
@@ -1198,239 +1262,5 @@ describe('EppoClient E2E test', () => {
         'other-flag': 'other-variation',
       });
     });
-  });
-});
-
-describe('EppoClient ConfigurationManager Integration', () => {
-  let client: EppoClient;
-  let flagStore: MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>;
-  let banditVariationStore: MemoryOnlyConfigurationStore<BanditVariation[]>;
-  let banditModelStore: MemoryOnlyConfigurationStore<BanditParameters>;
-
-  // Sample flag with correct shape
-  const testFlag: Flag = {
-    key: 'test-flag',
-    enabled: true,
-    variationType: VariationType.STRING,
-    variations: {
-      control: { key: 'control', value: 'control-value' },
-      treatment: { key: 'treatment', value: 'treatment-value' },
-    },
-    allocations: [
-      {
-        key: 'allocation-1',
-        rules: [],
-        splits: [
-          {
-            shards: [],
-            variationKey: 'treatment',
-          },
-        ],
-        doLog: true,
-      },
-    ],
-    totalShards: 10000,
-  };
-
-  // Sample bandit variation with correct shape
-  const testBanditVariation: BanditVariation = {
-    key: 'test-bandit',
-    flagKey: 'test-flag',
-    variationKey: 'treatment',
-    variationValue: 'treatment-value',
-  };
-
-  // Sample bandit parameters with correct shape
-  const testBanditParameters: BanditParameters = {
-    banditKey: 'test-bandit',
-    modelName: 'test-model',
-    modelVersion: '1.0',
-    modelData: {
-      gamma: 0,
-      defaultActionScore: 0,
-      actionProbabilityFloor: 0,
-      coefficients: {},
-    },
-  };
-
-  beforeEach(() => {
-    // Reset mocks
-    jest.clearAllMocks();
-
-    // Create fresh stores for each test
-    flagStore = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
-    banditVariationStore = new MemoryOnlyConfigurationStore<BanditVariation[]>();
-    banditModelStore = new MemoryOnlyConfigurationStore<BanditParameters>();
-
-    // Create client with the stores
-    client = new EppoClient({
-      flagConfigurationStore: flagStore,
-      banditVariationConfigurationStore: banditVariationStore,
-      banditModelConfigurationStore: banditModelStore,
-    });
-  });
-
-  it('should initialize ConfigurationManager in constructor', () => {
-    // Access the private configurationManager field
-    const configManager = (client as any).configurationManager;
-
-    expect(configManager).toBeDefined();
-    expect(configManager).toBeInstanceOf(ConfigurationManager);
-  });
-
-  it('should use ConfigurationManager for getConfiguration', () => {
-    // Create a spy on the ConfigurationManager's getConfiguration method
-    const configManager = (client as any).configurationManager;
-    const getConfigSpy = jest.spyOn(configManager, 'getConfiguration');
-
-    // Call the client's getConfiguration method
-    const config = (client as any).getConfiguration();
-
-    // Verify the manager's method was called
-    expect(getConfigSpy).toHaveBeenCalled();
-    expect(config).toBe(configManager.getConfiguration());
-  });
-
-  it('should update ConfigurationManager when setFlagConfigurationStore is called', async () => {
-    // Create a new store
-    const newFlagStore = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
-
-    // Pre-populate with a test flag
-    await newFlagStore.setEntries({ 'test-flag': testFlag });
-    newFlagStore.setFormat(FormatEnum.SERVER);
-
-    // Create a spy on the ConfigurationManager's setConfigurationStores method
-    const configManager = (client as any).configurationManager;
-    const setStoresSpy = jest.spyOn(configManager, 'setConfigurationStores');
-
-    // Call the setter method
-    client.setFlagConfigurationStore(newFlagStore);
-
-    // Verify the manager's method was called with the correct arguments
-    expect(setStoresSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        flagConfigurationStore: newFlagStore,
-      }),
-    );
-
-    // Verify the configuration was updated by checking if we can access the flag
-    const config = configManager.getConfiguration();
-    expect(config.getFlag('test-flag')).toEqual(testFlag);
-  });
-
-  it('should update ConfigurationManager when setBanditVariationConfigurationStore is called', async () => {
-    // Create a new store
-    const newBanditVariationStore = new MemoryOnlyConfigurationStore<BanditVariation[]>();
-
-    // Pre-populate with test data
-    await newBanditVariationStore.setEntries({
-      'test-flag': [testBanditVariation],
-    });
-    newBanditVariationStore.setFormat(FormatEnum.SERVER);
-
-    // Create a spy on the ConfigurationManager's setConfigurationStores method
-    const configManager = (client as any).configurationManager;
-    const setStoresSpy = jest.spyOn(configManager, 'setConfigurationStores');
-
-    // Call the setter method
-    client.setBanditVariationConfigurationStore(newBanditVariationStore);
-
-    // Verify the manager's method was called with the correct arguments
-    expect(setStoresSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        banditReferenceConfigurationStore: newBanditVariationStore,
-      }),
-    );
-
-    // Verify the configuration was updated
-    const config = configManager.getConfiguration();
-    expect(config.getBanditVariations()['test-flag']).toEqual([testBanditVariation]);
-  });
-
-  it('should update ConfigurationManager when setBanditModelConfigurationStore is called', async () => {
-    // Create a new store
-    const newBanditModelStore = new MemoryOnlyConfigurationStore<BanditParameters>();
-
-    // Pre-populate with test data
-    await newBanditModelStore.setEntries({
-      'test-bandit': testBanditParameters,
-    });
-    newBanditModelStore.setFormat(FormatEnum.SERVER);
-
-    // Create a spy on the ConfigurationManager's setConfigurationStores method
-    const configManager = (client as any).configurationManager;
-    const setStoresSpy = jest.spyOn(configManager, 'setConfigurationStores');
-
-    // Call the setter method
-    client.setBanditModelConfigurationStore(newBanditModelStore);
-
-    // Verify the manager's method was called with the correct arguments
-    expect(setStoresSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        banditConfigurationStore: newBanditModelStore,
-      }),
-    );
-
-    // Verify the configuration was updated
-    const config = configManager.getConfiguration();
-    expect(config.getBandits()['test-bandit']).toEqual(testBanditParameters);
-  });
-
-  it('should use configuration from ConfigurationManager for assignment decisions', async () => {
-    // Create a new flag store with a test flag
-    const newFlagStore = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
-    await newFlagStore.setEntries({ 'test-flag': testFlag });
-    newFlagStore.setFormat(FormatEnum.SERVER);
-
-    // Update the client's flag store
-    client.setFlagConfigurationStore(newFlagStore);
-
-    // Create a spy on the ConfigurationManager's getConfiguration method
-    const configManager = (client as any).configurationManager;
-    const getConfigSpy = jest.spyOn(configManager, 'getConfiguration');
-
-    // Get an assignment
-    const assignment = client.getStringAssignment('test-flag', 'subject-1', {}, 'default');
-
-    // Verify the manager's getConfiguration method was called
-    expect(getConfigSpy).toHaveBeenCalled();
-
-    // Verify we got the expected assignment (based on the test flag's configuration)
-    expect(assignment).toBe('treatment-value');
-  });
-
-  it('should reflect changes in ConfigurationManager immediately in assignments', async () => {
-    // First, set up a flag store with one variation
-    const initialFlagStore = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
-    const initialFlag = { ...testFlag };
-    await initialFlagStore.setEntries({ 'test-flag': initialFlag });
-    initialFlagStore.setFormat(FormatEnum.SERVER);
-
-    client.setFlagConfigurationStore(initialFlagStore);
-
-    // Get initial assignment
-    const initialAssignment = client.getStringAssignment('test-flag', 'subject-1', {}, 'default');
-    expect(initialAssignment).toBe('treatment-value');
-
-    // Now create a new flag store with a different variation
-    const updatedFlagStore = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
-    const updatedFlag = {
-      ...testFlag,
-      variations: {
-        control: { key: 'control', value: 'control-value' },
-        treatment: { key: 'treatment', value: 'new-treatment-value' },
-      },
-    };
-    await updatedFlagStore.setEntries({ 'test-flag': updatedFlag });
-    updatedFlagStore.setFormat(FormatEnum.SERVER);
-
-    // Update the client's flag store
-    client.setFlagConfigurationStore(updatedFlagStore);
-
-    // Get updated assignment
-    const updatedAssignment = client.getStringAssignment('test-flag', 'subject-1', {}, 'default');
-
-    // Verify the assignment reflects the updated configuration
-    expect(updatedAssignment).toBe('new-treatment-value');
   });
 });
