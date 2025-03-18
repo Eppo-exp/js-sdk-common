@@ -361,27 +361,9 @@ export default class EppoClient {
       flagConfigResponse,
       banditParamResponse,
     );
-
-    // Still initialize the client in case polling is needed.
-    // fire-and-forget so ignore the resolution of this promise.
-    this.initialize()
-      .then(() => {
-        logger.debug('Eppo SDK polling initialization complete');
-        return;
-      })
-      .catch((e) => {
-        logger.error('Eppo SDK Error initializing polling after bootstrap()', e);
-      });
   }
 
-  /**
-   * @deprecated use `initialize` instead.
-   */
   async fetchFlagConfigurations() {
-    return this.initialize();
-  }
-
-  async initialize() {
     if (!this.configurationRequestParameters) {
       throw new Error(
         'Eppo SDK unable to fetch flag configurations without configuration request parameters',
