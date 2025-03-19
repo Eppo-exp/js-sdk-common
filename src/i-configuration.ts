@@ -63,6 +63,8 @@ export class StoreBackedConfiguration implements IConfiguration {
       );
     }
     await Promise.all(promises);
+
+    // TODO: notify of config change if `didUpdateFlags` is true
     return didUpdateFlags;
   }
 

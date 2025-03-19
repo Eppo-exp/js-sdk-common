@@ -7,17 +7,21 @@ import {
   testCasesByFileName,
   BanditTestCase,
   BANDIT_TEST_DATA_DIR,
+  readMockConfigurationWireResponse,
+  SHARED_BOOTSTRAP_BANDIT_FLAGS_FILE,
 } from '../../test/testHelpers';
 import ApiEndpoints from '../api-endpoints';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
 import ConfigurationRequestor from '../configuration-requestor';
+import { ConfigurationManager } from '../configuration-store/configuration-manager';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   IConfigurationWire,
   IPrecomputedConfiguration,
   IObfuscatedPrecomputedConfigurationResponse,
+  ConfigurationWireV1,
 } from '../configuration-wire/configuration-wire-types';
 import { Evaluator, FlagEvaluation } from '../evaluator';
 import {
@@ -64,12 +68,12 @@ describe('EppoClient Bandits E2E test', () => {
       },
     });
     const httpClient = new FetchHttpClient(apiEndpoints, 1000);
-    const configurationRequestor = new ConfigurationRequestor(
-      httpClient,
+    const configManager = new ConfigurationManager(
       flagStore,
       banditVariationStore,
       banditModelStore,
     );
+    const configurationRequestor = new ConfigurationRequestor(httpClient, configManager, true);
     await configurationRequestor.fetchAndStoreConfigurations();
   });
 
@@ -93,8 +97,8 @@ describe('EppoClient Bandits E2E test', () => {
   describe('Shared test cases', () => {
     const testCases = testCasesByFileName<BanditTestCase>(BANDIT_TEST_DATA_DIR);
 
-    it.each(Object.keys(testCases))('Shared bandit test case - %s', async (fileName: string) => {
-      const { flag: flagKey, defaultValue, subjects } = testCases[fileName];
+    function testBanditCaseAgainstClient(client: EppoClient, testCase: BanditTestCase) {
+      const { flag: flagKey, defaultValue, subjects } = testCase;
       let numAssignmentsChecked = 0;
       subjects.forEach((subject) => {
         // test files have actions as an array, so we convert them to a map as expected by the client
@@ -130,6 +134,35 @@ describe('EppoClient Bandits E2E test', () => {
       });
       // Ensure that this test case correctly checked some test assignments
       expect(numAssignmentsChecked).toBeGreaterThan(0);
+    }
+
+    describe('bootstrapped client', () => {
+      const banditFlagsConfig = ConfigurationWireV1.fromString(
+        readMockConfigurationWireResponse(SHARED_BOOTSTRAP_BANDIT_FLAGS_FILE),
+      );
+
+      let client: EppoClient;
+      beforeAll(async () => {
+        client = new EppoClient({
+          flagConfigurationStore: new MemoryOnlyConfigurationStore(),
+          banditVariationConfigurationStore: new MemoryOnlyConfigurationStore(),
+          banditModelConfigurationStore: new MemoryOnlyConfigurationStore(),
+        });
+        client.setIsGracefulFailureMode(false);
+
+        // Bootstrap using the bandit flag config.
+        client.bootstrap(banditFlagsConfig);
+      });
+
+      it.each(Object.keys(testCases))('Shared bandit test case - %s', async (fileName: string) => {
+        testBanditCaseAgainstClient(client, testCases[fileName]);
+      });
+    });
+
+    describe('traditional client', () => {
+      it.each(Object.keys(testCases))('Shared bandit test case - %s', async (fileName: string) => {
+        testBanditCaseAgainstClient(client, testCases[fileName]);
+      });
     });
   });
 
