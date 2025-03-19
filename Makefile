@@ -27,7 +27,7 @@ help: Makefile
 testDataDir := test/data/
 tempDir := ${testDataDir}temp/
 gitDataDir := ${tempDir}sdk-test-data/
-branchName := tp/bootstrap-config
+branchName := main
 githubRepoLink := https://github.com/Eppo-exp/sdk-test-data.git
 repoName := sdk-test-data
 .PHONY: test-data
