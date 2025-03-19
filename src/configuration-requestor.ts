@@ -1,4 +1,4 @@
-import { IConfigurationManager } from './configuration-store/i-configuration-manager';
+import { ConfigurationManager } from './configuration-store/configuration-manager';
 import { IHttpClient } from './http-client';
 import { IConfiguration } from './i-configuration';
 import { BanditReference, BanditParameters } from './interfaces';
@@ -9,7 +9,7 @@ export default class ConfigurationRequestor {
 
   constructor(
     private readonly httpClient: IHttpClient,
-    private readonly configurationManager: IConfigurationManager,
+    private readonly configurationManager: ConfigurationManager,
     private readonly fetchBandits: boolean,
   ) {}
 

@@ -9,7 +9,6 @@ import ApiEndpoints from './api-endpoints';
 import ConfigurationRequestor from './configuration-requestor';
 import { ConfigurationManager } from './configuration-store/configuration-manager';
 import { IConfigurationStore } from './configuration-store/configuration-store';
-import { IConfigurationManager } from './configuration-store/i-configuration-manager';
 import { MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import FetchHttpClient, {
   IBanditParametersResponse,
@@ -24,7 +23,7 @@ describe('ConfigurationRequestor', () => {
   let banditVariationStore: IConfigurationStore<BanditVariation[]>;
   let banditModelStore: IConfigurationStore<BanditParameters>;
   let httpClient: IHttpClient;
-  let configurationManager: IConfigurationManager;
+  let configurationManager: ConfigurationManager;
   let configurationRequestor: ConfigurationRequestor;
 
   beforeEach(async () => {

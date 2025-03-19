@@ -17,7 +17,6 @@ import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-
 import ConfigurationRequestor from '../configuration-requestor';
 import { ConfigurationManager } from '../configuration-store/configuration-manager';
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
-import { IConfigurationManager } from '../configuration-store/i-configuration-manager';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   ConfigurationWireV1,
@@ -144,7 +143,7 @@ export default class EppoClient {
   private readonly evaluator = new Evaluator();
   private configurationRequestor?: ConfigurationRequestor;
   private readonly overrideValidator = new OverrideValidator();
-  private configurationManager: IConfigurationManager;
+  private configurationManager: ConfigurationManager;
 
   constructor({
     eventDispatcher = new NoOpEventDispatcher(),

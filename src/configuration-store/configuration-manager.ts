@@ -13,9 +13,14 @@ import {
 } from '../interfaces';
 
 import { IConfigurationStore } from './configuration-store';
-import { IConfigurationManager } from './i-configuration-manager';
 
-export class ConfigurationManager implements IConfigurationManager {
+export type ConfigurationStoreBundle = {
+  flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
+  banditReferenceConfigurationStore?: IConfigurationStore<BanditVariation[]>;
+  banditConfigurationStore?: IConfigurationStore<BanditParameters>;
+};
+
+export class ConfigurationManager {
   private configuration: StoreBackedConfiguration;
 
   constructor(
@@ -95,11 +100,7 @@ export class ConfigurationManager implements IConfigurationManager {
     );
   }
 
-  public setConfigurationStores(configStores: {
-    flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
-    banditReferenceConfigurationStore?: IConfigurationStore<BanditVariation[]>;
-    banditConfigurationStore?: IConfigurationStore<BanditParameters>;
-  }): void {
+  public setConfigurationStores(configStores: ConfigurationStoreBundle): void {
     this.flagConfigurationStore = configStores.flagConfigurationStore;
     this.banditReferenceConfigurationStore = configStores.banditReferenceConfigurationStore;
     this.banditConfigurationStore = configStores.banditConfigurationStore;
