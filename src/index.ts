@@ -36,6 +36,7 @@ import { ConfigurationStoreBundle } from './configuration-store/i-configuration-
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import { ConfigurationWireHelper } from './configuration-wire/configuration-wire-helper';
 import {
+  configurationFromString,
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   IPrecomputedConfigurationResponse,
@@ -159,6 +160,7 @@ export {
   PrecomputedFlag,
   FlagKey,
   ConfigurationWireHelper,
+  configurationFromString,
 
   // Test helpers
   decodePrecomputedFlag,

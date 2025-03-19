@@ -21,7 +21,7 @@ import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
-  ConfigurationWireV1,
+  configurationFromString,
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   ObfuscatedPrecomputedConfigurationResponse,
@@ -321,8 +321,6 @@ describe('EppoClient E2E test', () => {
     });
   });
 
-  const testCases = testCasesByFileName<IAssignmentTestCase>(ASSIGNMENT_TEST_DATA_DIR);
-
   function testCasesAgainstClient(client: EppoClient, testCase: IAssignmentTestCase) {
     const { flag, variationType, defaultValue, subjects } = testCase;
 
@@ -358,10 +356,10 @@ describe('EppoClient E2E test', () => {
     const testCases = testCasesByFileName<IAssignmentTestCase>(ASSIGNMENT_TEST_DATA_DIR);
 
     describe('boostrapped client', () => {
-      const bootstrapFlagsConfig = ConfigurationWireV1.fromString(
+      const bootstrapFlagsConfig = configurationFromString(
         readMockConfigurationWireResponse(SHARED_BOOTSTRAP_FLAGS_FILE),
       );
-      const bootstrapFlagsObfuscatedConfig = ConfigurationWireV1.fromString(
+      const bootstrapFlagsObfuscatedConfig = configurationFromString(
         readMockConfigurationWireResponse(SHARED_BOOTSTRAP_FLAGS_OBFUSCATED_FILE),
       );
 
