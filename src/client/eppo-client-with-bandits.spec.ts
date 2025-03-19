@@ -151,7 +151,7 @@ describe('EppoClient Bandits E2E test', () => {
         client.setIsGracefulFailureMode(false);
 
         // Bootstrap using the bandit flag config.
-        await client.bootstrap(banditFlagsConfig);
+        client.bootstrap(banditFlagsConfig);
       });
 
       it.each(Object.keys(testCases))('Shared bandit test case - %s', async (fileName: string) => {

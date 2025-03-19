@@ -326,7 +326,7 @@ export default class EppoClient {
    * accommodate writing to a persistent store. For fastest initialization, (at the cost of persisting configuration),
    * use `bootstrap` in conjunction with `MemoryOnlyConfigurationStore` instances which won't do an async write.
    */
-  async bootstrap(configuration: IConfigurationWire): Promise<void> {
+  bootstrap(configuration: IConfigurationWire): void {
     if (!configuration.config) {
       throw new Error('Flag configuration not provided');
     }
@@ -340,7 +340,8 @@ export default class EppoClient {
     // This method runs async because the configuration stores potentially have an async write at the end of updating
     // the configuration. Most instances of offlineInit will use `MemoryOnlyConfigurationStore` instances which actually
     // accomplish the config write synchronously.
-    await this.configurationManager.hydrateConfigurationStoresFromUfc(
+    // `void` keyword here suppresses warnings about leaving the promise hanging.
+    void this.configurationManager.hydrateConfigurationStoresFromUfc(
       flagConfigResponse,
       banditParamResponse,
     );
