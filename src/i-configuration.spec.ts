@@ -1,6 +1,14 @@
 import { IConfigurationStore } from './configuration-store/configuration-store';
-import { StoreBackedConfiguration } from './i-configuration';
-import { BanditParameters, BanditVariation, Environment, Flag, ObfuscatedFlag } from './interfaces';
+import { ImmutableConfiguration, StoreBackedConfiguration } from './i-configuration';
+import {
+  BanditParameters,
+  BanditVariation,
+  ConfigDetails,
+  Environment,
+  Flag,
+  ObfuscatedFlag,
+  VariationType,
+} from './interfaces';
 import { BanditKey, FlagKey } from './types';
 
 describe('StoreBackedConfiguration', () => {
@@ -426,6 +434,223 @@ describe('StoreBackedConfiguration', () => {
           variationKey: 'bandit-1',
         },
       ]);
+    });
+  });
+
+  describe('copy', () => {
+    it('should prevent modification of stored config', () => {
+      const config = new StoreBackedConfiguration(mockFlagStore);
+      const mockFlag: Flag = { key: 'test-flag', enabled: true } as Flag;
+      mockFlagStore.get.mockReturnValue(mockFlag);
+      mockFlagStore.entries.mockReturnValue({ [mockFlag.key]: mockFlag });
+
+      const storedFlag = config.getFlag('test-flag');
+      expect(storedFlag?.enabled).toBeTruthy();
+
+      const roConfig = config.copy();
+      expect(roConfig).toBeInstanceOf(ImmutableConfiguration);
+
+      const flag = roConfig.getFlag('test-flag');
+      expect(flag).toBeTruthy();
+      if (flag) {
+        flag.enabled = false;
+      } else {
+        fail('flag is null');
+      }
+
+      expect(flag?.enabled).toBeFalsy();
+      expect(storedFlag?.enabled).toBeTruthy();
+    });
+  });
+});
+
+describe('ImmutableConfiguration', () => {
+  let config: ImmutableConfiguration;
+
+  const mockFlags: Record<string, Flag> = {
+    'feature-a': {
+      key: 'feature-a',
+      variationType: VariationType.BOOLEAN,
+      enabled: true,
+      variations: {},
+      allocations: [],
+      totalShards: 10_000,
+    },
+    'feature-b': {
+      key: 'feature-b',
+      variationType: VariationType.STRING,
+      enabled: true,
+      variations: {},
+      allocations: [],
+      totalShards: 10_000,
+    },
+  };
+
+  const mockBanditVariations: Record<string, BanditVariation[]> = {
+    'feature-a': [
+      {
+        key: 'bandit-1',
+        variationValue: 'bandit-1',
+        flagKey: 'feature-a',
+        variationKey: 'bandit-1',
+      },
+    ],
+  };
+
+  const mockBandits: Record<string, BanditParameters> = {
+    'bandit-1': {
+      banditKey: 'bandit-1',
+      modelName: 'falcon',
+      modelVersion: 'v123',
+      modelData: {
+        gamma: 0,
+        defaultActionScore: 0,
+        actionProbabilityFloor: 0,
+        coefficients: {},
+      },
+    },
+  };
+
+  const mockConfigDetails: ConfigDetails = {
+    configEnvironment: { name: 'test' },
+    configFormat: 'SERVER',
+    configPublishedAt: '2024-03-20T00:00:00Z',
+    configFetchedAt: '2024-03-20T00:00:00Z',
+  };
+
+  beforeEach(() => {
+    config = new ImmutableConfiguration(
+      mockFlags,
+      true, // initialized
+      false, // obfuscated
+      mockConfigDetails,
+      mockBanditVariations,
+      mockBandits,
+    );
+  });
+
+  describe('immutability', () => {
+    it('should create deep copies of input data', () => {
+      const originalFlags = { ...mockFlags };
+      const flags = config.getFlags();
+
+      // Attempt to modify the returned data
+      flags['feature-a'].enabled = false;
+
+      // Verify original configuration remains unchanged
+      expect(originalFlags['feature-a'].enabled).toBeTruthy();
+    });
+
+    it('should create deep copies of bandit variations', () => {
+      const variations = config.getBanditVariations();
+      const originalVariation = [...mockBanditVariations['feature-a']];
+
+      variations['feature-a'][0].variationValue = 'modified';
+
+      expect(originalVariation[0].variationValue).toEqual('bandit-1');
+    });
+
+    it('should create deep copies of bandits', () => {
+      const bandits = config.getBandits();
+      const originalBandit = { ...mockBandits['bandit-1'] };
+
+      bandits['bandit-1'].modelName = 'eagle';
+
+      expect(originalBandit.modelName).toEqual('falcon');
+    });
+
+    it('should create deep copies of config details', () => {
+      const details = config.getFlagConfigDetails();
+      const originalDetails = { ...mockConfigDetails };
+
+      details.configFormat = 'CLIENT';
+
+      expect(originalDetails.configFormat).toEqual('SERVER');
+    });
+  });
+
+  describe('flag operations', () => {
+    it('should get existing flag', () => {
+      expect(config.getFlag('feature-a')).toEqual(mockFlags['feature-a']);
+    });
+
+    it('should return null for non-existent flag', () => {
+      expect(config.getFlag('non-existent')).toBeNull();
+    });
+
+    it('should get all flags', () => {
+      expect(config.getFlags()).toEqual(mockFlags);
+    });
+
+    it('should get all flag keys', () => {
+      expect(config.getFlagKeys()).toEqual(['feature-a', 'feature-b']);
+    });
+  });
+
+  describe('bandit operations', () => {
+    it('should get bandit variations for flag', () => {
+      expect(config.getFlagBanditVariations('feature-a')).toEqual(
+        mockBanditVariations['feature-a'],
+      );
+    });
+
+    it('should return empty array for flag without bandit variations', () => {
+      expect(config.getFlagBanditVariations('feature-b')).toEqual([]);
+    });
+
+    it('should get specific bandit', () => {
+      expect(config.getBandit('bandit-1')).toEqual(mockBandits['bandit-1']);
+    });
+
+    it('should return null for non-existent bandit', () => {
+      expect(config.getBandit('non-existent')).toBeNull();
+    });
+
+    it('should get flag variation bandit', () => {
+      expect(config.getFlagVariationBandit('feature-a', 'bandit-1')).toEqual(
+        mockBandits['bandit-1'],
+      );
+    });
+
+    it('should return null for non-matching variation value', () => {
+      expect(config.getFlagVariationBandit('feature-a', 'control')).toBeNull();
+    });
+  });
+
+  describe('configuration state', () => {
+    it('should return initialization state', () => {
+      expect(config.isInitialized()).toBe(true);
+    });
+
+    it('should return obfuscation state', () => {
+      expect(config.isObfuscated()).toBe(false);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle configuration without bandit variations', () => {
+      const configWithoutBandits = new ImmutableConfiguration(
+        mockFlags,
+        true,
+        false,
+        mockConfigDetails,
+      );
+
+      expect(configWithoutBandits.getBanditVariations()).toEqual({});
+      expect(configWithoutBandits.getFlagBanditVariations('feature-a')).toEqual([]);
+    });
+
+    it('should handle configuration without bandits', () => {
+      const configWithoutBandits = new ImmutableConfiguration(
+        mockFlags,
+        true,
+        false,
+        mockConfigDetails,
+        mockBanditVariations,
+      );
+
+      expect(configWithoutBandits.getBandits()).toEqual({});
+      expect(configWithoutBandits.getBandit('bandit-1')).toBeNull();
     });
   });
 });
