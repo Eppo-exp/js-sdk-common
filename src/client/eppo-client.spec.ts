@@ -367,14 +367,14 @@ describe('EppoClient E2E test', () => {
 
       describe('Not obfuscated', () => {
         let client: EppoClient;
-        beforeAll(() => {
+        beforeAll(async () => {
           client = new EppoClient({
             flagConfigurationStore: new MemoryOnlyConfigurationStore(),
           });
           client.setIsGracefulFailureMode(false);
 
           // Bootstrap using the flags config.
-          client.bootstrap(bootstrapFlagsConfig);
+          await client.bootstrap(bootstrapFlagsConfig);
         });
 
         it('contains some key flags', () => {
