@@ -46,26 +46,14 @@ export interface IBanditParametersResponse {
   bandits: Record<string, BanditParameters>;
 }
 
-/**
- * Fixes issues with url.toString() in older React Native versions
- * that leaves a trailing slash in pathname
- * @param url URL to stringify
- * @returns stringified url
- */
-const urlWithNoTrailingSlash = (url: URL) => {
-  // Note: URL.pathname does not exist in some React Native JS runtime
-  //       so we have to do string manipulation on the stringified URL
-  return url.toString().replace(/\/\?/, '?').replace(/\/$/, '');
-};
-
 export interface IHttpClient {
   getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined>;
   getBanditParameters(): Promise<IBanditParametersResponse | undefined>;
   getPrecomputedFlags(
     payload: PrecomputedFlagsPayload,
   ): Promise<IObfuscatedPrecomputedConfigurationResponse | undefined>;
-  rawGet<T>(url: URL): Promise<T | undefined>;
-  rawPost<T, P>(url: URL, payload: P): Promise<T | undefined>;
+  rawGet<T>(url: string): Promise<T | undefined>;
+  rawPost<T, P>(url: string, payload: P): Promise<T | undefined>;
 }
 
 export default class FetchHttpClient implements IHttpClient {
@@ -94,14 +82,14 @@ export default class FetchHttpClient implements IHttpClient {
     );
   }
 
-  async rawGet<T>(url: URL): Promise<T | undefined> {
+  async rawGet<T>(url: string): Promise<T | undefined> {
     try {
       // Canonical implementation of abortable fetch for interrupting when request takes longer than desired.
       // https://developer.chrome.com/blog/abortable-fetch/#reacting_to_an_aborted_fetch
       const controller = new AbortController();
       const signal = controller.signal;
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-      const response = await fetch(urlWithNoTrailingSlash(url), { signal });
+      const response = await fetch(url, { signal });
       // Clear timeout when response is received within the budget.
       clearTimeout(timeoutId);
 
@@ -120,13 +108,13 @@ export default class FetchHttpClient implements IHttpClient {
     }
   }
 
-  async rawPost<T, P>(url: URL, payload: P): Promise<T | undefined> {
+  async rawPost<T, P>(url: string, payload: P): Promise<T | undefined> {
     try {
       const controller = new AbortController();
       const signal = controller.signal;
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-      const response = await fetch(urlWithNoTrailingSlash(url), {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
