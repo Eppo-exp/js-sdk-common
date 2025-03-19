@@ -321,8 +321,6 @@ describe('EppoClient E2E test', () => {
     });
   });
 
-  const testCases = testCasesByFileName<IAssignmentTestCase>(ASSIGNMENT_TEST_DATA_DIR);
-
   function testCasesAgainstClient(client: EppoClient, testCase: IAssignmentTestCase) {
     const { flag, variationType, defaultValue, subjects } = testCase;
 

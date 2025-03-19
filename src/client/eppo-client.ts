@@ -17,10 +17,7 @@ import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-
 import ConfigurationRequestor from '../configuration-requestor';
 import { ConfigurationManager } from '../configuration-store/configuration-manager';
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
-import {
-  ConfigurationStoreBundle,
-  IConfigurationManager,
-} from '../configuration-store/i-configuration-manager';
+import { IConfigurationManager } from '../configuration-store/i-configuration-manager';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   ConfigurationWireV1,
@@ -249,15 +246,7 @@ export default class EppoClient {
     this.configurationRequestParameters = configurationRequestParameters;
   }
 
-  public setConfigurationStores(configStores: ConfigurationStoreBundle) {
-    // Update the configuration manager
-    this.configurationManager.setConfigurationStores(configStores);
-  }
-
   // noinspection JSUnusedGlobalSymbols
-  /**
-   * @deprecated use `setConfigurationStores` instead
-   */
   setFlagConfigurationStore(flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>) {
     this.flagConfigurationStore = flagConfigurationStore;
     this.configObfuscatedCache = undefined;
@@ -267,9 +256,6 @@ export default class EppoClient {
   }
 
   // noinspection JSUnusedGlobalSymbols
-  /**
-   * @deprecated use `setConfigurationStores` instead
-   */
   setBanditVariationConfigurationStore(
     banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]>,
   ) {
@@ -280,9 +266,6 @@ export default class EppoClient {
   }
 
   // noinspection JSUnusedGlobalSymbols
-  /**
-   * @deprecated use `setConfigurationStores` instead
-   */
   setBanditModelConfigurationStore(
     banditModelConfigurationStore: IConfigurationStore<BanditParameters>,
   ) {
@@ -294,7 +277,7 @@ export default class EppoClient {
 
   private innerSetConfigurationStores() {
     // Set the set of configuration stores to those owned by the `this`.
-    this.setConfigurationStores({
+    this.configurationManager.setConfigurationStores({
       flagConfigurationStore: this.flagConfigurationStore,
       banditReferenceConfigurationStore: this.banditVariationConfigurationStore,
       banditConfigurationStore: this.banditModelConfigurationStore,
