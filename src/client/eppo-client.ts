@@ -21,10 +21,10 @@ import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.stor
 import {
   ConfigurationWireV1,
   IConfigurationWire,
-  inflateResponse,
   IPrecomputedConfiguration,
   PrecomputedConfiguration,
 } from '../configuration-wire/configuration-wire-types';
+import { inflateJsonObject } from '../configuration-wire/json-util';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -330,11 +330,11 @@ export default class EppoClient {
     if (!configuration.config) {
       throw new Error('Flag configuration not provided');
     }
-    const flagConfigResponse: IUniversalFlagConfigResponse = inflateResponse(
+    const flagConfigResponse: IUniversalFlagConfigResponse = inflateJsonObject(
       configuration.config.response,
     );
     const banditParamResponse: IBanditParametersResponse | undefined = configuration.bandits
-      ? inflateResponse(configuration.bandits.response)
+      ? inflateJsonObject(configuration.bandits.response)
       : undefined;
 
     // This method runs async because the configuration stores potentially have an async write at the end of updating

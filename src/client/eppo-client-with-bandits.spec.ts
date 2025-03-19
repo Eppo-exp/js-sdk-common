@@ -21,7 +21,7 @@ import {
   IConfigurationWire,
   IPrecomputedConfiguration,
   IObfuscatedPrecomputedConfigurationResponse,
-  ConfigurationWireV1,
+  ConfigurationWireV1, configurationFromString,
 } from '../configuration-wire/configuration-wire-types';
 import { Evaluator, FlagEvaluation } from '../evaluator';
 import {
@@ -137,7 +137,7 @@ describe('EppoClient Bandits E2E test', () => {
     }
 
     describe('bootstrapped client', () => {
-      const banditFlagsConfig = ConfigurationWireV1.fromString(
+      const banditFlagsConfig = configurationFromString(
         readMockConfigurationWireResponse(SHARED_BOOTSTRAP_BANDIT_FLAGS_FILE),
       );
 

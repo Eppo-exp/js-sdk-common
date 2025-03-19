@@ -6,7 +6,8 @@ import {
 import { IUniversalFlagConfigResponse, IBanditParametersResponse } from '../http-client';
 import { FormatEnum } from '../interfaces';
 
-import { ConfigurationWireV1, deflateResponse, inflateResponse } from './configuration-wire-types';
+import { ConfigurationWireV1 } from './configuration-wire-types';
+import { deflateJsonObject, inflateJsonObject } from './json-util';
 
 describe('Response String Type Safety', () => {
   const mockFlagConfig: IUniversalFlagConfigResponse = readMockUFCResponse(
@@ -18,22 +19,22 @@ describe('Response String Type Safety', () => {
 
   describe('deflateResponse and inflateResponse', () => {
     it('should correctly serialize and deserialize flag config', () => {
-      const serialized = deflateResponse(mockFlagConfig);
-      const deserialized = inflateResponse(serialized);
+      const serialized = deflateJsonObject(mockFlagConfig);
+      const deserialized = inflateJsonObject(serialized);
 
       expect(deserialized).toEqual(mockFlagConfig);
     });
 
     it('should correctly serialize and deserialize bandit config', () => {
-      const serialized = deflateResponse(mockBanditConfig);
-      const deserialized = inflateResponse(serialized);
+      const serialized = deflateJsonObject(mockBanditConfig);
+      const deserialized = inflateJsonObject(serialized);
 
       expect(deserialized).toEqual(mockBanditConfig);
     });
 
     it('should maintain type information through serialization', () => {
-      const serialized = deflateResponse(mockFlagConfig);
-      const deserialized = inflateResponse(serialized);
+      const serialized = deflateJsonObject(mockFlagConfig);
+      const deserialized = inflateJsonObject(serialized);
 
       // TypeScript compilation check: these should work
       expect(deserialized.format).toBe(FormatEnum.SERVER);
@@ -54,7 +55,7 @@ describe('Response String Type Safety', () => {
       if (!wirePacket.config) {
         fail('Flag config not present in ConfigurationWire');
       }
-      const deserializedConfig = inflateResponse(wirePacket.config.response);
+      const deserializedConfig = inflateJsonObject(wirePacket.config.response);
       expect(deserializedConfig).toEqual(mockFlagConfig);
     });
 
@@ -80,8 +81,8 @@ describe('Response String Type Safety', () => {
       expect(wirePacket.bandits.etag).toBe('bandit-etag');
 
       // Verify we can deserialize both responses
-      const deserializedConfig = inflateResponse(wirePacket.config.response);
-      const deserializedBandits = inflateResponse(wirePacket.bandits.response);
+      const deserializedConfig = inflateJsonObject(wirePacket.config.response);
+      const deserializedBandits = inflateJsonObject(wirePacket.bandits.response);
 
       expect(deserializedConfig).toEqual(mockFlagConfig);
       expect(deserializedBandits).toEqual(mockBanditConfig);
