@@ -355,8 +355,9 @@ export default class EppoClient {
       ? inflateResponse(configuration.bandits.response)
       : undefined;
 
-    // We need to run this method sync, but, because the configuration stores potentially have an async write at the end
-    // of updating the configuration, the method to do so it also async. Use an IIFE to wrap the async call.
+    // This method runs async because the configuration stores potentially have an async write at the end of updating
+    // the configuration. Most instances of offlineInit will use `MemoryOnlyConfigurationStore` instances which actually
+    // accomplish the config write synchronously.
     await this.configurationManager.hydrateConfigurationStoresFromUfc(
       flagConfigResponse,
       banditParamResponse,
