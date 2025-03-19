@@ -155,7 +155,8 @@ export default class EppoClient {
 
     if (isObfuscated !== undefined) {
       logger.info(
-        `[Eppo SDK] specifying isObfuscated no longer has an effect; obfuscation is inferred from the configuration.`,
+        '[Eppo SDK] specifying isObfuscated no longer has an effect and will be removed in the next major release; obfuscation ' +
+          'is now inferred from the configuration, so you can safely remove the option.',
       );
     }
   }
@@ -256,7 +257,8 @@ export default class EppoClient {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   setIsObfuscated(isObfuscated: boolean) {
     logger.info(
-      '[Eppo SDK] setIsObfuscated no longer has an effect; obfuscation is inferred from the configuration.',
+      '[Eppo SDK] setIsObfuscated no longer has an effect and will be removed in the next major release; obfuscation ' +
+        'is now inferred from the configuration, so you can safely remove the call to this method.',
     );
   }
 
