@@ -42,7 +42,7 @@ import {
 } from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
 import FetchHttpClient from '../http-client';
-import { Configuration, IConfiguration, StoreBackedConfiguration } from '../i-configuration';
+import { Configuration, IConfiguration } from '../i-configuration';
 import {
   BanditModelData,
   BanditParameters,
