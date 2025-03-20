@@ -1,4 +1,56 @@
+import { IConfiguration } from '../i-configuration';
 import { Environment } from '../interfaces';
+
+/**
+ * `ConfigurationStore` is a central piece of Eppo SDK and answers a
+ * simple question: what configuration is currently active?
+ *
+ * @internal `ConfigurationStore` shall only be used inside Eppo SDKs.
+ */
+export class ConfigurationStore {
+  private readonly listeners: Array<
+    (configuration: IConfiguration | null) => void
+  > = [];
+
+  // TODO: replace IConfiguration with a concrete `Configuration` type.
+  public constructor(private configuration: IConfiguration | null = null) {}
+
+  public getConfiguration(): IConfiguration | null {
+    return this.configuration;
+  }
+
+  public setConfiguration(configuration: IConfiguration | null): void {
+    this.configuration = configuration;
+    this.notifyListeners();
+  }
+
+  /**
+   * Subscribe to configuration changes. The callback will be called
+   * every time configuration is changed.
+   *
+   * Returns a function to unsubscribe from future updates.
+   */
+  public onConfigurationChange(
+    listener: (configuration: IConfiguration | null) => void
+  ): () => void {
+    this.listeners.push(listener);
+
+    return () => {
+      const idx = this.listeners.indexOf(listener);
+      if (idx !== -1) {
+        this.listeners.splice(idx, 1);
+      }
+    };
+  }
+
+  private notifyListeners(): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(this.configuration);
+      } catch {}
+    }
+  }
+}
 
 /**
  * ConfigurationStore interface
@@ -21,6 +73,8 @@ import { Environment } from '../interfaces';
  *
  * The policy choices surrounding the use of one or more underlying storages are
  * implementation specific and handled upstream.
+ *
+ * @deprecated To be replaced with ConfigurationStore and PersistentStorage.
  */
 export interface IConfigurationStore<T> {
   init(): Promise<void>;
@@ -41,6 +95,7 @@ export interface IConfigurationStore<T> {
   salt?: string;
 }
 
+/** @deprecated To be replaced with ConfigurationStore and PersistentStorage. */
 export interface ISyncStore<T> {
   get(key: string): T | null;
   entries(): Record<string, T>;
@@ -49,6 +104,7 @@ export interface ISyncStore<T> {
   setEntries(entries: Record<string, T>): void;
 }
 
+/** @deprecated To be replaced with ConfigurationStore and PersistentStorage. */
 export interface IAsyncStore<T> {
   isInitialized(): boolean;
   isExpired(): Promise<boolean>;
