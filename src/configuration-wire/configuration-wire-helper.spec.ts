@@ -19,7 +19,7 @@ describe('ConfigurationWireHelper', () => {
         baseUrl: TEST_BASE_URL,
       });
 
-      const wirePacket = await helper.fetchBootstrapConfiguration();
+      const wirePacket = await helper.fetchConfiguration();
 
       expect(wirePacket.version).toBe(1);
       expect(wirePacket.config).toBeDefined();
@@ -47,9 +47,10 @@ describe('ConfigurationWireHelper', () => {
         sdkName: 'node-server',
         sdkVersion: '4.0.0',
         baseUrl: TEST_BASE_URL,
+        fetchBandits: true,
       });
 
-      const wirePacket = await helper.fetchBootstrapConfiguration();
+      const wirePacket = await helper.fetchConfiguration();
 
       expect(wirePacket.version).toBe(1);
       expect(wirePacket.config).toBeDefined();
@@ -76,12 +77,12 @@ describe('ConfigurationWireHelper', () => {
 
     it('should include fetchedAt timestamps', async () => {
       const helper = ConfigurationWireHelper.build(BANDIT_SDK_KEY, {
-        sdkName: 'android',
-        sdkVersion: '4.0.0',
+        sdkName: 'node-server',
         baseUrl: TEST_BASE_URL,
+        fetchBandits: true,
       });
 
-      const wirePacket = await helper.fetchBootstrapConfiguration();
+      const wirePacket = await helper.fetchConfiguration();
 
       if (!wirePacket.config) {
         throw new Error('Flag config not present in ConfigurationWire');
