@@ -271,13 +271,6 @@ export default class EppoClient {
   }
 
   // noinspection JSUnusedGlobalSymbols
-  setBanditModelConfigurationStore(
-    banditModelConfigurationStore: IConfigurationStore<BanditParameters>,
-  ) {
-    this.banditModelConfigurationStore = banditModelConfigurationStore;
-  }
-
-  // noinspection JSUnusedGlobalSymbols
   /**
    * Setting this value will have no side effects other than triggering a warning when the actual
    * configuration's obfuscated does not match the value set here.
