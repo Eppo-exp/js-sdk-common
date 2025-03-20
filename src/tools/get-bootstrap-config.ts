@@ -5,6 +5,8 @@ import { bootstrapConfigCommand } from './commands/bootstrap-config';
 
 /**
  * Script to run the bootstrap-config command directly.
+ *
+ * For usage, run: `ts-node src/tools/get-bootstrap-config.ts --help`
  */
 async function main() {
   await yargs(hideBin(process.argv))
