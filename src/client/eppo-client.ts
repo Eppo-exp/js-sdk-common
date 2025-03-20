@@ -17,7 +17,7 @@ import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-
 import { Configuration } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { ConfigurationStore } from '../configuration-store';
-import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
+import { ISyncStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
   ConfigurationWireV1,
@@ -44,12 +44,8 @@ import { FlagEvaluationError } from '../flag-evaluation-error';
 import FetchHttpClient from '../http-client';
 import {
   BanditModelData,
-  BanditParameters,
-  BanditVariation,
-  Flag,
   FormatEnum,
   IPrecomputedBandit,
-  ObfuscatedFlag,
   PrecomputedFlag,
   Variation,
   VariationType,
@@ -100,9 +96,6 @@ export type EppoClientParameters = {
   // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
   // or bandit events). These events are application-specific and captures by EppoClient#track API.
   eventDispatcher?: EventDispatcher;
-  flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
-  banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
-  banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
   overrideStore?: ISyncStore<Variation>;
   configurationRequestParameters?: FlagConfigurationRequestParameters;
   initialConfiguration?: Configuration;
@@ -136,19 +129,10 @@ export default class EppoClient {
   private readonly overrideValidator = new OverrideValidator();
 
   private readonly configurationStore;
-  /** @deprecated use configurationStore instead. */
-  private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
-  /** @deprecated use configurationStore instead. */
-  private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
-  /** @deprecated use configurationStore instead. */
-  private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
 
   constructor({
     eventDispatcher = new NoOpEventDispatcher(),
     isObfuscated,
-    flagConfigurationStore,
-    banditVariationConfigurationStore,
-    banditModelConfigurationStore,
     overrideStore,
     configurationRequestParameters,
     initialConfiguration,
@@ -156,9 +140,6 @@ export default class EppoClient {
     this.configurationStore = new ConfigurationStore(initialConfiguration);
 
     this.eventDispatcher = eventDispatcher;
-    this.flagConfigurationStore = flagConfigurationStore;
-    this.banditVariationConfigurationStore = banditVariationConfigurationStore;
-    this.banditModelConfigurationStore = banditModelConfigurationStore;
     this.overrideStore = overrideStore;
     this.configurationRequestParameters = configurationRequestParameters;
 
