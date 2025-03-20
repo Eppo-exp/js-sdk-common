@@ -10,16 +10,34 @@ import { BanditVariation, BanditParameters, Flag, BanditReference } from './inte
 // Requests AND stores flag configurations
 export default class ConfigurationRequestor {
   private banditModelVersions: string[] = [];
-  private readonly configuration: StoreBackedConfiguration;
+  private configuration: StoreBackedConfiguration;
 
   constructor(
     private readonly httpClient: IHttpClient,
-    private readonly flagConfigurationStore: IConfigurationStore<Flag>,
-    private readonly banditVariationConfigurationStore: IConfigurationStore<
-      BanditVariation[]
-    > | null,
-    private readonly banditModelConfigurationStore: IConfigurationStore<BanditParameters> | null,
+    private flagConfigurationStore: IConfigurationStore<Flag>,
+    private banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]> | null,
+    private banditModelConfigurationStore: IConfigurationStore<BanditParameters> | null,
   ) {
+    this.configuration = new StoreBackedConfiguration(
+      this.flagConfigurationStore,
+      this.banditVariationConfigurationStore,
+      this.banditModelConfigurationStore,
+    );
+  }
+
+  /**
+   * Updates the configuration stores and recreates the StoreBackedConfiguration
+   */
+  public setConfigurationStores(
+    flagConfigurationStore: IConfigurationStore<Flag>,
+    banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]> | null,
+    banditModelConfigurationStore: IConfigurationStore<BanditParameters> | null,
+  ): void {
+    this.flagConfigurationStore = flagConfigurationStore;
+    this.banditVariationConfigurationStore = banditVariationConfigurationStore;
+    this.banditModelConfigurationStore = banditModelConfigurationStore;
+
+    // Recreate the configuration with the new stores
     this.configuration = new StoreBackedConfiguration(
       this.flagConfigurationStore,
       this.banditVariationConfigurationStore,
