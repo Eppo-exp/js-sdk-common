@@ -1,4 +1,5 @@
 import { checkValueTypeMatch } from './client/eppo-client';
+import { Configuration } from './configuration';
 import {
   AllocationEvaluationCode,
   IFlagEvaluationDetails,
@@ -14,7 +15,7 @@ import {
   Allocation,
   Split,
   VariationType,
-  ConfigDetails,
+  FormatEnum,
 } from './interfaces';
 import { Rule, matchesRule } from './rules';
 import { MD5Sharder, Sharder } from './sharders';
@@ -45,19 +46,21 @@ export class Evaluator {
   }
 
   evaluateFlag(
+    configuration: Configuration,
     flag: Flag,
-    configDetails: ConfigDetails,
     subjectKey: string,
     subjectAttributes: Attributes,
-    obfuscated: boolean,
     expectedVariationType?: VariationType,
   ): FlagEvaluation {
+    const flagsConfig = configuration.getFlagsConfiguration();
     const flagEvaluationDetailsBuilder = new FlagEvaluationDetailsBuilder(
-      configDetails.configEnvironment.name,
+      flagsConfig?.response.environment.name ?? '',
       flag.allocations,
-      configDetails.configFetchedAt,
-      configDetails.configPublishedAt,
+      flagsConfig?.fetchedAt ?? '',
+      flagsConfig?.response.createdAt ?? '',
     );
+    const configFormat = flagsConfig?.response.format;
+    const obfuscated = configFormat !== FormatEnum.SERVER;
     try {
       if (!flag.enabled) {
         return noneResult(
@@ -68,7 +71,7 @@ export class Evaluator {
             'FLAG_UNRECOGNIZED_OR_DISABLED',
             `Unrecognized or disabled flag: ${flag.key}`,
           ),
-          configDetails.configFormat,
+          configFormat ?? '',
         );
       }
 
@@ -115,7 +118,7 @@ export class Evaluator {
                 .build(flagEvaluationCode, flagEvaluationDescription);
               return {
                 flagKey: flag.key,
-                format: configDetails.configFormat,
+                format: configFormat ?? '',
                 subjectKey,
                 subjectAttributes,
                 allocationKey: allocation.key,
@@ -141,7 +144,7 @@ export class Evaluator {
           'DEFAULT_ALLOCATION_NULL',
           'No allocations matched. Falling back to "Default Allocation", serving NULL',
         ),
-        configDetails.configFormat,
+        configFormat ?? '',
       );
     } catch (err: any) {
       console.error('>>>>', err);

@@ -1,132 +1,48 @@
-import { IConfigurationStore } from './configuration-store/configuration-store';
+import { Configuration } from './configuration';
+import { ConfigurationStore } from './configuration-store';
 import { IHttpClient } from './http-client';
-import {
-  ConfigStoreHydrationPacket,
-  IConfiguration,
-  StoreBackedConfiguration,
-} from './i-configuration';
-import { BanditVariation, BanditParameters, Flag, BanditReference } from './interfaces';
+
+export type ConfigurationRequestorOptions = {
+  wantsBandits?: boolean;
+};
 
 // Requests AND stores flag configurations
 export default class ConfigurationRequestor {
-  private banditModelVersions: string[] = [];
-  private readonly configuration: StoreBackedConfiguration;
+  private readonly options: ConfigurationRequestorOptions;
 
   constructor(
     private readonly httpClient: IHttpClient,
-    private readonly flagConfigurationStore: IConfigurationStore<Flag>,
-    private readonly banditVariationConfigurationStore: IConfigurationStore<
-      BanditVariation[]
-    > | null,
-    private readonly banditModelConfigurationStore: IConfigurationStore<BanditParameters> | null,
+    private readonly configurationStore: ConfigurationStore,
+    options: Partial<ConfigurationRequestorOptions> = {},
   ) {
-    this.configuration = new StoreBackedConfiguration(
-      this.flagConfigurationStore,
-      this.banditVariationConfigurationStore,
-      this.banditModelConfigurationStore,
-    );
+    this.options = {
+      wantsBandits: true,
+      ...options,
+    };
   }
 
-  public isFlagConfigExpired(): Promise<boolean> {
-    return this.flagConfigurationStore.isExpired();
-  }
+  async fetchConfiguration(): Promise<Configuration | null> {
+    const configResponse = await this.httpClient.getUniversalFlagConfiguration();
+    if (!configResponse?.response.flags) {
+      return null;
+    }
 
-  public getConfiguration(): IConfiguration {
-    return this.configuration;
+    const needsBandits =
+      this.options.wantsBandits &&
+      Object.keys(configResponse.response.banditReferences ?? {}).length > 0;
+
+    const banditsConfig = needsBandits ? await this.httpClient.getBanditParameters() : undefined;
+
+    return Configuration.fromResponses({
+      flags: configResponse,
+      bandits: banditsConfig,
+    });
   }
 
   async fetchAndStoreConfigurations(): Promise<void> {
-    const configResponse = await this.httpClient.getUniversalFlagConfiguration();
-    if (!configResponse?.flags) {
-      return;
+    const configuration = await this.fetchConfiguration();
+    if (configuration) {
+      this.configurationStore.setConfiguration(configuration);
     }
-
-    const flagResponsePacket: ConfigStoreHydrationPacket<Flag> = {
-      entries: configResponse.flags,
-      environment: configResponse.environment,
-      createdAt: configResponse.createdAt,
-      format: configResponse.format,
-    };
-
-    let banditVariationPacket: ConfigStoreHydrationPacket<BanditVariation[]> | undefined;
-    let banditModelPacket: ConfigStoreHydrationPacket<BanditParameters> | undefined;
-    const flagsHaveBandits = Object.keys(configResponse.banditReferences ?? {}).length > 0;
-    const banditStoresProvided = Boolean(
-      this.banditVariationConfigurationStore && this.banditModelConfigurationStore,
-    );
-    if (flagsHaveBandits && banditStoresProvided) {
-      // Map bandit flag associations by flag key for quick lookup (instead of bandit key as provided by the UFC)
-      const banditVariations = this.indexBanditVariationsByFlagKey(configResponse.banditReferences);
-
-      banditVariationPacket = {
-        entries: banditVariations,
-        environment: configResponse.environment,
-        createdAt: configResponse.createdAt,
-        format: configResponse.format,
-      };
-
-      if (
-        this.requiresBanditModelConfigurationStoreUpdate(
-          this.banditModelVersions,
-          configResponse.banditReferences,
-        )
-      ) {
-        const banditResponse = await this.httpClient.getBanditParameters();
-        if (banditResponse?.bandits) {
-          banditModelPacket = {
-            entries: banditResponse.bandits,
-            environment: configResponse.environment,
-            createdAt: configResponse.createdAt,
-            format: configResponse.format,
-          };
-
-          this.banditModelVersions = this.getLoadedBanditModelVersions(banditResponse.bandits);
-        }
-      }
-    }
-
-    if (
-      await this.configuration.hydrateConfigurationStores(
-        flagResponsePacket,
-        banditVariationPacket,
-        banditModelPacket,
-      )
-    ) {
-      // TODO: Notify that config updated.
-    }
-  }
-
-  private getLoadedBanditModelVersions(entries: Record<string, BanditParameters>): string[] {
-    return Object.values(entries).map((banditParam: BanditParameters) => banditParam.modelVersion);
-  }
-
-  private requiresBanditModelConfigurationStoreUpdate(
-    currentBanditModelVersions: string[],
-    banditReferences: Record<string, BanditReference>,
-  ): boolean {
-    const referencedModelVersions = Object.values(banditReferences).map(
-      (banditReference: BanditReference) => banditReference.modelVersion,
-    );
-
-    return !referencedModelVersions.every((modelVersion) =>
-      currentBanditModelVersions.includes(modelVersion),
-    );
-  }
-
-  private indexBanditVariationsByFlagKey(
-    banditVariationsByBanditKey: Record<string, BanditReference>,
-  ): Record<string, BanditVariation[]> {
-    const banditVariationsByFlagKey: Record<string, BanditVariation[]> = {};
-    Object.values(banditVariationsByBanditKey).forEach((banditReference) => {
-      banditReference.flagVariations.forEach((banditVariation) => {
-        let banditVariations = banditVariationsByFlagKey[banditVariation.flagKey];
-        if (!banditVariations) {
-          banditVariations = [];
-          banditVariationsByFlagKey[banditVariation.flagKey] = banditVariations;
-        }
-        banditVariations.push(banditVariation);
-      });
-    });
-    return banditVariationsByFlagKey;
   }
 }
