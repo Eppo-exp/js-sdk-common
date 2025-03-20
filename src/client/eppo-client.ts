@@ -210,7 +210,7 @@ export default class EppoClient {
   setFlagConfigurationStore(flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>) {
     this.flagConfigurationStore = flagConfigurationStore;
 
-    this.maybeUpdateConfigRequestor();
+    this.updateConfigRequestorIfExists();
   }
 
   // noinspection JSUnusedGlobalSymbols
@@ -219,7 +219,7 @@ export default class EppoClient {
   ) {
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
 
-    this.maybeUpdateConfigRequestor();
+    this.updateConfigRequestorIfExists();
   }
 
   /** Sets the EventDispatcher instance to use when tracking events with {@link track}. */
@@ -249,10 +249,10 @@ export default class EppoClient {
   ) {
     this.banditModelConfigurationStore = banditModelConfigurationStore;
 
-    this.maybeUpdateConfigRequestor();
+    this.updateConfigRequestorIfExists();
   }
 
-  private maybeUpdateConfigRequestor() {
+  private updateConfigRequestorIfExists() {
     // Update the ConfigurationRequestor if it exists
     if (this.configurationRequestor) {
       this.configurationRequestor.setConfigurationStores(
