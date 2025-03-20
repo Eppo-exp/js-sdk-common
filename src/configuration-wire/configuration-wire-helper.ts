@@ -49,27 +49,4 @@ export class ConfigurationWireHelper {
 
     this.httpClient = new FetchHttpClient(apiEndpoints, 5000);
   }
-
-  /**
-   * Fetches configuration data from the API and build a Bootstrap Configuration (aka an `IConfigurationWire` object).
-   * The IConfigurationWire instance can be used to bootstrap some SDKs.
-   */
-  public async fetchBootstrapConfiguration(): Promise<IConfigurationWire> {
-    // Get the configs
-    let banditResponse: IBanditParametersResponse | undefined;
-    const configResponse: IUniversalFlagConfigResponse | undefined =
-      await this.httpClient.getUniversalFlagConfiguration();
-
-    if (!configResponse?.flags) {
-      console.warn('Unable to fetch configuration, returning empty configuration');
-      return Promise.resolve(ConfigurationWireV1.empty());
-    }
-
-    const flagsHaveBandits = Object.keys(configResponse.banditReferences ?? {}).length > 0;
-    if (flagsHaveBandits) {
-      banditResponse = await this.httpClient.getBanditParameters();
-    }
-
-    return ConfigurationWireV1.fromResponses(configResponse, banditResponse);
-  }
 }

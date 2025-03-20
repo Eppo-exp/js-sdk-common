@@ -1,4 +1,5 @@
 import ApiEndpoints from './api-endpoints';
+import { BanditsConfig, FlagsConfig } from './configuration';
 import { IObfuscatedPrecomputedConfigurationResponse } from './configuration-wire/configuration-wire-types';
 import {
   BanditParameters,
@@ -47,8 +48,8 @@ export interface IBanditParametersResponse {
 }
 
 export interface IHttpClient {
-  getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined>;
-  getBanditParameters(): Promise<IBanditParametersResponse | undefined>;
+  getUniversalFlagConfiguration(): Promise<FlagsConfig | undefined>;
+  getBanditParameters(): Promise<BanditsConfig | undefined>;
   getPrecomputedFlags(
     payload: PrecomputedFlagsPayload,
   ): Promise<IObfuscatedPrecomputedConfigurationResponse | undefined>;
@@ -62,14 +63,28 @@ export default class FetchHttpClient implements IHttpClient {
     private readonly timeout: number,
   ) {}
 
-  async getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined> {
+  async getUniversalFlagConfiguration(): Promise<FlagsConfig | undefined> {
     const url = this.apiEndpoints.ufcEndpoint();
-    return await this.rawGet<IUniversalFlagConfigResponse>(url);
+    const response = await this.rawGet<IUniversalFlagConfigResponse>(url);
+    if (!response) {
+      return undefined;
+    }
+    return {
+      response,
+      fetchedAt: new Date().toISOString(),
+    };
   }
 
-  async getBanditParameters(): Promise<IBanditParametersResponse | undefined> {
+  async getBanditParameters(): Promise<BanditsConfig | undefined> {
     const url = this.apiEndpoints.banditParametersEndpoint();
-    return await this.rawGet<IBanditParametersResponse>(url);
+    const response = await this.rawGet<IBanditParametersResponse>(url);
+    if (!response) {
+      return undefined;
+    }
+    return {
+      response,
+      fetchedAt: new Date().toISOString(),
+    };
   }
 
   async getPrecomputedFlags(

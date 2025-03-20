@@ -287,18 +287,11 @@ export default class EppoClient {
       queryParams: { apiKey, sdkName, sdkVersion },
     });
     const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
-    const configurationRequestor = new ConfigurationRequestor(
-      httpClient,
-      this.flagConfigurationStore,
-      this.banditVariationConfigurationStore ?? null,
-      this.banditModelConfigurationStore ?? null,
-    );
+    const configurationRequestor = new ConfigurationRequestor(httpClient, this.configurationStore);
     this.configurationRequestor = configurationRequestor;
 
     const pollingCallback = async () => {
-      if (await configurationRequestor.isFlagConfigExpired()) {
-        return configurationRequestor.fetchAndStoreConfigurations();
-      }
+      return configurationRequestor.fetchAndStoreConfigurations();
     };
 
     this.requestPoller = initPoller(pollingIntervalMs, pollingCallback, {

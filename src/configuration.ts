@@ -2,7 +2,7 @@ import { decodeFlag } from './decoding';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from './http-client';
 import { BanditParameters, BanditVariation, Flag, FormatEnum, ObfuscatedFlag } from './interfaces';
 import { getMD5Hash } from './obfuscation';
-import { FlagKey, HashedFlagKey } from './types';
+import { ContextAttributes, FlagKey, HashedFlagKey } from './types';
 
 /** @internal for SDK use only */
 export type FlagsConfig = {
@@ -52,9 +52,28 @@ export class Configuration {
     return new Configuration(flags, bandits);
   }
 
-  // TODO(v5)
+  // TODO:
   // public static fromString(configurationWire: string): Configuration {}
-  // public toString(): string {}
+
+  /** Serializes configuration to "configuration wire" format. */
+  public toString(): string {
+    const wire: ConfigurationWire = {
+      version: 1,
+    };
+    if (this.flags) {
+      wire.config = {
+        ...this.flags,
+        response: JSON.stringify(this.flags.response),
+      };
+    }
+    if (this.bandits) {
+      wire.bandits = {
+        ...this.bandits,
+        response: JSON.stringify(this.bandits.response),
+      };
+    }
+    return JSON.stringify(wire);
+  }
 
   public getFlagKeys(): FlagKey[] | HashedFlagKey[] {
     if (!this.flags) {
@@ -126,3 +145,30 @@ function indexBanditVariationsByFlagKey(
   });
   return banditVariationsByFlagKey;
 }
+
+/** @internal */
+type ConfigurationWire = {
+  /**
+   * Version field should be incremented for breaking format changes.
+   * For example, removing required fields or changing field type/meaning.
+   */
+  version: 1;
+
+  config?: {
+    response: string;
+    etag?: string;
+    fetchedAt?: string;
+  };
+
+  bandits?: {
+    response: string;
+    etag?: string;
+    fetchedAt?: string;
+  };
+
+  precomputed?: {
+    response: string;
+    subjectKey: string;
+    subjectAttributes?: ContextAttributes;
+  };
+};
