@@ -18,7 +18,7 @@ export const bootstrapConfigCommand: CommandModule = {
       sdk: {
         type: 'string',
         description: 'Target SDK name',
-        default: 'android',
+        default: 'js-client-sdk',
       },
       'base-url': {
         type: 'string',
@@ -43,11 +43,10 @@ export const bootstrapConfigCommand: CommandModule = {
     try {
       const helper = ConfigurationWireHelper.build(argv.key as string, {
         sdkName: argv.sdk as string,
-        sdkVersion: 'v5.0.0',
         baseUrl: argv['base-url'] as string,
         fetchBandits: true,
       });
-      const config = await helper.fetchBootstrapConfiguration();
+      const config = await helper.fetchConfiguration();
 
       if (!config) {
         console.error('Error: Failed to fetch configuration');

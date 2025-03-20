@@ -77,16 +77,16 @@ yarn bootstrap-config --key <sdkKey>
 Common usage examples:
 ```bash
 # Basic usage
-yarn bootstrap-config --key <sdkKey>
+yarn bootstrap-config --key <sdkKey> --output bootstrap-config.json
 
-# With custom SDK name (default is 'android')
-yarn bootstrap-config --key <sdkKey> --sdk js-client
+# With custom SDK name (default is 'js-client-sdk')
+yarn bootstrap-config --key <sdkKey> --sdk android
 
 # With custom base URL
 yarn bootstrap-config --key <sdkKey> --base-url https://api.custom-domain.com
 
-# Save configuration to a file
-yarn bootstrap-config --key <sdkKey> --output bootstrap-config.json
+# Output configuration to stdout
+yarn bootstrap-config --key <sdkKey> 
 
 # Show help
 yarn bootstrap-config --help
@@ -94,7 +94,7 @@ yarn bootstrap-config --help
 
 The tool accepts the following arguments:
 - `--key, -k`: SDK key (required, can also be set via EPPO_SDK_KEY environment variable)
-- `--sdk`: Target SDK name (default: 'android')
+- `--sdk`: Target SDK name (default: 'js-client-sdk')
 - `--base-url`: Custom base URL for the API
 - `--output, -o`: Output file path (if not specified, outputs to console)
 - `--help, -h`: Show help
@@ -107,16 +107,22 @@ async function getBootstrapConfig() {
   // Initialize the helper
   const helper = ConfigurationHelper.build(
     'your-sdk-key',
-    'js-client', // optional: target SDK name (default: 'android')
-    'https://api.custom-domain.com' // optional: custom base URL
-  );
+    {
+      sdkName: 'android', // optional: target SDK name (default: 'js-client-sdk')
+      baseUrl: 'https://api.custom-domain.com', // optional: custom base URL
+    });
 
   // Fetch the configuration
-  const configBuilder = await helper.getBootstrapConfigurationString();
-  const configString = configBuilder.toString();
+  const config = await helper.fetchConfiguration();
+  const configString = config.toString();
 
-  // Use the configuration string to initialize your SDK
-  console.log(configString);
+  // You are responsible to transport this string to the client
+  const clientInitialData = {eppoConfig: eppoConfigString};
+
+  // Client-side
+  const client = getInstance();
+  const initialConfig = configurationFromString(clientInitialData.eppoConfig);
+  client.setInitialConfig(configurationFromString(configString));
 }
 ```
 

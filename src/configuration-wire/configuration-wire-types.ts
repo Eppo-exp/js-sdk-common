@@ -200,6 +200,10 @@ export class ConfigurationWireV1 implements IConfigurationWire {
     readonly bandits?: IConfigResponse<IBanditParametersResponse>,
   ) {}
 
+  public toString(): string {
+    return JSON.stringify(this as IConfigurationWire);
+  }
+
   public static fromResponses(
     flagConfig: IUniversalFlagConfigResponse,
     banditConfig?: IBanditParametersResponse,
