@@ -15,6 +15,7 @@ import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-ca
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
 import ConfigurationRequestor from '../configuration-requestor';
+import { ConfigurationStore } from '../configuration-store';
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
@@ -41,7 +42,7 @@ import {
 } from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
 import FetchHttpClient from '../http-client';
-import { IConfiguration, StoreBackedConfiguration } from '../i-configuration';
+import { Configuration, IConfiguration, StoreBackedConfiguration } from '../i-configuration';
 import {
   BanditModelData,
   BanditParameters,
@@ -124,10 +125,7 @@ export default class EppoClient {
   private banditLogger?: IBanditLogger;
   private banditAssignmentCache?: AssignmentCache;
   private configurationRequestParameters?: FlagConfigurationRequestParameters;
-  private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
-  private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
   private overrideStore?: ISyncStore<Variation>;
-  private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
   // whether to suppress any errors and return default values instead
@@ -136,6 +134,14 @@ export default class EppoClient {
   private readonly evaluator = new Evaluator();
   private configurationRequestor?: ConfigurationRequestor;
   private readonly overrideValidator = new OverrideValidator();
+
+  private readonly configurationStore = new ConfigurationStore(null);
+  /** @deprecated use configurationStore instead. */
+  private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
+  /** @deprecated use configurationStore instead. */
+  private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
+  /** @deprecated use configurationStore instead. */
+  private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
 
   constructor({
     eventDispatcher = new NoOpEventDispatcher(),
@@ -161,14 +167,8 @@ export default class EppoClient {
     }
   }
 
-  private getConfiguration(): IConfiguration {
-    return this.configurationRequestor
-      ? this.configurationRequestor.getConfiguration()
-      : new StoreBackedConfiguration(
-          this.flagConfigurationStore,
-          this.banditVariationConfigurationStore,
-          this.banditModelConfigurationStore,
-        );
+  private getConfiguration(): Configuration | null {
+    return this.configurationStore.getConfiguration();
   }
 
   /**
@@ -206,18 +206,6 @@ export default class EppoClient {
     this.configurationRequestParameters = configurationRequestParameters;
   }
 
-  // noinspection JSUnusedGlobalSymbols
-  setFlagConfigurationStore(flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>) {
-    this.flagConfigurationStore = flagConfigurationStore;
-  }
-
-  // noinspection JSUnusedGlobalSymbols
-  setBanditVariationConfigurationStore(
-    banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]>,
-  ) {
-    this.banditVariationConfigurationStore = banditVariationConfigurationStore;
-  }
-
   /** Sets the EventDispatcher instance to use when tracking events with {@link track}. */
   // noinspection JSUnusedGlobalSymbols
   setEventDispatcher(eventDispatcher: EventDispatcher) {
@@ -237,29 +225,6 @@ export default class EppoClient {
    */
   setContext(key: string, value: string | number | boolean | null) {
     this.eventDispatcher?.attachContext(key, value);
-  }
-
-  // noinspection JSUnusedGlobalSymbols
-  setBanditModelConfigurationStore(
-    banditModelConfigurationStore: IConfigurationStore<BanditParameters>,
-  ) {
-    this.banditModelConfigurationStore = banditModelConfigurationStore;
-  }
-
-  // noinspection JSUnusedGlobalSymbols
-  /**
-   * Setting this value will have no side effects other than triggering a warning when the actual
-   * configuration's obfuscated does not match the value set here.
-   *
-   * @deprecated The client determines whether the configuration is obfuscated by inspection
-   * @param isObfuscated
-   */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  setIsObfuscated(isObfuscated: boolean) {
-    logger.warn(
-      '[Eppo SDK] setIsObfuscated no longer has an effect and will be removed in the next major release; obfuscation ' +
-        'is now inferred from the configuration, so you can safely remove the call to this method.',
-    );
   }
 
   setOverrideStore(store: ISyncStore<Variation>): void {
@@ -641,6 +606,9 @@ export default class EppoClient {
     defaultAction: string,
   ): string {
     const config = this.getConfiguration();
+    if (!config) {
+      return defaultAction;
+    }
     let result: string | null = null;
 
     const flagBanditVariations = config.getFlagBanditVariations(flagKey);
@@ -696,6 +664,10 @@ export default class EppoClient {
         );
       variation = assignedVariation;
       evaluationDetails = assignmentEvaluationDetails;
+
+      if (!config) {
+        return { variation, action: null, evaluationDetails };
+      }
 
       // Check if the assigned variation is an active bandit
       // Note: the reason for non-bandit assignments include the subject being bucketed into a non-bandit variation or
@@ -929,8 +901,11 @@ export default class EppoClient {
     subjectAttributes: Attributes = {},
   ): Record<FlagKey, PrecomputedFlag> {
     const config = this.getConfiguration();
+    if (!config) {
+      return {};
+    }
     const configDetails = config.getFlagConfigDetails();
-    const flagKeys = this.getFlagKeys();
+    const flagKeys = config.getFlagKeys();
     const flags: Record<FlagKey, PrecomputedFlag> = {};
 
     // Evaluate all the enabled flags for the user
@@ -985,11 +960,24 @@ export default class EppoClient {
     banditActions: Record<FlagKey, BanditActions> = {},
     salt?: string,
   ): string {
-    const config = this.getConfiguration();
-    const configDetails = config.getFlagConfigDetails();
-
     const subjectContextualAttributes = ensureContextualSubjectAttributes(subjectAttributes);
     const subjectFlatAttributes = ensureNonContextualSubjectAttributes(subjectAttributes);
+
+    const config = this.getConfiguration();
+    if (!config) {
+      const precomputedConfig = PrecomputedConfiguration.obfuscated(
+        subjectKey,
+        {},
+        {},
+        salt ?? '',
+        subjectContextualAttributes,
+        undefined,
+      );
+      return JSON.stringify(ConfigurationWireV1.precomputed(precomputedConfig));
+    }
+
+    const configDetails = config.getFlagConfigDetails();
+
     const flags = this.getAllAssignments(subjectKey, subjectFlatAttributes);
 
     const bandits = this.computeBanditsForFlags(
@@ -1036,6 +1024,14 @@ export default class EppoClient {
     const config = this.getConfiguration();
 
     const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(config, flagKey);
+    if (!config) {
+      const flagEvaluationDetails = flagEvaluationDetailsBuilder.buildForNoneResult(
+        'FLAG_UNRECOGNIZED_OR_DISABLED',
+        "Configuration hasn't being fetched yet",
+      );
+      return noneResult(flagKey, subjectKey, subjectAttributes, flagEvaluationDetails, '');
+    }
+
     const overrideVariation = this.overrideStore?.get(flagKey);
     if (overrideVariation) {
       return overrideResult(
@@ -1138,9 +1134,13 @@ export default class EppoClient {
   }
 
   private newFlagEvaluationDetailsBuilder(
-    config: IConfiguration,
+    config: IConfiguration | null,
     flagKey: string,
   ): FlagEvaluationDetailsBuilder {
+    if (!config) {
+      return new FlagEvaluationDetailsBuilder('', [], '', '');
+    }
+
     const flag = this.getNormalizedFlag(config, flagKey);
     const configDetails = config.getFlagConfigDetails();
     return new FlagEvaluationDetailsBuilder(
@@ -1162,19 +1162,8 @@ export default class EppoClient {
     return flag ? decodeFlag(flag) : null;
   }
 
-  // noinspection JSUnusedGlobalSymbols
-  getFlagKeys() {
-    /**
-     * Returns a list of all flag keys that have been initialized.
-     * This can be useful to debug the initialization process.
-     *
-     * Note that it is generally not a good idea to preload all flag configurations.
-     */
-    return this.getConfiguration().getFlagKeys();
-  }
-
   isInitialized() {
-    return this.getConfiguration().isInitialized();
+    return this.getConfiguration()?.isInitialized() ?? false;
   }
 
   /** @deprecated Use `setAssignmentLogger` */
@@ -1237,10 +1226,6 @@ export default class EppoClient {
 
   setIsGracefulFailureMode(gracefulFailureMode: boolean) {
     this.isGracefulFailureMode = gracefulFailureMode;
-  }
-
-  getFlagConfigurations(): Record<string, Flag> {
-    return this.getConfiguration().getFlags();
   }
 
   private flushQueuedEvents<T>(eventQueue: BoundedEventQueue<T>, logFunction?: (event: T) => void) {
@@ -1319,7 +1304,7 @@ export default class EppoClient {
 
   private buildLoggerMetadata(): Record<string, unknown> {
     return {
-      obfuscated: this.getConfiguration().isObfuscated(),
+      obfuscated: this.getConfiguration()?.isObfuscated(),
       sdkLanguage: 'javascript',
       sdkLibVersion: LIB_VERSION,
     };
