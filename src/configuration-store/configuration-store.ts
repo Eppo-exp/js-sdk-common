@@ -1,4 +1,4 @@
-import { IConfiguration } from '../i-configuration';
+import { Configuration } from '../i-configuration';
 import { Environment } from '../interfaces';
 
 /**
@@ -9,17 +9,16 @@ import { Environment } from '../interfaces';
  */
 export class ConfigurationStore {
   private readonly listeners: Array<
-    (configuration: IConfiguration | null) => void
+    (configuration: Configuration | null) => void
   > = [];
 
-  // TODO: replace IConfiguration with a concrete `Configuration` type.
-  public constructor(private configuration: IConfiguration | null = null) {}
+  public constructor(private configuration: Configuration | null = null) {}
 
-  public getConfiguration(): IConfiguration | null {
+  public getConfiguration(): Configuration | null {
     return this.configuration;
   }
 
-  public setConfiguration(configuration: IConfiguration | null): void {
+  public setConfiguration(configuration: Configuration | null): void {
     this.configuration = configuration;
     this.notifyListeners();
   }
@@ -31,7 +30,7 @@ export class ConfigurationStore {
    * Returns a function to unsubscribe from future updates.
    */
   public onConfigurationChange(
-    listener: (configuration: IConfiguration | null) => void
+    listener: (configuration: Configuration | null) => void
   ): () => void {
     this.listeners.push(listener);
 

@@ -28,6 +28,12 @@ export interface IConfiguration {
   isInitialized(): boolean;
 }
 
+// TODO: replace more abstract `IConfiguration` with some concrete
+// implementation, so we know what to expect from it (i.e., it's
+// probably a bad idea to allow users implementing their own
+// configurations).
+export type Configuration = IConfiguration;
+
 export type ConfigStoreHydrationPacket<T extends Entry> = {
   entries: Record<string, T>;
   environment: Environment;
