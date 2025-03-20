@@ -280,6 +280,44 @@ export default class EppoClient {
     );
   }
 
+  public bootstrap(configuration: IConfigurationWire) {
+    if (!this.configurationRequestParameters) {
+      throw new Error(
+        'Eppo SDK unable to fetch flag configurations without configuration request parameters',
+      );
+    }
+    // if fetchFlagConfigurations() was previously called, stop any polling process from that call
+    this.requestPoller?.stop();
+    const {
+      apiKey,
+      sdkName,
+      sdkVersion,
+      baseUrl, // Default is set in ApiEndpoints constructor if undefined
+      requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+    } = this.configurationRequestParameters;
+
+    let { pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS } = this.configurationRequestParameters;
+    if (pollingIntervalMs <= 0) {
+      logger.error('pollingIntervalMs must be greater than 0. Using default');
+      pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS;
+    }
+
+    // todo: Inject the chain of dependencies below
+    const apiEndpoints = new ApiEndpoints({
+      baseUrl,
+      queryParams: { apiKey, sdkName, sdkVersion },
+    });
+    const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
+    const configurationRequestor = new ConfigurationRequestor(
+      httpClient,
+      this.flagConfigurationStore,
+      this.banditVariationConfigurationStore ?? null,
+      this.banditModelConfigurationStore ?? null,
+    );
+
+    configurationRequestor.setInitialConfiguration(configuration);
+  }
+
   async fetchFlagConfigurations() {
     if (!this.configurationRequestParameters) {
       throw new Error(

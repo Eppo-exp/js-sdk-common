@@ -27,7 +27,8 @@
     "typecheck": "tsc",
     "test": "yarn test:unit",
     "test:unit": "NODE_ENV=test jest '.*\\.spec\\.ts'",
-    "obfuscate-mock-ufc": "ts-node test/writeObfuscatedMockUFC"
+    "obfuscate-mock-ufc": "ts-node test/writeObfuscatedMockUFC",
+    "bootstrap-config": "ts-node src/tools/get-bootstrap-config.ts"
   },
   "jsdelivr": "dist/eppo-sdk.js",
   "repository": {
