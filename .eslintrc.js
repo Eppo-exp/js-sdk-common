@@ -78,14 +78,7 @@ module.exports = {
         message: "'setImmediate' unavailable in JavaScript. Use 'setTimeout(fn, 0)' instead",
       },
     ],
-    'prettier/prettier': [
-      'warn',
-      {
-        singleQuote: true,
-        trailingComma: 'all',
-        printWidth: 100,
-      },
-    ],
+    'prettier/prettier': ['warn'],
     'unused-imports/no-unused-imports': 'error',
   },
   overrides: [
