@@ -11,6 +11,7 @@ import {
 } from './interfaces';
 import { BanditKey, FlagKey, HashedFlagKey } from './types';
 
+// TODO(v5): remove IConfiguration once all users migrate to Configuration.
 export interface IConfiguration {
   getFlag(key: FlagKey | HashedFlagKey): Flag | ObfuscatedFlag | null;
   getFlags(): Record<FlagKey | HashedFlagKey, Flag | ObfuscatedFlag>;

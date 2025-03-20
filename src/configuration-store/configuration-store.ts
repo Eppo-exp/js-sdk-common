@@ -1,4 +1,4 @@
-import { Configuration } from '../i-configuration';
+import { Configuration } from '../configuration';
 import { Environment } from '../interfaces';
 
 /**
@@ -8,18 +8,18 @@ import { Environment } from '../interfaces';
  * @internal `ConfigurationStore` shall only be used inside Eppo SDKs.
  */
 export class ConfigurationStore {
-  private configuration: Configuration | null;
-  private readonly listeners: Array<(configuration: Configuration | null) => void> = [];
+  private configuration: Configuration;
+  private readonly listeners: Array<(configuration: Configuration) => void> = [];
 
-  public constructor(configuration: Configuration | null) {
+  public constructor(configuration: Configuration = Configuration.empty()) {
     this.configuration = configuration;
   }
 
-  public getConfiguration(): Configuration | null {
+  public getConfiguration(): Configuration {
     return this.configuration;
   }
 
-  public setConfiguration(configuration: Configuration | null): void {
+  public setConfiguration(configuration: Configuration): void {
     this.configuration = configuration;
     this.notifyListeners();
   }
@@ -30,9 +30,7 @@ export class ConfigurationStore {
    *
    * Returns a function to unsubscribe from future updates.
    */
-  public onConfigurationChange(
-    listener: (configuration: Configuration | null) => void,
-  ): () => void {
+  public onConfigurationChange(listener: (configuration: Configuration) => void): () => void {
     this.listeners.push(listener);
 
     return () => {

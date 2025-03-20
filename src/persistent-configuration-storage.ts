@@ -1,4 +1,4 @@
-import { Configuration } from './i-configuration';
+import { Configuration } from './configuration';
 
 /**
  * Persistent configuration storages are responsible for persisting
