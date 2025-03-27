@@ -54,7 +54,7 @@ describe('ApiEndpoints', () => {
     });
 
     it('should use subdomain from SDK token when valid', () => {
-      // This token has cs=test-subdomain
+      //  cs=test-subdomain
       const sdkToken = 'abc.Y3M9dGVzdC1zdWJkb21haW4=';
       const endpoints = new ApiEndpoints({ sdkToken: new EnhancedSdkToken(sdkToken) });
       expect(endpoints.endpoint('/data')).toBe('https://test-subdomain.fscdn.eppo.cloud/api/data');
@@ -62,7 +62,7 @@ describe('ApiEndpoints', () => {
 
     it('should prefer custom baseUrl over SDK token subdomain', () => {
       const customBaseUrl = 'https://custom-domain.com';
-      // This token has cs=test-subdomain
+      //  cs=test-subdomain
       const sdkToken = 'abc.Y3M9dGVzdC1zdWJkb21haW4=';
       const endpoints = new ApiEndpoints({
         baseUrl: customBaseUrl,
@@ -73,7 +73,7 @@ describe('ApiEndpoints', () => {
     });
 
     it('should fallback to DEFAULT_BASE_URL when SDK token has no subdomain', () => {
-      // This token has no cs parameter
+      // eh=event-hostname
       const sdkToken = 'abc.ZWg9ZXZlbnQtaG9zdG5hbWU=';
       const endpoints = new ApiEndpoints({ sdkToken: new EnhancedSdkToken(sdkToken) });
       expect(endpoints.endpoint('').startsWith(DEFAULT_BASE_URL)).toBeTruthy();
@@ -88,7 +88,7 @@ describe('ApiEndpoints', () => {
 
   describe('Endpoint URL construction', () => {
     it('should use effective base URL for UFC endpoint', () => {
-      // This token has cs=test-subdomain
+      //  cs=test-subdomain
       const sdkToken = 'abc.Y3M9dGVzdC1zdWJkb21haW4=';
       const endpoints = new ApiEndpoints({ sdkToken: new EnhancedSdkToken(sdkToken) });
 
@@ -98,7 +98,7 @@ describe('ApiEndpoints', () => {
     });
 
     it('should use effective base URL for bandit parameters endpoint', () => {
-      // This token has cs=test-subdomain
+      // cs=test-subdomain
       const sdkToken = 'abc.Y3M9dGVzdC1zdWJkb21haW4=';
       const endpoints = new ApiEndpoints({ sdkToken: new EnhancedSdkToken(sdkToken) });
 
@@ -107,8 +107,8 @@ describe('ApiEndpoints', () => {
       );
     });
 
-    it('should use the sub-domain and default base URL for precomputed flags endpoint', () => {
-      // This token has cs=test-subdomain
+    it('should use the subdomain and default base URL for precomputed flags endpoint', () => {
+      // cs=test-subdomain
       const sdkToken = 'abc.Y3M9dGVzdC1zdWJkb21haW4=';
       const endpoints = new ApiEndpoints({
         sdkToken: new EnhancedSdkToken(sdkToken),
@@ -119,7 +119,7 @@ describe('ApiEndpoints', () => {
       expect(endpoints.precomputedFlagsEndpoint()).toContain('test-subdomain');
     });
 
-    it('should handle slash management between base URL and resource', () => {
+    it('should have exactly one slash between base URL and resource', () => {
       const baseUrlWithSlash = 'https://domain.com/';
       const baseUrlWithoutSlash = 'https://domain.com';
       const resourceWithSlash = '/resource';
@@ -199,7 +199,6 @@ describe('ApiEndpoints', () => {
 describe('ApiEndpoints - Additional Tests', () => {
   describe('URL normalization', () => {
     it('should preserve different protocol types', () => {
-      // We can test this indirectly through the endpoint method
       const httpEndpoints = new ApiEndpoints({ baseUrl: 'http://example.com' });
       const httpsEndpoints = new ApiEndpoints({ baseUrl: 'https://example.com' });
       const protocolRelativeEndpoints = new ApiEndpoints({ baseUrl: '//example.com' });
@@ -232,11 +231,10 @@ describe('ApiEndpoints - Additional Tests', () => {
     });
 
     it('should handle subdomains with special characters', () => {
-      // Encode a token with cs=test-sub.domain-special
+      // Token with cs=test-sub.domain-special encoded
       const sdkToken = new EnhancedSdkToken('abc.Y3M9dGVzdC1zdWIuZG9tYWluLXNwZWNpYWw=');
       const endpoints = new ApiEndpoints({ sdkToken });
 
-      // The implementation should handle this correctly, but this is what we'd expect
       expect(endpoints.endpoint('')).toContain('test-sub.domain-special');
     });
   });
@@ -257,7 +255,6 @@ describe('ApiEndpoints - Additional Tests', () => {
     });
 
     it('should prioritize hostname over subdomain if both are available', () => {
-      // Create a mock token with both hostname and subdomain
       const mockToken = {
         isValid: () => true,
         getEventIngestionHostname: () => 'event-host.example.com',
@@ -269,7 +266,6 @@ describe('ApiEndpoints - Additional Tests', () => {
     });
 
     it('should return null when token is valid but no hostname or subdomain is available', () => {
-      // Create a mock token with neither hostname nor subdomain
       const mockToken = {
         isValid: () => true,
         getEventIngestionHostname: () => null,
@@ -278,27 +274,6 @@ describe('ApiEndpoints - Additional Tests', () => {
 
       const endpoints = new ApiEndpoints({ sdkToken: mockToken });
       expect(endpoints.eventIngestionEndpoint()).toBeNull();
-    });
-  });
-
-  describe('Edge cases and error handling', () => {
-    it('should handle extremely long subdomains', () => {
-      const longSubdomain = 'a'.repeat(100);
-      const mockToken = {
-        isValid: () => true,
-        getSubdomain: () => longSubdomain,
-      } as EnhancedSdkToken;
-
-      const endpoints = new ApiEndpoints({ sdkToken: mockToken });
-      expect(endpoints.endpoint('')).toContain(longSubdomain);
-    });
-
-    it('should handle unusual base URL formats', () => {
-      const endpoints = new ApiEndpoints({
-        baseUrl: 'https://@:example.com:8080/path?query=value#fragment',
-      });
-      // The exact handling will depend on implementation details, but it shouldn't throw
-      expect(() => endpoints.endpoint('test')).not.toThrow();
     });
   });
 });

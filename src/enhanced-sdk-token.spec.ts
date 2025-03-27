@@ -28,10 +28,12 @@ describe('EnhancedSdkToken', () => {
     const tokenWithoutEh = new EnhancedSdkToken('zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA=='); // only cs=experiment
     expect(tokenWithoutEh.getEventIngestionHostname()).toBeNull();
     expect(tokenWithoutEh.getSubdomain()).toEqual('experiment');
+    expect(tokenWithoutEh.isValid()).toBeTruthy();
 
     const tokenWithoutCs = new EnhancedSdkToken('zCsQuoHJxVPp895.ZWg9YWJjMTIzLmVwcG8uY2xvdWQ='); // only eh=abc123.eppo.cloud
     expect(tokenWithoutCs.getEventIngestionHostname()).toEqual('abc123.eppo.cloud');
     expect(tokenWithoutCs.getSubdomain()).toBeNull();
+    expect(tokenWithoutCs.isValid()).toBeTruthy();
   });
 
   it('should handle invalid tokens', () => {

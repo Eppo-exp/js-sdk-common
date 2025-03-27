@@ -38,9 +38,8 @@ export default class ApiEndpoints {
 
     if (protocolMatch) {
       return url;
-    } else {
-      return `${protocol}${url}`;
     }
+    return `${protocol}${url}`;
   }
 
   /**
