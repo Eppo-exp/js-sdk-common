@@ -2,13 +2,12 @@ import {
   BANDIT_ENDPOINT,
   BASE_URL,
   DEFAULT_EVENT_DOMAIN,
+  EVENT_ENDPOINT,
   PRECOMPUTED_FLAGS_ENDPOINT,
   UFC_ENDPOINT,
 } from './constants';
 import EnhancedSdkToken from './enhanced-sdk-token';
 import { IQueryParams, IQueryParamsWithSubject } from './http-client';
-
-const EVENT_ENDPOINT = 'v0/i';
 
 interface IApiEndpointsParams {
   queryParams?: IQueryParams | IQueryParamsWithSubject;
