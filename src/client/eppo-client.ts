@@ -30,6 +30,7 @@ import {
   DEFAULT_REQUEST_TIMEOUT_MS,
 } from '../constants';
 import { decodeFlag } from '../decoding';
+import EnhancedSdkToken from '../enhanced-sdk-token';
 import { EppoValue } from '../eppo_value';
 import { Evaluator, FlagEvaluation, noneResult, overrideResult } from '../evaluator';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
@@ -326,11 +327,12 @@ export default class EppoClient {
       pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS;
     }
 
-    // todo: Inject the chain of dependencies below
     const apiEndpoints = new ApiEndpoints({
       baseUrl,
       queryParams: { apiKey, sdkName, sdkVersion },
+      sdkToken: new EnhancedSdkToken(apiKey),
     });
+
     const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
     const configurationRequestor = new ConfigurationRequestor(
       httpClient,

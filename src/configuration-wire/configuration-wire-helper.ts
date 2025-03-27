@@ -1,4 +1,5 @@
 import ApiEndpoints from '../api-endpoints';
+import EnhancedSdkToken from '../enhanced-sdk-token';
 import FetchHttpClient, {
   IBanditParametersResponse,
   IHttpClient,
@@ -45,6 +46,7 @@ export class ConfigurationWireHelper {
     const apiEndpoints = new ApiEndpoints({
       baseUrl,
       queryParams,
+      sdkToken: new EnhancedSdkToken(sdkKey),
     });
 
     this.httpClient = new FetchHttpClient(apiEndpoints, 5000);
