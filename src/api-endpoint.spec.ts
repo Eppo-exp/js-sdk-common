@@ -72,6 +72,18 @@ describe('ApiEndpoints', () => {
       expect(endpoints.endpoint('')).toContain(customBaseUrl);
     });
 
+    it('should not allow custom baseUrl to be the default base url', () => {
+      const customBaseUrl = 'https://custom-domain.com';
+      //  cs=test-subdomain
+      const sdkToken = 'abc.Y3M9dGVzdC1zdWJkb21haW4=';
+      const endpoints = new ApiEndpoints({
+        baseUrl: DEFAULT_BASE_URL,
+        sdkToken: new EnhancedSdkToken(sdkToken),
+      });
+
+      expect(endpoints.endpoint('/data')).toBe('https://test-subdomain.fscdn.eppo.cloud/api/data');
+    });
+
     it('should fallback to DEFAULT_BASE_URL when SDK token has no subdomain', () => {
       // eh=event-hostname
       const sdkToken = 'abc.ZWg9ZXZlbnQtaG9zdG5hbWU=';
