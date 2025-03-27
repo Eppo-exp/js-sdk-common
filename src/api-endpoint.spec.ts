@@ -1,11 +1,13 @@
+import * as td from 'testdouble';
+
 import ApiEndpoints from './api-endpoints';
-import { BASE_URL as DEFAULT_BASE_URL } from './constants';
+import { BASE_URL as DEFAULT_BASE_URL, DEFAULT_EVENT_DOMAIN } from './constants';
 import EnhancedSdkToken from './enhanced-sdk-token';
 
 describe('ApiEndpoints', () => {
   it('should append query parameters to the URL', () => {
     const apiEndpoints = new ApiEndpoints({
-      baseUrl: 'https://api.example.com',
+      baseUrl: 'http://api.example.com',
       queryParams: {
         apiKey: '12345',
         sdkVersion: 'foobar',
@@ -13,10 +15,10 @@ describe('ApiEndpoints', () => {
       },
     });
     expect(apiEndpoints.endpoint('/data').toString()).toEqual(
-      'https://api.example.com/data?apiKey=12345&sdkVersion=foobar&sdkName=ExampleSDK',
+      'http://api.example.com/data?apiKey=12345&sdkVersion=foobar&sdkName=ExampleSDK',
     );
     expect(apiEndpoints.ufcEndpoint().toString()).toEqual(
-      'https://api.example.com/flag-config/v1/config?apiKey=12345&sdkVersion=foobar&sdkName=ExampleSDK',
+      'http://api.example.com/flag-config/v1/config?apiKey=12345&sdkVersion=foobar&sdkName=ExampleSDK',
     );
   });
 
@@ -55,7 +57,7 @@ describe('ApiEndpoints', () => {
       // This token has cs=test-subdomain
       const sdkToken = 'abc.Y3M9dGVzdC1zdWJkb21haW4=';
       const endpoints = new ApiEndpoints({ sdkToken: new EnhancedSdkToken(sdkToken) });
-      expect(endpoints.getEffectiveBaseUrl()).toBe('https://test-subdomain.fscdn.eppo.cloud/api');
+      expect(endpoints.endpoint('/data')).toBe('https://test-subdomain.fscdn.eppo.cloud/api/data');
     });
 
     it('should prefer custom baseUrl over SDK token subdomain', () => {
@@ -66,20 +68,21 @@ describe('ApiEndpoints', () => {
         baseUrl: customBaseUrl,
         sdkToken: new EnhancedSdkToken(sdkToken),
       });
-      expect(endpoints.getEffectiveBaseUrl()).toBe(customBaseUrl);
+
+      expect(endpoints.endpoint('')).toContain(customBaseUrl);
     });
 
     it('should fallback to DEFAULT_BASE_URL when SDK token has no subdomain', () => {
       // This token has no cs parameter
       const sdkToken = 'abc.ZWg9ZXZlbnQtaG9zdG5hbWU=';
       const endpoints = new ApiEndpoints({ sdkToken: new EnhancedSdkToken(sdkToken) });
-      expect(endpoints.getEffectiveBaseUrl()).toBe(DEFAULT_BASE_URL);
+      expect(endpoints.endpoint('').startsWith(DEFAULT_BASE_URL)).toBeTruthy();
     });
 
     it('should fallback to DEFAULT_BASE_URL when SDK token is invalid', () => {
       const invalidToken = new EnhancedSdkToken('invalid-token');
       const endpoints = new ApiEndpoints({ sdkToken: invalidToken });
-      expect(endpoints.getEffectiveBaseUrl()).toBe(DEFAULT_BASE_URL);
+      expect(endpoints.endpoint('').startsWith(DEFAULT_BASE_URL)).toBeTruthy();
     });
   });
 
@@ -133,6 +136,37 @@ describe('ApiEndpoints', () => {
     });
   });
 
+  describe('Event Url generation', () => {
+    const hostnameToken = new EnhancedSdkToken(
+      'zCsQuoHJxVPp895.ZWg9MTIzNDU2LmUudGVzdGluZy5lcHBvLmNsb3Vk',
+    );
+    const mockedToken = td.object<EnhancedSdkToken>();
+    beforeAll(() => {
+      td.when(mockedToken.isValid()).thenReturn(true);
+    });
+
+    it('should decode the event ingestion hostname from the SDK key', () => {
+      const endpoints = new ApiEndpoints({ sdkToken: hostnameToken });
+      const hostname = endpoints.eventIngestionEndpoint();
+      expect(hostname).toEqual('https://123456.e.testing.eppo.cloud/v0/i');
+    });
+
+    it('should decode strings with non URL-safe characters', () => {
+      // this is not a really valid ingestion URL, but it's useful for testing the decoder
+      td.when(mockedToken.getEventIngestionHostname()).thenReturn('12 3456/.e.testing.eppo.cloud');
+      const endpoints = new ApiEndpoints({ sdkToken: mockedToken });
+      const hostname = endpoints.eventIngestionEndpoint();
+      expect(hostname).toEqual('https://12 3456/.e.testing.eppo.cloud/v0/i');
+    });
+
+    it("should return null if the SDK key doesn't contain the event ingestion hostname", () => {
+      td.when(mockedToken.isValid()).thenReturn(false);
+      const endpoints = new ApiEndpoints({ sdkToken: mockedToken });
+      const hostname = endpoints.eventIngestionEndpoint();
+      expect(hostname).toBeNull();
+    });
+  });
+
   describe('Query parameter handling', () => {
     it('should append query parameters to endpoint URLs', () => {
       const queryParams = { apiKey: 'test-key', sdkName: 'js-sdk', sdkVersion: '1.0.0' };
@@ -158,6 +192,113 @@ describe('ApiEndpoints', () => {
 
       expect(url).toContain('sdkName=value+with+spaces');
       expect(url).toContain('sdkVersion=a%2Bb%3Dc%26d');
+    });
+  });
+});
+
+describe('ApiEndpoints - Additional Tests', () => {
+  describe('URL normalization', () => {
+    it('should preserve different protocol types', () => {
+      // We can test this indirectly through the endpoint method
+      const httpEndpoints = new ApiEndpoints({ baseUrl: 'http://example.com' });
+      const httpsEndpoints = new ApiEndpoints({ baseUrl: 'https://example.com' });
+      const protocolRelativeEndpoints = new ApiEndpoints({ baseUrl: '//example.com' });
+
+      expect(httpEndpoints.endpoint('test')).toEqual('http://example.com/test');
+      expect(httpsEndpoints.endpoint('test')).toEqual('https://example.com/test');
+      expect(protocolRelativeEndpoints.endpoint('test')).toEqual('//example.com/test');
+    });
+
+    it('should add https:// to URLs without protocols', () => {
+      const endpoints = new ApiEndpoints({ baseUrl: 'example.com' });
+      expect(endpoints.endpoint('test')).toEqual('https://example.com/test');
+    });
+
+    it('should handle multiple slashes', () => {
+      const endpoints = new ApiEndpoints({ baseUrl: 'example.com/' });
+      expect(endpoints.endpoint('/test')).toEqual('https://example.com/test');
+    });
+  });
+
+  describe('Subdomain handling', () => {
+    it('should correctly integrate subdomain with base URLs containing paths', () => {
+      const sdkToken = new EnhancedSdkToken('abc.Y3M9dGVzdC1zdWJkb21haW4='); // cs=test-subdomain
+      const endpoints = new ApiEndpoints({
+        sdkToken,
+        defaultUrl: 'example.com/api/v2',
+      });
+
+      expect(endpoints.endpoint('')).toContain('https://test-subdomain.example.com/api/v2');
+    });
+
+    it('should handle subdomains with special characters', () => {
+      // Encode a token with cs=test-sub.domain-special
+      const sdkToken = new EnhancedSdkToken('abc.Y3M9dGVzdC1zdWIuZG9tYWluLXNwZWNpYWw=');
+      const endpoints = new ApiEndpoints({ sdkToken });
+
+      // The implementation should handle this correctly, but this is what we'd expect
+      expect(endpoints.endpoint('')).toContain('test-sub.domain-special');
+    });
+  });
+
+  describe('Event ingestion endpoint', () => {
+    it('should use subdomain with DEFAULT_EVENT_DOMAIN when hostname is not available', () => {
+      // Create a mock token with only a subdomain
+      const mockToken = {
+        isValid: () => true,
+        getEventIngestionHostname: () => null,
+        getSubdomain: () => 'test-subdomain',
+      } as EnhancedSdkToken;
+
+      const endpoints = new ApiEndpoints({ sdkToken: mockToken });
+      expect(endpoints.eventIngestionEndpoint()).toEqual(
+        `https://test-subdomain.${DEFAULT_EVENT_DOMAIN}/v0/i`,
+      );
+    });
+
+    it('should prioritize hostname over subdomain if both are available', () => {
+      // Create a mock token with both hostname and subdomain
+      const mockToken = {
+        isValid: () => true,
+        getEventIngestionHostname: () => 'event-host.example.com',
+        getSubdomain: () => 'test-subdomain',
+      } as EnhancedSdkToken;
+
+      const endpoints = new ApiEndpoints({ sdkToken: mockToken });
+      expect(endpoints.eventIngestionEndpoint()).toEqual('https://event-host.example.com/v0/i');
+    });
+
+    it('should return null when token is valid but no hostname or subdomain is available', () => {
+      // Create a mock token with neither hostname nor subdomain
+      const mockToken = {
+        isValid: () => true,
+        getEventIngestionHostname: () => null,
+        getSubdomain: () => null,
+      } as EnhancedSdkToken;
+
+      const endpoints = new ApiEndpoints({ sdkToken: mockToken });
+      expect(endpoints.eventIngestionEndpoint()).toBeNull();
+    });
+  });
+
+  describe('Edge cases and error handling', () => {
+    it('should handle extremely long subdomains', () => {
+      const longSubdomain = 'a'.repeat(100);
+      const mockToken = {
+        isValid: () => true,
+        getSubdomain: () => longSubdomain,
+      } as EnhancedSdkToken;
+
+      const endpoints = new ApiEndpoints({ sdkToken: mockToken });
+      expect(endpoints.endpoint('')).toContain(longSubdomain);
+    });
+
+    it('should handle unusual base URL formats', () => {
+      const endpoints = new ApiEndpoints({
+        baseUrl: 'https://@:example.com:8080/path?query=value#fragment',
+      });
+      // The exact handling will depend on implementation details, but it shouldn't throw
+      expect(() => endpoints.endpoint('test')).not.toThrow();
     });
   });
 });

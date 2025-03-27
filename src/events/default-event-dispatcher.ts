@@ -1,4 +1,6 @@
+import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
+import EnhancedSdkToken from '../enhanced-sdk-token';
 
 import BatchEventProcessor from './batch-event-processor';
 import BatchRetryManager from './batch-retry-manager';
@@ -8,7 +10,6 @@ import EventDispatcher from './event-dispatcher';
 import NamedEventQueue from './named-event-queue';
 import NetworkStatusListener from './network-status-listener';
 import NoOpEventDispatcher from './no-op-event-dispatcher';
-import { buildIngestionUrl } from './sdk-key-decoder';
 
 export type EventDispatcherConfig = {
   // The Eppo SDK key
@@ -177,7 +178,8 @@ export function newDefaultEventDispatcher(
   batchSize: number = DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
   config: Omit<EventDispatcherConfig, 'ingestionUrl' | 'sdkKey'> = DEFAULT_EVENT_DISPATCHER_CONFIG,
 ): EventDispatcher {
-  const ingestionUrl = buildIngestionUrl(sdkKey);
+  const apiEndpointsHelper = new ApiEndpoints({ sdkToken: new EnhancedSdkToken(sdkKey) });
+  const ingestionUrl = apiEndpointsHelper.eventIngestionEndpoint();
   if (!ingestionUrl) {
     logger.debug(
       'Unable to parse Event ingestion URL from SDK key, falling back to no-op event dispatcher',
