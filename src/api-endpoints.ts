@@ -30,12 +30,11 @@ interface IApiEndpointsParams {
  * This class handles two distinct types of endpoints:
  * 1. Configuration endpoints (UFC, bandits, precomputed flags) - based on the effective base URL
  *    which considers baseUrl, subdomain from SDK token, and defaultUrl in that order.
- * 2. Event ingestion endpoints - always uses the event domain (e.eppo.cloud) with either the
- *    subdomain from SDK token or a full hostname from SDK token. This endpoint IGNORES the
- *    baseUrl and defaultUrl parameters.
+ * 2. Event ingestion endpoint - either uses the default event domain with subdomain from SDK token
+ *    or a full hostname from SDK token. This endpoint IGNORES the baseUrl and defaultUrl parameters.
  *
  * For event ingestion endpoints, consider using the static helper method:
- * `ApiEndpoints.createEventIngestionUrl(sdkTokenDecoder)`
+ * `ApiEndpoints.createEventIngestionUrl(sdkKey)`
  */
 export default class ApiEndpoints {
   private readonly sdkToken: SdkKeyDecoder | null;
