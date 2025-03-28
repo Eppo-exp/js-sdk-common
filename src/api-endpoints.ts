@@ -7,7 +7,7 @@ import {
   UFC_ENDPOINT,
 } from './constants';
 import { IQueryParams, IQueryParamsWithSubject } from './http-client';
-import SdkKeyDecoder from './sdk-key-decoder';
+import SdkTokenDecoder from './sdk-token-decoder';
 
 /**
  * Parameters for configuring the API endpoints
@@ -21,7 +21,7 @@ interface IApiEndpointsParams {
   queryParams?: IQueryParams | IQueryParamsWithSubject;
   baseUrl?: string;
   defaultUrl: string;
-  sdkTokenDecoder?: SdkKeyDecoder;
+  sdkTokenDecoder?: SdkTokenDecoder;
 }
 
 /**
@@ -37,7 +37,7 @@ interface IApiEndpointsParams {
  * `ApiEndpoints.createEventIngestionUrl(sdkKey)`
  */
 export default class ApiEndpoints {
-  private readonly sdkToken: SdkKeyDecoder | null;
+  private readonly sdkToken: SdkTokenDecoder | null;
   private readonly _effectiveBaseUrl: string;
   private readonly params: IApiEndpointsParams;
 
@@ -53,7 +53,7 @@ export default class ApiEndpoints {
    */
   static createEventIngestionUrl(sdkToken: string): string | null {
     return new ApiEndpoints({
-      sdkTokenDecoder: new SdkKeyDecoder(sdkToken),
+      sdkTokenDecoder: new SdkTokenDecoder(sdkToken),
     }).eventIngestionEndpoint();
   }
 

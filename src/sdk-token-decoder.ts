@@ -3,7 +3,7 @@ import { Base64 } from 'js-base64';
 /**
  * Decodes SDK tokens with embedded encoded data.
  */
-export default class SdkKeyDecoder {
+export default class SdkTokenDecoder {
   private readonly decodedParams: URLSearchParams | null;
 
   constructor(private readonly sdkKey: string) {

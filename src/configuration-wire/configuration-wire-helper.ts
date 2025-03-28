@@ -4,7 +4,7 @@ import FetchHttpClient, {
   IHttpClient,
   IUniversalFlagConfigResponse,
 } from '../http-client';
-import SdkKeyDecoder from '../sdk-key-decoder';
+import SdkTokenDecoder from '../sdk-token-decoder';
 
 import { ConfigurationWireV1, IConfigurationWire } from './configuration-wire-types';
 
@@ -46,7 +46,7 @@ export class ConfigurationWireHelper {
     const apiEndpoints = new ApiEndpoints({
       baseUrl,
       queryParams,
-      sdkTokenDecoder: new SdkKeyDecoder(sdkKey),
+      sdkTokenDecoder: new SdkTokenDecoder(sdkKey),
     });
 
     this.httpClient = new FetchHttpClient(apiEndpoints, 5000);

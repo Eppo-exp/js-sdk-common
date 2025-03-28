@@ -2,7 +2,7 @@ import * as td from 'testdouble';
 
 import ApiEndpoints from './api-endpoints';
 import { BASE_URL as DEFAULT_BASE_URL, DEFAULT_EVENT_DOMAIN } from './constants';
-import SdkKeyDecoder from './sdk-key-decoder';
+import SdkTokenDecoder from './sdk-token-decoder';
 
 describe('ApiEndpoints', () => {
   describe('Query parameters', () => {
@@ -71,14 +71,14 @@ describe('ApiEndpoints', () => {
       },
       {
         name: 'should use subdomain from SDK token when valid',
-        params: { sdkTokenDecoder: new SdkKeyDecoder('abc.Y3M9dGVzdC1zdWJkb21haW4=') },
+        params: { sdkTokenDecoder: new SdkTokenDecoder('abc.Y3M9dGVzdC1zdWJkb21haW4=') },
         expected: 'https://test-subdomain.fscdn.eppo.cloud/api/assignments',
       },
       {
         name: 'should prefer custom baseUrl over SDK token subdomain',
         params: {
           baseUrl: 'https://custom-domain.com',
-          sdkTokenDecoder: new SdkKeyDecoder('abc.Y3M9dGVzdC1zdWJkb21haW4='),
+          sdkTokenDecoder: new SdkTokenDecoder('abc.Y3M9dGVzdC1zdWJkb21haW4='),
         },
         expected: 'https://custom-domain.com/assignments',
       },
@@ -86,18 +86,18 @@ describe('ApiEndpoints', () => {
         name: 'should not allow custom baseUrl to be the default base url',
         params: {
           baseUrl: DEFAULT_BASE_URL,
-          sdkTokenDecoder: new SdkKeyDecoder('abc.Y3M9dGVzdC1zdWJkb21haW4='),
+          sdkTokenDecoder: new SdkTokenDecoder('abc.Y3M9dGVzdC1zdWJkb21haW4='),
         },
         expected: 'https://test-subdomain.fscdn.eppo.cloud/api/assignments',
       },
       {
         name: 'should fallback to DEFAULT_BASE_URL when SDK token has no subdomain',
-        params: { sdkTokenDecoder: new SdkKeyDecoder('abc.ZWg9ZXZlbnQtaG9zdG5hbWU=') },
+        params: { sdkTokenDecoder: new SdkTokenDecoder('abc.ZWg9ZXZlbnQtaG9zdG5hbWU=') },
         expected: 'https://fscdn.eppo.cloud/api/assignments',
       },
       {
         name: 'should fallback to DEFAULT_BASE_URL when SDK token has nothing encoded',
-        params: { sdkTokenDecoder: new SdkKeyDecoder('invalid-token') },
+        params: { sdkTokenDecoder: new SdkTokenDecoder('invalid-token') },
         expected: 'https://fscdn.eppo.cloud/api/assignments',
       },
     ];
@@ -113,7 +113,7 @@ describe('ApiEndpoints', () => {
   });
 
   describe('Endpoint URL construction', () => {
-    const sdkTokenDecoder = new SdkKeyDecoder('abc.Y3M9dGVzdC1zdWJkb21haW4='); // cs=test-subdomain
+    const sdkTokenDecoder = new SdkTokenDecoder('abc.Y3M9dGVzdC1zdWJkb21haW4='); // cs=test-subdomain
 
     const endpointTestCases = [
       {
@@ -138,13 +138,13 @@ describe('ApiEndpoints', () => {
   });
 
   describe('Event ingestion URL', () => {
-    const hostnameToken = new SdkKeyDecoder(
+    const hostnameToken = new SdkTokenDecoder(
       'zCsQuoHJxVPp895.ZWg9MTIzNDU2LmUudGVzdGluZy5lcHBvLmNsb3Vk',
     );
-    let mockedDecoder: SdkKeyDecoder;
+    let mockedDecoder: SdkTokenDecoder;
 
     beforeEach(() => {
-      mockedDecoder = td.object<SdkKeyDecoder>();
+      mockedDecoder = td.object<SdkTokenDecoder>();
       td.when(mockedDecoder.isValid()).thenReturn(true);
     });
 
