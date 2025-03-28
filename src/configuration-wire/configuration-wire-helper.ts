@@ -9,9 +9,10 @@ import SdkTokenDecoder from '../sdk-token-decoder';
 import { ConfigurationWireV1, IConfigurationWire } from './configuration-wire-types';
 
 export type SdkOptions = {
-  sdkName: string;
-  sdkVersion: string;
+  sdkName?: string;
+  sdkVersion?: string;
   baseUrl?: string;
+  fetchBandits?: boolean;
 };
 
 /**
@@ -23,25 +24,28 @@ export class ConfigurationWireHelper {
   /**
    * Build a new ConfigurationHelper for the target SDK Key.
    * @param sdkKey
+   * @param opts
    */
   public static build(
     sdkKey: string,
-    opts: SdkOptions = { sdkName: 'android', sdkVersion: '4.0.0' },
+    opts: SdkOptions = { sdkName: 'js-client-sdk', sdkVersion: '4.0.0' },
   ) {
-    const { sdkName, sdkVersion, baseUrl } = opts;
-    return new ConfigurationWireHelper(sdkKey, sdkName, sdkVersion, baseUrl);
+    const { sdkName, sdkVersion, baseUrl, fetchBandits } = opts;
+    return new ConfigurationWireHelper(sdkKey, sdkName, sdkVersion, baseUrl, fetchBandits);
   }
 
   private constructor(
     sdkKey: string,
-    targetSdkName = 'android',
+    targetSdkName = 'js-client-sdk',
     targetSdkVersion = '4.0.0',
     baseUrl?: string,
+    private readonly fetchBandits = false,
   ) {
     const queryParams = {
       sdkName: targetSdkName,
       sdkVersion: targetSdkVersion,
       apiKey: sdkKey,
+      sdkProxy: 'config-wire-helper',
     };
     const apiEndpoints = new ApiEndpoints({
       baseUrl,
@@ -56,7 +60,7 @@ export class ConfigurationWireHelper {
    * Fetches configuration data from the API and build a Bootstrap Configuration (aka an `IConfigurationWire` object).
    * The IConfigurationWire instance can be used to bootstrap some SDKs.
    */
-  public async fetchBootstrapConfiguration(): Promise<IConfigurationWire> {
+  public async fetchConfiguration(): Promise<IConfigurationWire> {
     // Get the configs
     let banditResponse: IBanditParametersResponse | undefined;
     const configResponse: IUniversalFlagConfigResponse | undefined =
@@ -68,7 +72,7 @@ export class ConfigurationWireHelper {
     }
 
     const flagsHaveBandits = Object.keys(configResponse.banditReferences ?? {}).length > 0;
-    if (flagsHaveBandits) {
+    if (this.fetchBandits && flagsHaveBandits) {
       banditResponse = await this.httpClient.getBanditParameters();
     }
 
