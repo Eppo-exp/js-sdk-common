@@ -1,6 +1,5 @@
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
-import SdkKeyDecoder from '../sdk-key-decoder';
 
 import BatchEventProcessor from './batch-event-processor';
 import BatchRetryManager from './batch-retry-manager';
@@ -178,8 +177,7 @@ export function newDefaultEventDispatcher(
   batchSize: number = DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
   config: Omit<EventDispatcherConfig, 'ingestionUrl' | 'sdkKey'> = DEFAULT_EVENT_DISPATCHER_CONFIG,
 ): EventDispatcher {
-  const apiEndpointsHelper = new ApiEndpoints({ sdkTokenDecoder: new SdkKeyDecoder(sdkKey) });
-  const ingestionUrl = apiEndpointsHelper.eventIngestionEndpoint();
+  const ingestionUrl = ApiEndpoints.createEventIngestionUrl(sdkKey);
   if (!ingestionUrl) {
     logger.debug(
       'Unable to parse Event ingestion URL from SDK key, falling back to no-op event dispatcher',
