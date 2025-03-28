@@ -9,7 +9,7 @@ export const DEFAULT_POLL_CONFIG_REQUEST_RETRIES = 7;
 export const BASE_URL = 'https://fscdn.eppo.cloud/api';
 export const UFC_ENDPOINT = '/flag-config/v1/config';
 export const BANDIT_ENDPOINT = '/flag-config/v1/bandits';
-export const EVENT_ENDPOINT = 'v0/i';
+export const EVENT_ENDPOINT = '/v0/i';
 
 export const PRECOMPUTED_BASE_URL = 'https://fs-edge-assignment.eppo.cloud';
 export const PRECOMPUTED_FLAGS_ENDPOINT = '/assignments';

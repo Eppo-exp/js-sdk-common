@@ -30,7 +30,6 @@ import {
   DEFAULT_REQUEST_TIMEOUT_MS,
 } from '../constants';
 import { decodeFlag } from '../decoding';
-import EnhancedSdkToken from '../enhanced-sdk-token';
 import { EppoValue } from '../eppo_value';
 import { Evaluator, FlagEvaluation, noneResult, overrideResult } from '../evaluator';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
@@ -57,6 +56,7 @@ import {
 import { getMD5Hash } from '../obfuscation';
 import { OverridePayload, OverrideValidator } from '../override-validator';
 import initPoller, { IPoller } from '../poller';
+import SdkKeyDecoder from '../sdk-key-decoder';
 import {
   Attributes,
   AttributeType,
@@ -330,7 +330,7 @@ export default class EppoClient {
     const apiEndpoints = new ApiEndpoints({
       baseUrl,
       queryParams: { apiKey, sdkName, sdkVersion },
-      sdkToken: new EnhancedSdkToken(apiKey),
+      sdkTokenDecoder: new SdkKeyDecoder(apiKey),
     });
 
     const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);

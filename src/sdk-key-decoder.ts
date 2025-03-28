@@ -1,24 +1,19 @@
 import { Base64 } from 'js-base64';
 
 /**
- * An SDK Key with encoded data for customer-specific endpoints.
+ * Decodes SDK tokens with embedded encoded data.
  */
-export default class EnhancedSdkToken {
-  private readonly encodedPayload: string | null;
+export default class SdkKeyDecoder {
   private readonly decodedParams: URLSearchParams | null;
 
   constructor(private readonly sdkKey: string) {
-    const parts = sdkKey.split('.');
-    this.encodedPayload = parts.length > 1 ? parts[1] : null;
-
-    if (this.encodedPayload) {
-      try {
-        const decodedPayload = Base64.decode(this.encodedPayload);
-        this.decodedParams = new URLSearchParams(decodedPayload);
-      } catch (e) {
-        this.decodedParams = null;
-      }
-    } else {
+    try {
+      const [, payload] = sdkKey.split('.');
+      const encodedPayload = payload ?? null;
+      this.decodedParams = encodedPayload
+        ? new URLSearchParams(Base64.decode(encodedPayload))
+        : null;
+    } catch {
       this.decodedParams = null;
     }
   }
@@ -46,9 +41,7 @@ export default class EnhancedSdkToken {
    * Checks if the SDK Key had the subdomain or event hostname encoded.
    */
   isValid(): boolean {
-    return (
-      this.decodedParams !== null &&
-      (this.getSubdomain() !== null || this.getEventIngestionHostname() !== null)
-    );
+    if (!this.decodedParams) return false;
+    return !!this.getEventIngestionHostname() || !!this.getSubdomain();
   }
 }

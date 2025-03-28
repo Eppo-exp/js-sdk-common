@@ -6,27 +6,27 @@ import {
   PRECOMPUTED_FLAGS_ENDPOINT,
   UFC_ENDPOINT,
 } from './constants';
-import EnhancedSdkToken from './enhanced-sdk-token';
 import { IQueryParams, IQueryParamsWithSubject } from './http-client';
+import SdkKeyDecoder from './sdk-key-decoder';
 
 interface IApiEndpointsParams {
   queryParams?: IQueryParams | IQueryParamsWithSubject;
   baseUrl?: string;
   defaultUrl: string;
-  sdkToken?: EnhancedSdkToken;
+  sdkTokenDecoder?: SdkKeyDecoder;
 }
 
 /**
  * Utility class for constructing Eppo API endpoint URLs
  */
 export default class ApiEndpoints {
-  private readonly sdkToken: EnhancedSdkToken | null;
+  private readonly sdkToken: SdkKeyDecoder | null;
   private readonly _effectiveBaseUrl: string;
   private readonly params: IApiEndpointsParams;
 
   constructor(params: Partial<IApiEndpointsParams>) {
     this.params = Object.assign({}, { defaultUrl: BASE_URL }, params);
-    this.sdkToken = params.sdkToken ?? null;
+    this.sdkToken = params.sdkTokenDecoder ?? null;
     this._effectiveBaseUrl = this.determineBaseUrl();
   }
 
@@ -42,12 +42,6 @@ export default class ApiEndpoints {
     return `${protocol}${url}`;
   }
 
-  /**
-   * Determine the effective base URL based on the constructor parameters:
-   * 1. If baseUrl is provided, and it is not equal to the DEFAULT_BASE_URL, use it
-   * 2. If the api key contains an encoded customer-specific subdomain, use it with DEFAULT_DOMAIN
-   * 3. Otherwise, fall back to DEFAULT_BASE_URL
-   */
   private joinUrlParts(...parts: string[]): string {
     return parts
       .map((part) => part.trim())
@@ -61,7 +55,10 @@ export default class ApiEndpoints {
   }
 
   /**
-   * Determine the effective base URL based on the constructor parameters
+   * Determine the effective base URL:
+   * 1. If baseUrl is provided, and it is not equal to the DEFAULT_BASE_URL, use it
+   * 2. If the api key contains an encoded customer-specific subdomain, use it with DEFAULT_DOMAIN
+   * 3. Otherwise, fall back to DEFAULT_BASE_URL
    */
   private determineBaseUrl(): string {
     // If baseUrl is explicitly provided and different from default, use it
@@ -82,10 +79,7 @@ export default class ApiEndpoints {
     return this.normalizeUrl(this.params.defaultUrl);
   }
 
-  /**
-   * Creates an endpoint URL with the specified resource path and query parameters
-   */
-  endpoint(resource: string): string {
+  private endpoint(resource: string): string {
     const url = this.joinUrlParts(this._effectiveBaseUrl, resource);
 
     const queryParams = this.params.queryParams;

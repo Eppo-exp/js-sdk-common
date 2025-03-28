@@ -1,10 +1,10 @@
 import ApiEndpoints from '../api-endpoints';
-import EnhancedSdkToken from '../enhanced-sdk-token';
 import FetchHttpClient, {
   IBanditParametersResponse,
   IHttpClient,
   IUniversalFlagConfigResponse,
 } from '../http-client';
+import SdkKeyDecoder from '../sdk-key-decoder';
 
 import { ConfigurationWireV1, IConfigurationWire } from './configuration-wire-types';
 
@@ -46,7 +46,7 @@ export class ConfigurationWireHelper {
     const apiEndpoints = new ApiEndpoints({
       baseUrl,
       queryParams,
-      sdkToken: new EnhancedSdkToken(sdkKey),
+      sdkTokenDecoder: new SdkKeyDecoder(sdkKey),
     });
 
     this.httpClient = new FetchHttpClient(apiEndpoints, 5000);

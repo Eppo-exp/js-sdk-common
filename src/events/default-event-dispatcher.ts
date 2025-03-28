@@ -1,6 +1,6 @@
 import ApiEndpoints from '../api-endpoints';
 import { logger } from '../application-logger';
-import EnhancedSdkToken from '../enhanced-sdk-token';
+import SdkKeyDecoder from '../sdk-key-decoder';
 
 import BatchEventProcessor from './batch-event-processor';
 import BatchRetryManager from './batch-retry-manager';
@@ -178,7 +178,7 @@ export function newDefaultEventDispatcher(
   batchSize: number = DEFAULT_EVENT_DISPATCHER_BATCH_SIZE,
   config: Omit<EventDispatcherConfig, 'ingestionUrl' | 'sdkKey'> = DEFAULT_EVENT_DISPATCHER_CONFIG,
 ): EventDispatcher {
-  const apiEndpointsHelper = new ApiEndpoints({ sdkToken: new EnhancedSdkToken(sdkKey) });
+  const apiEndpointsHelper = new ApiEndpoints({ sdkTokenDecoder: new SdkKeyDecoder(sdkKey) });
   const ingestionUrl = apiEndpointsHelper.eventIngestionEndpoint();
   if (!ingestionUrl) {
     logger.debug(
