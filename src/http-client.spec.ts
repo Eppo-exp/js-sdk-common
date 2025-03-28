@@ -29,12 +29,11 @@ describe('FetchHttpClient', () => {
     });
     (global.fetch as jest.Mock).mockImplementation(() => mockFetchPromise);
 
-    const resource = '/data';
-    const result = await httpClient.rawGet(apiEndpoints.endpoint(resource));
+    const result = await httpClient.rawGet(apiEndpoints.ufcEndpoint());
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(global.fetch).toHaveBeenCalledWith(
-      `${baseUrl}${resource}?apiKey=12345&sdkVersion=1.0&sdkName=ExampleSDK`,
+      `${baseUrl}/flag-config/v1/config?apiKey=12345&sdkVersion=1.0&sdkName=ExampleSDK`,
       { signal: expect.any(AbortSignal) },
     );
     expect(result).toEqual({ data: 'test' });
@@ -48,8 +47,7 @@ describe('FetchHttpClient', () => {
     });
     (global.fetch as jest.Mock).mockImplementation(() => mockFetchPromise);
 
-    const resource = '/data';
-    const url = apiEndpoints.endpoint(resource);
+    const url = apiEndpoints.ufcEndpoint();
     await expect(httpClient.rawGet(url)).rejects.toThrow(HttpRequestError);
     await expect(httpClient.rawGet(url)).rejects.toEqual(
       new HttpRequestError('Failed to fetch data', 404),
@@ -71,8 +69,7 @@ describe('FetchHttpClient', () => {
         ),
     );
 
-    const resource = '/data';
-    const url = apiEndpoints.endpoint(resource);
+    const url = apiEndpoints.ufcEndpoint();
     const getPromise = httpClient.rawGet(url);
 
     // Immediately advance the timers by 10 seconds to simulate the timeout

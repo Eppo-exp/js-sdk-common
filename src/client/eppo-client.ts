@@ -61,6 +61,7 @@ import {
 import { getMD5Hash } from '../obfuscation';
 import { OverridePayload, OverrideValidator } from '../override-validator';
 import initPoller, { IPoller } from '../poller';
+import SdkTokenDecoder from '../sdk-token-decoder';
 import {
   Attributes,
   AttributeType,
@@ -362,7 +363,9 @@ export default class EppoClient {
     const apiEndpoints = new ApiEndpoints({
       baseUrl,
       queryParams: { apiKey, sdkName, sdkVersion },
+      sdkTokenDecoder: new SdkTokenDecoder(apiKey),
     });
+
     const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
 
     // Use the configuration manager when creating the requestor
