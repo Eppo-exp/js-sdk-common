@@ -56,6 +56,7 @@ import {
 import { getMD5Hash } from '../obfuscation';
 import { OverridePayload, OverrideValidator } from '../override-validator';
 import initPoller, { IPoller } from '../poller';
+import SdkTokenDecoder from '../sdk-token-decoder';
 import {
   Attributes,
   AttributeType,
@@ -326,11 +327,12 @@ export default class EppoClient {
       pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS;
     }
 
-    // todo: Inject the chain of dependencies below
     const apiEndpoints = new ApiEndpoints({
       baseUrl,
       queryParams: { apiKey, sdkName, sdkVersion },
+      sdkTokenDecoder: new SdkTokenDecoder(apiKey),
     });
+
     const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
     const configurationRequestor = new ConfigurationRequestor(
       httpClient,
