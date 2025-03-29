@@ -6,11 +6,13 @@ export type ConfigurationRequestorOptions = {
   wantsBandits: boolean;
 };
 
-// Requests AND stores flag configurations
+/**
+ * @internal
+ */
 export default class ConfigurationRequestor {
   private readonly options: ConfigurationRequestorOptions;
 
-  constructor(
+  public constructor(
     private readonly httpClient: IHttpClient,
     private readonly configurationStore: ConfigurationStore,
     options: Partial<ConfigurationRequestorOptions> = {},
@@ -21,7 +23,7 @@ export default class ConfigurationRequestor {
     };
   }
 
-  async fetchConfiguration(): Promise<Configuration | null> {
+  public async fetchConfiguration(): Promise<Configuration | null> {
     const flags = await this.httpClient.getUniversalFlagConfiguration();
     if (!flags?.response.flags) {
       return null;
@@ -32,19 +34,12 @@ export default class ConfigurationRequestor {
     return Configuration.fromResponses({ flags, bandits });
   }
 
-  async fetchAndStoreConfigurations(): Promise<void> {
-    const configuration = await this.fetchConfiguration();
-    if (configuration) {
-      this.configurationStore.setConfiguration(configuration);
-    }
-  }
-
   /**
    * Get bandits configuration matching the flags configuration.
    *
    * This function does not fetch bandits if the client does not want
    * them (`ConfigurationRequestorOptions.wantsBandits === false`) or
-   * we we can reuse bandit models from `ConfigurationStore`.
+   * if we can reuse bandit models from `ConfigurationStore`.
    */
   private async getBanditsFor(flags: FlagsConfig): Promise<BanditsConfig | undefined> {
     const needsBandits =

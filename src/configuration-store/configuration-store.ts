@@ -1,5 +1,6 @@
 import { Configuration } from '../configuration';
 import { Environment } from '../interfaces';
+import { Listeners } from '../listener';
 
 /**
  * `ConfigurationStore` is a central piece of Eppo SDK and answers a
@@ -9,7 +10,7 @@ import { Environment } from '../interfaces';
  */
 export class ConfigurationStore {
   private configuration: Configuration;
-  private readonly listeners: Array<(configuration: Configuration) => void> = [];
+  private readonly listeners: Listeners<[Configuration]> = new Listeners();
 
   public constructor(configuration: Configuration = Configuration.empty()) {
     this.configuration = configuration;
@@ -21,7 +22,7 @@ export class ConfigurationStore {
 
   public setConfiguration(configuration: Configuration): void {
     this.configuration = configuration;
-    this.notifyListeners();
+    this.listeners.notify(configuration);
   }
 
   /**
@@ -31,24 +32,7 @@ export class ConfigurationStore {
    * Returns a function to unsubscribe from future updates.
    */
   public onConfigurationChange(listener: (configuration: Configuration) => void): () => void {
-    this.listeners.push(listener);
-
-    return () => {
-      const idx = this.listeners.indexOf(listener);
-      if (idx !== -1) {
-        this.listeners.splice(idx, 1);
-      }
-    };
-  }
-
-  private notifyListeners(): void {
-    for (const listener of this.listeners) {
-      try {
-        listener(this.configuration);
-      } catch {
-        // ignore
-      }
-    }
+    return this.listeners.addListener(listener);
   }
 }
 

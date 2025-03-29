@@ -87,6 +87,34 @@ export class Configuration {
     return this.flags;
   }
 
+  /** @internal */
+  public getFetchedAt(): Date | undefined {
+    const flagsFetchedAt = this.flags?.fetchedAt ? new Date(this.flags.fetchedAt).getTime() : 0;
+    const banditsFetchedAt = this.bandits?.fetchedAt ? new Date(this.bandits.fetchedAt).getTime() : 0;
+    const maxFetchedAt = Math.max(flagsFetchedAt, banditsFetchedAt);
+    return maxFetchedAt > 0 ? new Date(maxFetchedAt) : undefined;
+  }
+
+  /** @internal */
+  public isEmpty(): boolean {
+    return !this.flags;
+  }
+
+  /** @internal */
+  public getAge(): number | undefined {
+    const fetchedAt = this.getFetchedAt();
+    if (!fetchedAt) {
+      return undefined;
+    }
+    return Date.now() - fetchedAt.getTime();
+  }
+
+  /** @internal */
+  public isStale(maxAgeSeconds: number): boolean {
+    const age = this.getAge();
+    return !!age && age > maxAgeSeconds * 1000;
+  }
+
   /** @internal
    *
    * Returns flag configuration for the given flag key. Obfuscation is
@@ -116,6 +144,7 @@ export class Configuration {
     return this.flagBanditVariations[flagKey] ?? [];
   }
 
+  /** @internal */
   public getFlagVariationBandit(flagKey: string, variationValue: string): BanditParameters | null {
     const banditVariations = this.getFlagBanditVariations(flagKey);
     const banditKey = banditVariations?.find(

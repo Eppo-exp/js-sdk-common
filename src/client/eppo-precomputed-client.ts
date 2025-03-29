@@ -14,7 +14,7 @@ import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
   DEFAULT_REQUEST_TIMEOUT_MS,
-  DEFAULT_POLL_INTERVAL_MS,
+  DEFAULT_BASE_POLLING_INTERVAL_MS,
   MAX_EVENT_QUEUE_SIZE,
   PRECOMPUTED_BASE_URL,
 } from '../constants';
@@ -43,13 +43,13 @@ export interface Subject {
   subjectAttributes: Attributes | ContextAttributes;
 }
 
-export type PrecomputedFlagsRequestParameters = {
+export type PrecomputedRequestParameters = {
   apiKey: string;
   sdkVersion: string;
   sdkName: string;
   baseUrl?: string;
   requestTimeoutMs?: number;
-  pollingIntervalMs?: number;
+  basePollingIntervalMs?: number;
   numInitialRequestRetries?: number;
   numPollRequestRetries?: number;
   pollAfterSuccessfulInitialization?: boolean;
@@ -64,7 +64,7 @@ interface EppoPrecomputedClientOptions {
   overrideStore?: ISyncStore<Variation>;
   subject: Subject;
   banditActions?: Record<FlagKey, Record<string, ContextAttributes>>;
-  requestParameters?: PrecomputedFlagsRequestParameters;
+  requestParameters?: PrecomputedRequestParameters;
 }
 
 export default class EppoPrecomputedClient {
@@ -75,7 +75,7 @@ export default class EppoPrecomputedClient {
   private banditAssignmentCache?: AssignmentCache;
   private assignmentCache?: AssignmentCache;
   private requestPoller?: IPoller;
-  private requestParameters?: PrecomputedFlagsRequestParameters;
+  private requestParameters?: PrecomputedRequestParameters;
   private subject: {
     subjectKey: string;
     subjectAttributes: ContextAttributes;
@@ -153,10 +153,10 @@ export default class EppoPrecomputedClient {
     } = this.requestParameters;
     const { subjectKey, subjectAttributes } = this.subject;
 
-    let { pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS } = this.requestParameters;
-    if (pollingIntervalMs <= 0) {
-      logger.error('pollingIntervalMs must be greater than 0. Using default');
-      pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS;
+    let { basePollingIntervalMs = DEFAULT_BASE_POLLING_INTERVAL_MS } = this.requestParameters;
+    if (basePollingIntervalMs <= 0) {
+      logger.error('basePollingIntervalMs must be greater than 0. Using default');
+      basePollingIntervalMs = DEFAULT_BASE_POLLING_INTERVAL_MS;
     }
 
     // todo: Inject the chain of dependencies below
@@ -180,7 +180,7 @@ export default class EppoPrecomputedClient {
       }
     };
 
-    this.requestPoller = initPoller(pollingIntervalMs, pollingCallback, {
+    this.requestPoller = initPoller(basePollingIntervalMs, pollingCallback, {
       maxStartRetries: numInitialRequestRetries,
       maxPollRetries: numPollRequestRetries,
       pollAfterSuccessfulStart: pollAfterSuccessfulInitialization,

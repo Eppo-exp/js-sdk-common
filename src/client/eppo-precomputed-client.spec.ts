@@ -14,7 +14,7 @@ import {
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { IPrecomputedConfigurationResponse } from '../configuration-wire/configuration-wire-types';
-import { DEFAULT_POLL_INTERVAL_MS, MAX_EVENT_QUEUE_SIZE, POLL_JITTER_PCT } from '../constants';
+import { DEFAULT_BASE_POLLING_INTERVAL_MS, MAX_EVENT_QUEUE_SIZE, POLL_JITTER_PCT } from '../constants';
 import FetchHttpClient from '../http-client';
 import {
   FormatEnum,
@@ -398,7 +398,7 @@ describe('EppoPrecomputedClient E2E test', () => {
     const precomputedFlagKey = 'string-flag';
     const red = 'red';
 
-    const maxRetryDelay = DEFAULT_POLL_INTERVAL_MS * POLL_JITTER_PCT;
+    const maxRetryDelay = DEFAULT_BASE_POLLING_INTERVAL_MS * POLL_JITTER_PCT;
 
     beforeAll(async () => {
       global.fetch = jest.fn(() => {
@@ -513,7 +513,7 @@ describe('EppoPrecomputedClient E2E test', () => {
 
         // Expire the cache and advance time until a reload should happen
         MockStore.expired = true;
-        await jest.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS * 1.5);
+        await jest.advanceTimersByTimeAsync(DEFAULT_BASE_POLLING_INTERVAL_MS * 1.5);
 
         variation = client.getStringAssignment(precomputedFlagKey, 'default');
         expect(variation).toBe(red);
@@ -641,7 +641,7 @@ describe('EppoPrecomputedClient E2E test', () => {
       expect(variation).toBe(red);
       expect(callCount).toBe(2);
 
-      await jest.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS);
+      await jest.advanceTimersByTimeAsync(DEFAULT_BASE_POLLING_INTERVAL_MS);
       // By default, no more polling
       expect(callCount).toBe(pollAfterSuccessfulInitialization ? 3 : 2);
     });
@@ -706,7 +706,7 @@ describe('EppoPrecomputedClient E2E test', () => {
       expect(client.getStringAssignment(precomputedFlagKey, 'default')).toBe('default');
 
       // Advance timers so a post-init poll can take place
-      await jest.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS * 1.5);
+      await jest.advanceTimersByTimeAsync(DEFAULT_BASE_POLLING_INTERVAL_MS * 1.5);
 
       // if pollAfterFailedInitialization = true, we will poll later and get a config, otherwise not
       expect(callCount).toBe(pollAfterFailedInitialization ? 2 : 1);

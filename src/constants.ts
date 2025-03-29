@@ -2,7 +2,7 @@ import { FormatEnum } from './interfaces';
 
 export const DEFAULT_REQUEST_TIMEOUT_MS = 5000;
 export const REQUEST_TIMEOUT_MILLIS = DEFAULT_REQUEST_TIMEOUT_MS; // for backwards compatibility
-export const DEFAULT_POLL_INTERVAL_MS = 30000;
+export const DEFAULT_BASE_POLLING_INTERVAL_MS = 30000;
 export const POLL_JITTER_PCT = 0.1;
 export const DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES = 1;
 export const DEFAULT_POLL_CONFIG_REQUEST_RETRIES = 7;

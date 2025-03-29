@@ -149,8 +149,10 @@ export default function initPoller(
 /**
  * Compute a random jitter as a percentage of the polling interval.
  * Will be (5%,10%) of the interval assuming POLL_JITTER_PCT = 0.1
+ *
+ * @internal
  */
-function randomJitterMs(intervalMs: number) {
+export function randomJitterMs(intervalMs: number) {
   const halfPossibleJitter = (intervalMs * POLL_JITTER_PCT) / 2;
   // We want the randomly chosen jitter to be at least 1ms so total jitter is slightly more than half the max possible.
   // This makes things easy for automated tests as two polls cannot execute within the maximum possible time waiting for one.
