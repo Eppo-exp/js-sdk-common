@@ -717,6 +717,7 @@ describe('EppoPrecomputedClient E2E test', () => {
 
     describe('Enhanced SDK Token with encoded subdomain', () => {
       let urlsRequested: string[] = [];
+      const SDK_PARAM_SUFFIX = 'sdkName=js-client-sdk-common&sdkVersion=1.0.0';
 
       beforeEach(() => {
         urlsRequested = [];
@@ -744,8 +745,9 @@ describe('EppoPrecomputedClient E2E test', () => {
         await client.fetchPrecomputedFlags();
 
         expect(urlsRequested).toHaveLength(1);
-        expect(urlsRequested[0]).toContain(
-          'https://experiment.fs-edge-assignment.eppo.cloud/assignments?apiKey=zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA%3D%3D&sdkName=js-client-sdk-common&sdkVersion=1.0.0',
+        expect(urlsRequested[0]).toEqual(
+          'https://experiment.fs-edge-assignment.eppo.cloud/assignments?apiKey=zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA%3D%3D&' +
+            SDK_PARAM_SUFFIX,
         );
       });
 
@@ -764,7 +766,8 @@ describe('EppoPrecomputedClient E2E test', () => {
 
         expect(urlsRequested).toHaveLength(1);
         expect(urlsRequested[0]).toEqual(
-          'https://fs-edge-assignment.eppo.cloud/assignments?apiKey=old+style+key&sdkName=js-client-sdk-common&sdkVersion=1.0.0',
+          'https://fs-edge-assignment.eppo.cloud/assignments?apiKey=old+style+key&' +
+            SDK_PARAM_SUFFIX,
         );
       });
 
@@ -783,7 +786,10 @@ describe('EppoPrecomputedClient E2E test', () => {
         await client.fetchPrecomputedFlags();
 
         expect(urlsRequested).toHaveLength(1);
-        expect(urlsRequested[0]).toContain('https://custom-base-url.com');
+        expect(urlsRequested[0]).toEqual(
+          'https://custom-base-url.com/assignments?apiKey=zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA%3D%3D&' +
+            SDK_PARAM_SUFFIX,
+        );
       });
     });
   });
