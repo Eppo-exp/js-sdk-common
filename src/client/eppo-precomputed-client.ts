@@ -32,6 +32,7 @@ import {
 import { getMD5Hash } from '../obfuscation';
 import initPoller, { IPoller } from '../poller';
 import PrecomputedRequestor from '../precomputed-requestor';
+import SdkTokenDecoder from '../sdk-token-decoder';
 import { Attributes, ContextAttributes, FlagKey } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
@@ -164,6 +165,7 @@ export default class EppoPrecomputedClient {
       defaultUrl: PRECOMPUTED_BASE_URL,
       baseUrl,
       queryParams: { apiKey, sdkName, sdkVersion },
+      sdkTokenDecoder: new SdkTokenDecoder(apiKey),
     });
     const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
     const precomputedRequestor = new PrecomputedRequestor(
