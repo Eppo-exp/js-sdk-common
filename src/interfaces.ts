@@ -148,8 +148,8 @@ interface SwitchbackVariation {
   key: string;
   value: string;
 }
-type SwitchbackKey = string;
-type SwitchbackSubjectAttributeKey = string;
+export type SwitchbackKey = string;
+export type SwitchbackSubjectAttributeKey = string;
 export interface Switchback {
   key: SwitchbackKey;
   subjectAttributeKey: SwitchbackSubjectAttributeKey;
@@ -159,10 +159,6 @@ export interface Switchback {
   variations: SwitchbackVariation[];
 }
 
-export interface Switchbacks {
-  switchbacks: Record<SwitchbackKey, Switchback>;
-  switchbackSubjectAttributes: Record<SwitchbackSubjectAttributeKey, string[]>;
-}
 
 export enum FormatEnum {
   SERVER = 'SERVER',

@@ -7,6 +7,9 @@ import {
   Flag,
   FormatEnum,
   PrecomputedFlagsPayload,
+  Switchback,
+  SwitchbackKey,
+  SwitchbackSubjectAttributeKey,
 } from './interfaces';
 import { Attributes } from './types';
 
@@ -42,6 +45,11 @@ export interface IUniversalFlagConfigResponse {
   banditReferences: Record<string, BanditReference>;
 }
 
+export interface ISwitchbacksConfigResponse {
+  switchbacks: Record<SwitchbackKey, Switchback>;
+  subjectAttributes: Record<SwitchbackSubjectAttributeKey, string[]>;
+}
+
 export interface IBanditParametersResponse {
   bandits: Record<string, BanditParameters>;
 }
@@ -52,15 +60,13 @@ export interface IHttpClient {
   getPrecomputedFlags(
     payload: PrecomputedFlagsPayload,
   ): Promise<IObfuscatedPrecomputedConfigurationResponse | undefined>;
+  getSwitchbacksConfiguration(): Promise<ISwitchbacksConfigResponse | undefined>;
   rawGet<T>(url: string): Promise<T | undefined>;
   rawPost<T, P>(url: string, payload: P): Promise<T | undefined>;
 }
 
 export default class FetchHttpClient implements IHttpClient {
-  constructor(
-    private readonly apiEndpoints: ApiEndpoints,
-    private readonly timeout: number,
-  ) {}
+  constructor(private readonly apiEndpoints: ApiEndpoints, private readonly timeout: number) {}
 
   async getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined> {
     const url = this.apiEndpoints.ufcEndpoint();
@@ -80,6 +86,11 @@ export default class FetchHttpClient implements IHttpClient {
       url,
       payload,
     );
+  }
+
+  async getSwitchbacksConfiguration(): Promise<ISwitchbacksConfigResponse | undefined> {
+    const url = this.apiEndpoints.switchbacksEndpoint();
+    return await this.rawGet<ISwitchbacksConfigResponse>(url);
   }
 
   async rawGet<T>(url: string): Promise<T | undefined> {

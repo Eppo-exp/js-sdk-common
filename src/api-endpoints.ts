@@ -5,6 +5,7 @@ import {
   EVENT_ENDPOINT,
   PRECOMPUTED_FLAGS_ENDPOINT,
   UFC_ENDPOINT,
+  SWITCHBACKS_ENDPOINT,
 } from './constants';
 import { IQueryParams, IQueryParamsWithSubject } from './http-client';
 import SdkTokenDecoder from './sdk-token-decoder';
@@ -150,6 +151,16 @@ export default class ApiEndpoints {
    */
   precomputedFlagsEndpoint(): string {
     return this.endpoint(PRECOMPUTED_FLAGS_ENDPOINT);
+  }
+
+  /**
+   * Returns the URL for the switchbacks endpoint.
+   * Uses the configuration base URL determined by baseUrl, subdomain, or default.
+   *
+   * @returns The full switchbacks endpoint URL
+   */
+  switchbacksEndpoint(): string {
+    return this.endpoint(SWITCHBACKS_ENDPOINT);
   }
 
   /**
