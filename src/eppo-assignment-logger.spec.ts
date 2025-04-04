@@ -13,7 +13,12 @@ describe('EppoAssignmentLogger', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockEppoClient = new EppoClient({
-      flagConfigurationStore: {} as IConfigurationStore<Flag>,
+      sdkKey: 'test-sdk-key',
+      sdkName: 'test-sdk-name',
+      sdkVersion: 'test-sdk-version',
+      configuration: {
+        initializationStrategy: 'none',
+      },
     }) as jest.Mocked<EppoClient>;
     mockEppoClient.track = jest.fn();
     logger = new EppoAssignmentLogger(mockEppoClient);

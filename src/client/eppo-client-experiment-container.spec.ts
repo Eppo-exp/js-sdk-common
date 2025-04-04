@@ -1,4 +1,4 @@
-import { MOCK_UFC_RESPONSE_FILE, readMockUFCResponse } from '../../test/testHelpers';
+import { MOCK_UFC_RESPONSE_FILE, readMockUfcConfiguration, readMockUFCResponse } from '../../test/testHelpers';
 import * as applicationLogger from '../application-logger';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { Flag, ObfuscatedFlag } from '../interfaces';
@@ -9,15 +9,6 @@ import { initConfiguration } from './test-utils';
 type Container = { name: string };
 
 describe('getExperimentContainerEntry', () => {
-  global.fetch = jest.fn(() => {
-    const ufc = readMockUFCResponse(MOCK_UFC_RESPONSE_FILE);
-    return Promise.resolve({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve(ufc),
-    });
-  }) as jest.Mock;
-
   const controlContainer: Container = { name: 'Control Container' };
   const treatment1Container: Container = { name: 'Treatment Variation 1 Container' };
   const treatment2Container: Container = { name: 'Treatment Variation 2 Container' };
@@ -29,9 +20,16 @@ describe('getExperimentContainerEntry', () => {
   let loggerWarnSpy: jest.SpyInstance;
 
   beforeEach(async () => {
-    const storage = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
-    await initConfiguration(storage);
-    client = new EppoClient({ flagConfigurationStore: storage });
+    client = new EppoClient({ 
+      configuration: {
+        initializationStrategy: 'none',
+        initialConfiguration: readMockUfcConfiguration(),
+      },
+      sdkKey: 'dummy',
+      sdkName: 'js-client-sdk-common',
+      sdkVersion: '1.0.0',
+      baseUrl: 'http://127.0.0.1:4000',
+    });
     client.setIsGracefulFailureMode(true);
     flagExperiment = {
       flagKey: 'my-key',

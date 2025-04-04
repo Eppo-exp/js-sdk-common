@@ -27,7 +27,7 @@ import { decodeBase64, encodeBase64, getMD5Hash } from '../obfuscation';
 import PrecomputedRequestor from '../precomputed-requestor';
 
 import EppoPrecomputedClient, {
-  PrecomputedFlagsRequestParameters,
+  PrecomputedRequestParameters,
   Subject,
 } from './eppo-precomputed-client';
 
@@ -393,7 +393,7 @@ describe('EppoPrecomputedClient E2E test', () => {
     let client: EppoPrecomputedClient;
     let precomputedFlagStore: IConfigurationStore<PrecomputedFlag>;
     let subject: Subject;
-    let requestParameters: PrecomputedFlagsRequestParameters;
+    let requestParameters: PrecomputedRequestParameters;
 
     const precomputedFlagKey = 'string-flag';
     const red = 'red';

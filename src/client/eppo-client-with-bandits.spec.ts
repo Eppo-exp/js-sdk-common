@@ -7,6 +7,7 @@ import {
   testCasesByFileName,
   BanditTestCase,
   BANDIT_TEST_DATA_DIR,
+  readMockBanditsConfiguration,
 } from '../../test/testHelpers';
 import ApiEndpoints from '../api-endpoints';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
@@ -32,9 +33,6 @@ import { Attributes, BanditActions, ContextAttributes } from '../types';
 import EppoClient, { IAssignmentDetails } from './eppo-client';
 
 describe('EppoClient Bandits E2E test', () => {
-  const flagStore = new MemoryOnlyConfigurationStore<Flag>();
-  const banditVariationStore = new MemoryOnlyConfigurationStore<BanditVariation[]>();
-  const banditModelStore = new MemoryOnlyConfigurationStore<BanditParameters>();
   let client: EppoClient;
   const mockLogAssignment = jest.fn();
   const mockLogBanditAction = jest.fn();
@@ -63,22 +61,18 @@ describe('EppoClient Bandits E2E test', () => {
         sdkVersion: '1.0.0',
       },
     });
-    const httpClient = new FetchHttpClient(apiEndpoints, 1000);
-    const configurationRequestor = new ConfigurationRequestor(
-      httpClient,
-      flagStore,
-      banditVariationStore,
-      banditModelStore,
-    );
-    await configurationRequestor.fetchAndStoreConfigurations();
   });
 
   beforeEach(() => {
     client = new EppoClient({
-      flagConfigurationStore: flagStore,
-      banditVariationConfigurationStore: banditVariationStore,
-      banditModelConfigurationStore: banditModelStore,
-      isObfuscated: false,
+      sdkKey: 'dummy',
+      sdkName: 'js-client-sdk-common',
+      sdkVersion: '1.0.0',
+      baseUrl: 'http://127.0.0.1:4000',
+      configuration: {
+        initializationStrategy: 'none',
+        initialConfiguration: readMockBanditsConfiguration(),
+      },
     });
     client.setIsGracefulFailureMode(false);
     client.setAssignmentLogger({ logAssignment: mockLogAssignment });

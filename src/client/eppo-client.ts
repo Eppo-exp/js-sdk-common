@@ -29,7 +29,15 @@ import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
   DEFAULT_BASE_POLLING_INTERVAL_MS,
+  DEFAULT_MAX_POLLING_INTERVAL_MS,
   DEFAULT_REQUEST_TIMEOUT_MS,
+  DEFAULT_INITIALIZATION_TIMEOUT_MS,
+  DEFAULT_MAX_AGE_SECONDS,
+  DEFAULT_MAX_STALE_SECONDS,
+  DEFAULT_INITIALIZATION_STRATEGY,
+  DEFAULT_ACTIVATION_STRATEGY,
+  DEFAULT_ENABLE_POLLING_CLIENT,
+  DEFAULT_ENABLE_BANDITS,
 } from '../constants';
 import { EppoValue } from '../eppo_value';
 import { Evaluator, FlagEvaluation, noneResult, overrideResult } from '../evaluator';
@@ -51,7 +59,7 @@ import {
   VariationType,
 } from '../interfaces';
 import { OverridePayload, OverrideValidator } from '../override-validator';
-import initPoller, { IPoller, randomJitterMs } from '../poller';
+import { randomJitterMs } from '../poller';
 import {
   Attributes,
   AttributeType,
@@ -64,8 +72,14 @@ import {
 import { shallowClone } from '../util';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
-import { PersistentConfigurationStorage } from '../persistent-configuration-storage';
+import {
+  PersistentConfigurationCache,
+  PersistentConfigurationStorage,
+} from '../persistent-configuration-cache';
 import { ConfigurationPoller } from '../configuration-poller';
+import { ConfigurationFeed, ConfigurationSource } from '../configuration-feed';
+import { BroadcastChannel } from '../broadcast';
+
 export interface IAssignmentDetails<T extends Variation['value'] | object> {
   variation: T;
   action: string | null;
@@ -93,7 +107,7 @@ export type EppoClientParameters = {
     /**
      * Whether to enable bandits.
      *
-     * This influences whether bandits configuration is loaded.
+     * This influences whether bandits configuration is fetched.
      * Disabling bandits helps to save network bandwidth if bandits
      * are unused.
      *
@@ -232,6 +246,37 @@ export type EppoClientParameters = {
   };
 };
 
+/**
+ * ## Initialization
+ *
+ * During initialization, the client will:
+ * 1. Load initial configuration from `configuration.initialConfiguration` if provided
+ * 2. If no initial configuration and `configuration.persistentStorage` is provided and strategy is
+ *    not 'no-cache' or 'none', attempt to load cached configuration
+ * 3. Based on `configuration.initializationStrategy`:
+ *    - 'stale-while-revalidate': Use cached config if within `maxStaleSeconds`, fetch fresh in
+ *      background
+ *    - 'only-if-cached': Use cached config only, no network requests
+ *    - 'no-cache': Always fetch fresh config
+ *    - 'none': Use only initial config, no loading/fetching
+ * 4. If fetching enabled, attempt fetches until success or `initializationTimeoutMs` reached
+ * 5. If `configuration.enablePolling` is true, begin polling for updates every
+ *    `basePollingIntervalMs`
+ * 6. When new configs are fetched, activate based on `configuration.activationStrategy`:
+ *    - 'always': Activate immediately
+ *    - 'stale': Activate if current config exceeds `maxStaleSeconds`
+ *    - 'empty': Activate if current config is empty
+ *    - 'next-load': Store for next initialization
+ *
+ * Initialization is considered complete when either:
+ * - For 'stale-while-revalidate': Fresh configuration is fetched
+ * - For 'only-if-cached': Cache is loaded or initial configuration applied
+ * - For 'no-cache': Fresh configuration is fetched
+ * - For 'none': Immediately
+ *
+ * If `configuration.initializationTimeoutMs` is reached before completion, initialization finishes
+ * with the best available configuration (from cache, initial configuration, or empty).
+ */
 export default class EppoClient {
   private eventDispatcher: EventDispatcher;
   private readonly assignmentEventsQueue: BoundedEventQueue<IAssignmentEvent> =
@@ -249,36 +294,53 @@ export default class EppoClient {
   private readonly evaluator = new Evaluator();
   private readonly overrideValidator = new OverrideValidator();
 
-  private readonly configurationStore;
+  private readonly configurationFeed;
+  private readonly configurationStore: ConfigurationStore;
+  private readonly configurationCache?: PersistentConfigurationCache;
   private readonly configurationRequestor: ConfigurationRequestor;
-  private readonly requestPoller: ConfigurationPoller;
+  private readonly configurationPoller: ConfigurationPoller;
   private initialized = false;
   private readonly initializationPromise: Promise<void>;
-
 
   constructor(options: EppoClientParameters) {
     const { eventDispatcher = new NoOpEventDispatcher(), overrideStore, configuration } = options;
 
+    this.eventDispatcher = eventDispatcher;
+    this.overrideStore = overrideStore;
+
     const {
       configuration: {
         persistentStorage,
-        initializationStrategy = 'stale-while-revalidate',
-        initializationTimeoutMs = 5_000,
-        initialConfiguration,
-        requestTimeoutMs = 5_000,
-        basePollingIntervalMs = 30_000,
-        maxPollingIntervalMs = 300_000,
-        enablePolling = true,
-        maxAgeSeconds = 30,
-        maxStaleSeconds = Infinity,
-        activationStrategy = 'stale',
+        initializationTimeoutMs = DEFAULT_INITIALIZATION_TIMEOUT_MS,
+        requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+        basePollingIntervalMs = DEFAULT_BASE_POLLING_INTERVAL_MS,
+        maxPollingIntervalMs = DEFAULT_MAX_POLLING_INTERVAL_MS,
+        enablePolling = DEFAULT_ENABLE_POLLING_CLIENT,
+        maxAgeSeconds = DEFAULT_MAX_AGE_SECONDS,
+        activationStrategy = DEFAULT_ACTIVATION_STRATEGY,
       } = {},
     } = options;
 
-    this.configurationStore = new ConfigurationStore(configuration?.initialConfiguration);
+    this.configurationFeed = new BroadcastChannel<[Configuration, ConfigurationSource]>();
 
-    this.eventDispatcher = eventDispatcher;
-    this.overrideStore = overrideStore;
+    this.configurationStore = new ConfigurationStore(configuration?.initialConfiguration);
+    this.configurationStore.register(
+      this.configurationFeed,
+      activationStrategy === 'always'
+        ? { type: 'always' }
+        : activationStrategy === 'stale'
+        ? { type: 'stale', maxAgeSeconds }
+        : activationStrategy === 'empty'
+        ? { type: 'empty' }
+        : { type: 'never' },
+    );
+
+    if (persistentStorage) {
+      this.configurationCache = new PersistentConfigurationCache(
+        persistentStorage,
+        this.configurationFeed,
+      );
+    }
 
     this.configurationRequestor = new ConfigurationRequestor(
       new FetchHttpClient(
@@ -292,59 +354,48 @@ export default class EppoClient {
         }),
         requestTimeoutMs,
       ),
-      this.configurationStore,
+      this.configurationFeed,
       {
-        wantsBandits: options.bandits?.enable ?? true,
+        wantsBandits: options.bandits?.enable ?? DEFAULT_ENABLE_BANDITS,
       },
     );
 
-    this.requestPoller = new ConfigurationPoller(this.configurationRequestor, {
+    this.configurationPoller = new ConfigurationPoller(this.configurationRequestor, {
+      configurationFeed: this.configurationFeed,
       basePollingIntervalMs,
       maxPollingIntervalMs,
-    });
-    this.requestPoller.onConfigurationFetched((configuration: Configuration) => {
-      // During initialization, always set the configuration.
-      // Otherwise, apply the activation strategy.
-      const shouldActivate = !this.initialized || 
-        EppoClient.shouldActivateConfiguration(activationStrategy, maxAgeSeconds, this.configurationStore.getConfiguration());
-
-      if (shouldActivate) {
-        this.configurationStore.setConfiguration(configuration);
-      }
-
-      try {
-        persistentStorage?.storeConfiguration(configuration);
-      } catch (err) {
-        logger.warn('Eppo SDK failed to store configuration in persistent store', { err });
-      }
+      maxAgeMs: maxAgeSeconds * 1000,
     });
 
-    this.initializationPromise = withTimeout(
-      this.initialize(options),
-      initializationTimeoutMs
-    )
+    this.initializationPromise = withTimeout(this.initialize(options), initializationTimeoutMs)
       .catch((err) => {
-        logger.warn('Eppo SDK encountered an error during initialization', { err });
+        logger.warn({ err }, '[Eppo SDK] Encountered an error during initialization');
       })
       .finally(() => {
+        logger.debug('[Eppo SDK] Finished initialization');
         this.initialized = true;
         if (enablePolling) {
-          this.requestPoller.start();
+          this.configurationPoller.start();
         }
       });
   }
 
   private async initialize(options: EppoClientParameters): Promise<void> {
+    logger.debug('[Eppo SDK] Initializing EppoClient');
     const {
       configuration: {
-        persistentStorage,
-        initializationStrategy = 'stale-while-revalidate',
+        initializationStrategy = DEFAULT_INITIALIZATION_STRATEGY,
         initialConfiguration,
-        basePollingIntervalMs = 30_000,
-        maxAgeSeconds = 30,
-        maxStaleSeconds = Infinity,
+        basePollingIntervalMs = DEFAULT_BASE_POLLING_INTERVAL_MS,
+        maxAgeSeconds = DEFAULT_MAX_AGE_SECONDS,
+        maxStaleSeconds = DEFAULT_MAX_STALE_SECONDS,
       } = {},
     } = options;
+
+    if (initialConfiguration) {
+      this.configurationStore.setConfiguration(initialConfiguration);
+      this.configurationFeed.broadcast(initialConfiguration, ConfigurationSource.Cache);
+    }
 
     if (initializationStrategy === 'none') {
       this.initialized = true;
@@ -353,20 +404,14 @@ export default class EppoClient {
 
     if (
       !initialConfiguration && // initial configuration overrides persistent storage for initialization
-      persistentStorage &&
+      this.configurationCache &&
       (initializationStrategy === 'stale-while-revalidate' ||
         initializationStrategy === 'only-if-cached')
     ) {
       try {
-        const configuration = await persistentStorage.loadConfiguration();
+        const configuration = await this.configurationCache.loadConfiguration({ maxStaleSeconds });
         if (configuration && !this.initialized) {
-          const age = configuration.getAge();
-
-          const isTooOld = age && age > maxStaleSeconds * 1000;
-          if (!isTooOld) {
-            // The configuration is too old to be used.
-            this.configurationStore.setConfiguration(configuration);
-          }
+          this.configurationStore.setConfiguration(configuration);
         }
       } catch (err) {
         logger.warn('Eppo SDK failed to load configuration from persistent store', { err });
@@ -378,24 +423,38 @@ export default class EppoClient {
     }
 
     // Finish initialization early if cached configuration is fresh.
-    const configurationAgeMs = this.configurationStore.getConfiguration()?.getAge();
-    if (configurationAgeMs && configurationAgeMs < maxAgeSeconds * 1000) {
+    const cachedConfiguration = this.configurationStore.getConfiguration();
+    const configurationAgeMs = cachedConfiguration?.getAgeMs();
+    if (configurationAgeMs !== undefined && configurationAgeMs < maxAgeSeconds * 1000) {
+      logger.debug(
+        { configurationAgeMs, maxAgeSeconds },
+        '[Eppo SDK] The cached configuration is fresh, skipping fetch',
+      );
       return;
+    } else if (cachedConfiguration) {
+      logger.debug(
+        { configurationAgeMs, maxAgeSeconds },
+        '[Eppo SDK] The cached configuration is stale, fetching new configuration',
+      );
+    } else {
+      logger.debug('[Eppo SDK] No cached configuration found, fetching new configuration');
     }
 
-    // Loop until we sucessfully fetch configuration or
-    // initialization deadline is reached (and sets this.initialized
-    // to true).
+    // Loop until we sucessfully fetch configuration or initialization deadline is reached (and sets
+    // this.initialized to true).
     while (!this.initialized) {
       try {
-        // The fetchImmediate method will trigger the listener registered in the constructor,
-        // which will activate the configuration.
-        await this.requestPoller.fetchImmediate();
-        
-        // If we got here, the fetch was successful, and we can exit the loop.
-        return;
+        logger.debug('[Eppo SDK] Fetching initial configuration');
+        const configuration = await this.configurationRequestor.fetchConfiguration();
+        if (configuration) {
+          this.configurationFeed.broadcast(configuration, ConfigurationSource.Network);
+          this.configurationStore.setConfiguration(configuration);
+
+          // The fetch was successful, so we can exit the loop.
+          return;
+        }
       } catch (err) {
-        logger.warn('Eppo SDK failed to fetch initial configuration', { err });
+        logger.warn({ err }, '[Eppo SDK] Failed to fetch initial configuration');
       }
 
       // Note: this is only using the jitter without the base polling interval.
@@ -403,14 +462,13 @@ export default class EppoClient {
     }
   }
 
-  private static shouldActivateConfiguration(
-    activationStrategy: string,
-    maxAgeSeconds: number,
-    prevConfiguration: Configuration
-  ): boolean {
-    return activationStrategy === 'always'
-      || (activationStrategy === 'stale' && (prevConfiguration.isStale(maxAgeSeconds) ?? true))
-      || (activationStrategy === 'empty' && (prevConfiguration.isEmpty() ?? true));
+  /**
+   * Waits for the client to finish initialization sequence and be ready to serve assignments.
+   *
+   * @returns A promise that resolves when the client is initialized.
+   */
+  public waitForInitialization(): Promise<void> {
+    return this.initializationPromise;
   }
 
   public getConfiguration(): Configuration {
@@ -425,12 +483,12 @@ export default class EppoClient {
   }
 
   /**
-   * Register a listener to be notified when a new configuration is fetched.
+   * Register a listener to be notified when a new configuration is received.
    * @param listener Callback function that receives the fetched `Configuration` object
    * @returns A function that can be called to unsubscribe the listener.
    */
-  public onConfigurationFetched(listener: (configuration: Configuration) => void): void {
-    this.requestPoller.onConfigurationFetched(listener);
+  public onNewConfiguration(listener: (configuration: Configuration) => void): () =>void {
+    return this.configurationFeed.addListener(listener);
   }
 
   /**
@@ -438,8 +496,8 @@ export default class EppoClient {
    * @param listener Callback function that receives the activated `Configuration` object
    * @returns A function that can be called to unsubscribe the listener.
    */
-  public onConfigurationActivated(listener: (configuration: Configuration) => void): void {
-    this.configurationStore.onConfigurationChange(listener);
+  public onConfigurationActivated(listener: (configuration: Configuration) => void): () => void {
+    return this.configurationStore.onConfigurationChange(listener);
   }
 
   /**
@@ -512,8 +570,8 @@ export default class EppoClient {
 
   // noinspection JSUnusedGlobalSymbols
   stopPolling() {
-    if (this.requestPoller) {
-      this.requestPoller.stop();
+    if (this.configurationPoller) {
+      this.configurationPoller.stop();
     }
   }
 
@@ -1504,14 +1562,14 @@ export default class EppoClient {
 
     return result
       ? {
-        banditKey: bandit.banditKey,
-        action: result.actionKey,
-        actionNumericAttributes: result.actionAttributes.numericAttributes,
-        actionCategoricalAttributes: result.actionAttributes.categoricalAttributes,
-        actionProbability: result.actionWeight,
-        modelVersion: bandit.modelVersion,
-        optimalityGap: result.optimalityGap,
-      }
+          banditKey: bandit.banditKey,
+          action: result.actionKey,
+          actionNumericAttributes: result.actionAttributes.numericAttributes,
+          actionCategoricalAttributes: result.actionAttributes.categoricalAttributes,
+          actionProbability: result.actionWeight,
+          modelVersion: bandit.modelVersion,
+          optimalityGap: result.optimalityGap,
+        }
       : null;
   }
 }

@@ -41,6 +41,29 @@ export class Configuration {
     return new Configuration();
   }
 
+  /**
+   * Initializes a Configuration from a legacy flags configuration format. New applications should
+   * use `Configuration.fromString` instead.
+   *
+   * @deprecated Use `Configuration.fromString` instead.
+   */
+  public static fromFlagsConfiguration(
+    flags: Record<string, Flag | ObfuscatedFlag>,
+    options: { obfuscated: boolean },
+  ): Configuration {
+    return new Configuration({
+      response: {
+        format: options.obfuscated ? FormatEnum.CLIENT : FormatEnum.SERVER,
+        flags,
+        createdAt: new Date().toISOString(),
+        environment: {
+          name: 'from-flags-configuration',
+        },
+        banditReferences: {},
+      },
+    });
+  }
+
   /** @internal For SDK usage only. */
   public static fromResponses({
     flags,
@@ -101,7 +124,7 @@ export class Configuration {
   }
 
   /** @internal */
-  public getAge(): number | undefined {
+  public getAgeMs(): number | undefined {
     const fetchedAt = this.getFetchedAt();
     if (!fetchedAt) {
       return undefined;
@@ -111,7 +134,7 @@ export class Configuration {
 
   /** @internal */
   public isStale(maxAgeSeconds: number): boolean {
-    const age = this.getAge();
+    const age = this.getAgeMs();
     return !!age && age > maxAgeSeconds * 1000;
   }
 
@@ -162,7 +185,7 @@ function indexBanditVariationsByFlagKey(
   flagsResponse: IUniversalFlagConfigResponse,
 ): Record<string, BanditVariation[]> {
   const banditVariationsByFlagKey: Record<string, BanditVariation[]> = {};
-  Object.values(flagsResponse.banditReferences).forEach((banditReference) => {
+  Object.values(flagsResponse.banditReferences ?? {}).forEach((banditReference) => {
     banditReference.flagVariations.forEach((banditVariation) => {
       let banditVariations = banditVariationsByFlagKey[banditVariation.flagKey];
       if (!banditVariations) {

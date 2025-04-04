@@ -1,32 +1,57 @@
 import ConfigurationRequestor from './configuration-requestor';
-import { Listeners } from './listener';
-import { Configuration } from './configuration';
-import { randomJitterMs } from './poller';
 import { logger } from './application-logger';
+import { POLL_JITTER_PCT } from './constants';
+import { ConfigurationFeed, ConfigurationSource } from './configuration-feed';
 
 /**
  * Polls for new configurations from the Eppo server. When a new configuration is fetched,
- * it is passed to the subscribers of `onConfigurationFetched`.
+ * it is published to the configuration feed.
  * 
  * The poller is created in the stopped state. Call `start` to begin polling.
  * 
  * @internal
  */
 export class ConfigurationPoller {
-  private readonly listeners = new Listeners<[Configuration]>();
+  private readonly configurationFeed?: ConfigurationFeed;
   private readonly basePollingIntervalMs: number;
   private readonly maxPollingIntervalMs: number;
+  private readonly maxAgeMs: number;
+
   private isRunning = false;
+
+  // We're watching configuration feed and recording the latest known fetch time (in milliseconds
+  // since Unix epoch), so we don't poll for configuration too often.
+  private lastFetchTime?: number;
 
   public constructor(
     private readonly configurationRequestor: ConfigurationRequestor,
     options: {
+      configurationFeed?: ConfigurationFeed,
       basePollingIntervalMs: number;
       maxPollingIntervalMs: number;
+      maxAgeMs: number;
     },
   ) {
     this.basePollingIntervalMs = options.basePollingIntervalMs;
     this.maxPollingIntervalMs = options.maxPollingIntervalMs;
+    this.maxAgeMs = options.maxAgeMs;
+    this.configurationFeed = options.configurationFeed;
+
+    this.configurationFeed?.addListener((configuration) => {
+      const fetchedAt = configuration.getFetchedAt()?.getTime();
+      if (!fetchedAt) {
+        return;
+      }
+
+      if (this.lastFetchTime !== undefined && fetchedAt < this.lastFetchTime) {
+        // Ignore configuration if it's not the latest.
+        return;
+      }
+
+      // Math.min() ensures that we don't use a fetchedAt time that is in the future. If the time is
+      // in the future, we use the current time.
+      this.lastFetchTime = Math.min(fetchedAt, Date.now());
+    });
   }
 
   /**
@@ -37,10 +62,11 @@ export class ConfigurationPoller {
    */
   public start(): void {
     if (!this.isRunning) {
+      logger.debug('[Eppo SDK] starting configuration poller');
       this.isRunning = true;
       this.poll().finally(() => {
-        // Just to be safe, reset isRunning if the poll() method throws an error or exits (it
-        // shouldn't).
+        // Just to be safe, reset isRunning if the poll() method throws an error or exits
+        // unexpectedly (it shouldn't).
         this.isRunning = false;
       });
     }
@@ -54,49 +80,32 @@ export class ConfigurationPoller {
    * listeners are not notified of any new configurations after this method is called.
    */
   public stop(): void {
+    logger.debug('[Eppo SDK] stopping configuration poller');
     this.isRunning = false;
   }
 
-  /**
-   * Register a listener to be notified when new configuration is fetched.
-   * @param listener Callback function that receives the fetched `Configuration` object
-   * @returns A function that can be called to unsubscribe the listener.
-   */
-  public onConfigurationFetched(listener: (configuration: Configuration) => void): () => void {
-    return this.listeners.addListener(listener);
-  }
-
-  /**
-   * Fetch configuration immediately without waiting for the next polling cycle.
-   * 
-   * Note: This does not coordinate with active polling - polling intervals will not be adjusted
-   * when using this method.
-   * 
-   * @throws If there is an error fetching the configuration
-   */
-  public async fetchImmediate(): Promise<Configuration | null> {
-    const configuration = await this.configurationRequestor.fetchConfiguration();
-    if (configuration) {
-      this.listeners.notify(configuration);
-    }
-    return configuration;
-  }
-
   private async poll(): Promise<void> {
-    // Number of failures we've seen in a row.
     let consecutiveFailures = 0;
 
     while (this.isRunning) {
-      try {
-        const configuration = await this.configurationRequestor.fetchConfiguration();
-        if (configuration && this.isRunning) {
-          this.listeners.notify(configuration);
+      if (this.lastFetchTime !== undefined && Date.now() - this.lastFetchTime < this.maxAgeMs) {
+        // Configuration is still fresh, so we don't need to poll. Skip this iteration.
+        logger.debug('[Eppo SDK] configuration is still fresh, skipping poll');
+      } else {
+        try {
+          logger.debug('[Eppo SDK] polling for new configuration');
+          const configuration = await this.configurationRequestor.fetchConfiguration();
+          if (configuration && this.isRunning) {
+            logger.debug('[Eppo SDK] fetched configuration');
+            this.configurationFeed?.broadcast(configuration, ConfigurationSource.Network);
+          }
+
+          // Reset failure counter on success
+          consecutiveFailures = 0;
+        } catch (err) {
+          logger.warn({ err }, '[Eppo SDK] encountered an error polling configurations');
+          consecutiveFailures++;
         }
-        // Reset failure counter on success
-        consecutiveFailures = 0;
-      } catch (err) {
-        logger.warn('Eppo SDK encountered an error polling configurations', { err });
-        consecutiveFailures++;
       }
 
       if (consecutiveFailures === 0) {
@@ -106,10 +115,7 @@ export class ConfigurationPoller {
         const baseDelayMs = Math.min((Math.pow(2, consecutiveFailures) * this.basePollingIntervalMs), this.maxPollingIntervalMs);
         const delayMs = baseDelayMs + randomJitterMs(baseDelayMs);
 
-        logger.warn('Eppo SDK will try polling again', {
-          delayMs,
-          consecutiveFailures,
-        });
+        logger.warn({ delayMs, consecutiveFailures }, '[Eppo SDK] will try polling again');
 
         await timeout(delayMs);
       }
@@ -121,3 +127,20 @@ function timeout(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Compute a random jitter as a percentage of the polling interval.
+ * Will be (5%,10%) of the interval assuming POLL_JITTER_PCT = 0.1
+ */
+function randomJitterMs(intervalMs: number) {
+  const halfPossibleJitter = (intervalMs * POLL_JITTER_PCT) / 2;
+  // We want the randomly chosen jitter to be at least 1ms so total jitter is slightly more than
+  // half the max possible.
+  //
+  // This makes things easy for automated tests as two polls cannot execute within the maximum
+  // possible time waiting for one.
+  const randomOtherHalfJitter = Math.max(
+    Math.floor((Math.random() * intervalMs * POLL_JITTER_PCT) / 2),
+    1,
+  );
+  return halfPossibleJitter + randomOtherHalfJitter;
+}

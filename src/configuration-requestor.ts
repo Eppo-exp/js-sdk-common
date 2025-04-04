@@ -1,5 +1,5 @@
 import { BanditsConfig, Configuration, FlagsConfig } from './configuration';
-import { ConfigurationStore } from './configuration-store';
+import { ConfigurationFeed, ConfigurationSource } from './configuration-feed';
 import { IHttpClient } from './http-client';
 
 export type ConfigurationRequestorOptions = {
@@ -12,15 +12,27 @@ export type ConfigurationRequestorOptions = {
 export default class ConfigurationRequestor {
   private readonly options: ConfigurationRequestorOptions;
 
+  // We track the latest seen configuration to possibly reuse it for flags/bandits.
+  private latestConfiguration?: Configuration;
+
   public constructor(
     private readonly httpClient: IHttpClient,
-    private readonly configurationStore: ConfigurationStore,
+    private readonly configurationFeed: ConfigurationFeed,
     options: Partial<ConfigurationRequestorOptions> = {},
   ) {
     this.options = {
       wantsBandits: true,
       ...options,
     };
+
+    this.configurationFeed.addListener((configuration) => {
+      const prevFetchedAt = this.latestConfiguration?.getFetchedAt();
+      const newFetchedAt = configuration.getFetchedAt();
+
+      if (!prevFetchedAt || (newFetchedAt && newFetchedAt > prevFetchedAt)) {
+        this.latestConfiguration = configuration;
+      }
+    });
   }
 
   public async fetchConfiguration(): Promise<Configuration | null> {
@@ -31,7 +43,11 @@ export default class ConfigurationRequestor {
 
     const bandits = await this.getBanditsFor(flags);
 
-    return Configuration.fromResponses({ flags, bandits });
+    const configuration = Configuration.fromResponses({ flags, bandits });
+    this.latestConfiguration = configuration;
+    this.configurationFeed.broadcast(configuration, ConfigurationSource.Network);
+
+    return configuration;
   }
 
   /**
@@ -48,7 +64,7 @@ export default class ConfigurationRequestor {
       return undefined;
     }
 
-    const prevBandits = this.configurationStore.getConfiguration().getBanditConfiguration();
+    const prevBandits = this.latestConfiguration?.getBanditConfiguration();
     const canReuseBandits = banditsUpToDate(flags, prevBandits);
     if (canReuseBandits) {
       return prevBandits;

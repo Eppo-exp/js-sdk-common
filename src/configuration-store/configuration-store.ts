@@ -1,40 +1,4 @@
-import { Configuration } from '../configuration';
 import { Environment } from '../interfaces';
-import { Listeners } from '../listener';
-
-/**
- * `ConfigurationStore` is a central piece of Eppo SDK and answers a
- * simple question: what configuration is currently active?
- *
- * @internal `ConfigurationStore` shall only be used inside Eppo SDKs.
- */
-export class ConfigurationStore {
-  private configuration: Configuration;
-  private readonly listeners: Listeners<[Configuration]> = new Listeners();
-
-  public constructor(configuration: Configuration = Configuration.empty()) {
-    this.configuration = configuration;
-  }
-
-  public getConfiguration(): Configuration {
-    return this.configuration;
-  }
-
-  public setConfiguration(configuration: Configuration): void {
-    this.configuration = configuration;
-    this.listeners.notify(configuration);
-  }
-
-  /**
-   * Subscribe to configuration changes. The callback will be called
-   * every time configuration is changed.
-   *
-   * Returns a function to unsubscribe from future updates.
-   */
-  public onConfigurationChange(listener: (configuration: Configuration) => void): () => void {
-    return this.listeners.addListener(listener);
-  }
-}
 
 /**
  * ConfigurationStore interface
