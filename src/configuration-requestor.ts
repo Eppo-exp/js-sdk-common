@@ -37,16 +37,23 @@ export default class ConfigurationRequestor {
     flagConfigurationStore: IConfigurationStore<Flag>,
     banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]> | null,
     banditModelConfigurationStore: IConfigurationStore<BanditParameters> | null,
+    switchbackConfigurationStore: IConfigurationStore<Switchback> | null,
+    switchbackSubjectAttributesConfigurationStore: IConfigurationStore<SwitchbackSubjectAttributeValues> | null,
   ): void {
     this.flagConfigurationStore = flagConfigurationStore;
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
     this.banditModelConfigurationStore = banditModelConfigurationStore;
+    this.switchbackConfigurationStore = switchbackConfigurationStore;
+    this.switchbackSubjectAttributesConfigurationStore =
+      switchbackSubjectAttributesConfigurationStore;
 
     // Recreate the configuration with the new stores
     this.configuration = new StoreBackedConfiguration(
       this.flagConfigurationStore,
       this.banditVariationConfigurationStore,
       this.banditModelConfigurationStore,
+      this.switchbackConfigurationStore,
+      this.switchbackSubjectAttributesConfigurationStore,
     );
   }
 

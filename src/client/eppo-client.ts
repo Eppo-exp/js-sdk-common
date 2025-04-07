@@ -106,6 +106,8 @@ export type EppoClientParameters = {
   flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
   banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
   banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
+  switchbackConfigurationStore?: IConfigurationStore<Switchback>;
+  switchbackSubjectAttributesConfigurationStore?: IConfigurationStore<SwitchbackSubjectAttributeValues>;
   overrideStore?: ISyncStore<Variation>;
   configurationRequestParameters?: FlagConfigurationRequestParameters;
   /**
@@ -148,6 +150,8 @@ export default class EppoClient {
     flagConfigurationStore,
     banditVariationConfigurationStore,
     banditModelConfigurationStore,
+    switchbackConfigurationStore,
+    switchbackSubjectAttributesConfigurationStore,
     overrideStore,
     configurationRequestParameters,
   }: EppoClientParameters) {
@@ -155,6 +159,9 @@ export default class EppoClient {
     this.flagConfigurationStore = flagConfigurationStore;
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
     this.banditModelConfigurationStore = banditModelConfigurationStore;
+    this.switchbackConfigurationStore = switchbackConfigurationStore;
+    this.switchbackSubjectAttributesConfigurationStore =
+      switchbackSubjectAttributesConfigurationStore;
     this.overrideStore = overrideStore;
     this.configurationRequestParameters = configurationRequestParameters;
 
@@ -173,6 +180,8 @@ export default class EppoClient {
           this.flagConfigurationStore,
           this.banditVariationConfigurationStore,
           this.banditModelConfigurationStore,
+          this.switchbackConfigurationStore,
+          this.switchbackSubjectAttributesConfigurationStore,
         );
   }
 
@@ -264,6 +273,8 @@ export default class EppoClient {
         this.flagConfigurationStore,
         this.banditVariationConfigurationStore || null,
         this.banditModelConfigurationStore || null,
+        this.switchbackConfigurationStore || null,
+        this.switchbackSubjectAttributesConfigurationStore || null,
       );
     }
   }
