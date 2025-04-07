@@ -1,5 +1,12 @@
 import { Rule } from './rules';
-import { Attributes, Base64String, ContextAttributes, FlagKey } from './types';
+import {
+  Attributes,
+  Base64String,
+  ContextAttributes,
+  FlagKey,
+  SwitchbackKey,
+  SwitchbackSubjectAttributeKey,
+} from './types';
 
 export enum VariationType {
   STRING = 'STRING',
@@ -148,8 +155,6 @@ interface SwitchbackVariation {
   key: string;
   value: string;
 }
-export type SwitchbackKey = string;
-export type SwitchbackSubjectAttributeKey = string;
 export interface Switchback {
   key: SwitchbackKey;
   subjectAttributeKey: SwitchbackSubjectAttributeKey;

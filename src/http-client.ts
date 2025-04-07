@@ -8,10 +8,13 @@ import {
   FormatEnum,
   PrecomputedFlagsPayload,
   Switchback,
+} from './interfaces';
+import {
+  Attributes,
   SwitchbackKey,
   SwitchbackSubjectAttributeKey,
-} from './interfaces';
-import { Attributes } from './types';
+  SwitchbackSubjectAttributeValues,
+} from './types';
 
 export interface IQueryParams {
   apiKey: string;
@@ -47,7 +50,7 @@ export interface IUniversalFlagConfigResponse {
 
 export interface ISwitchbacksConfigResponse {
   switchbacks: Record<SwitchbackKey, Switchback>;
-  subjectAttributes: Record<SwitchbackSubjectAttributeKey, string[]>;
+  subjectAttributes: Record<SwitchbackSubjectAttributeKey, SwitchbackSubjectAttributeValues>;
 }
 
 export interface IBanditParametersResponse {

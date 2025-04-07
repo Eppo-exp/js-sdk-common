@@ -16,3 +16,6 @@ export type MD5String = string;
 export type FlagKey = string;
 export type BanditKey = string;
 export type HashedFlagKey = FlagKey;
+export type SwitchbackKey = string;
+export type SwitchbackSubjectAttributeKey = string;
+export type SwitchbackSubjectAttributeValues = string[];

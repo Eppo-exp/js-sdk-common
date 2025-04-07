@@ -50,6 +50,8 @@ import {
   IPrecomputedBandit,
   ObfuscatedFlag,
   PrecomputedFlag,
+  Switchback,
+  SwitchbackSubjectAttributeValues,
   Variation,
   VariationType,
 } from '../interfaces';
@@ -127,6 +129,8 @@ export default class EppoClient {
   private configurationRequestParameters?: FlagConfigurationRequestParameters;
   private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
   private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
+  private switchbackConfigurationStore?: IConfigurationStore<Switchback>;
+  private switchbackSubjectAttributesConfigurationStore?: IConfigurationStore<SwitchbackSubjectAttributeValues>;
   private overrideStore?: ISyncStore<Variation>;
   private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
   private assignmentLogger?: IAssignmentLogger;
@@ -339,6 +343,8 @@ export default class EppoClient {
       this.flagConfigurationStore,
       this.banditVariationConfigurationStore ?? null,
       this.banditModelConfigurationStore ?? null,
+      this.switchbackConfigurationStore ?? null,
+      this.switchbackSubjectAttributesConfigurationStore ?? null,
     );
     this.configurationRequestor = configurationRequestor;
 

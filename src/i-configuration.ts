@@ -10,7 +10,7 @@ import {
   ObfuscatedFlag,
   Switchback,
 } from './interfaces';
-import { BanditKey, FlagKey, HashedFlagKey } from './types';
+import { BanditKey, FlagKey, HashedFlagKey, SwitchbackSubjectAttributeValues } from './types';
 
 export interface IConfiguration {
   getFlag(key: FlagKey | HashedFlagKey): Flag | ObfuscatedFlag | null;
@@ -45,9 +45,7 @@ export class StoreBackedConfiguration implements IConfiguration {
     > | null,
     private readonly banditModelConfigurationStore?: IConfigurationStore<BanditParameters> | null,
     private readonly switchbackConfigurationStore?: IConfigurationStore<Switchback> | null,
-    private readonly switchbackSubjectAttributesConfigurationStore?: IConfigurationStore<
-      string[]
-    > | null,
+    private readonly switchbackSubjectAttributesConfigurationStore?: IConfigurationStore<SwitchbackSubjectAttributeValues> | null,
   ) {}
 
   public async hydrateConfigurationStores(
@@ -55,7 +53,7 @@ export class StoreBackedConfiguration implements IConfiguration {
     banditVariationConfig?: ConfigStoreHydrationPacket<BanditVariation[]>,
     banditModelConfig?: ConfigStoreHydrationPacket<BanditParameters>,
     switchbackConfig?: ConfigStoreHydrationPacket<Switchback>,
-    switchbackSubjectAttributesConfig?: ConfigStoreHydrationPacket<string[]>,
+    switchbackSubjectAttributesConfig?: ConfigStoreHydrationPacket<SwitchbackSubjectAttributeValues>,
   ) {
     const didUpdateFlags = await hydrateConfigurationStore(this.flagConfigurationStore, flagConfig);
     const promises: Promise<boolean>[] = [];

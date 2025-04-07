@@ -7,6 +7,7 @@ import {
   PrecomputedFlag,
   Switchback,
 } from '../interfaces';
+import { SwitchbackSubjectAttributeValues } from '../types';
 
 import { IConfigurationStore } from './configuration-store';
 
@@ -17,7 +18,7 @@ export type Entry =
   | PrecomputedFlag
   | IObfuscatedPrecomputedBandit
   | Switchback
-  | string[];
+  | SwitchbackSubjectAttributeValues;
 
 export async function hydrateConfigurationStore<T extends Entry>(
   configurationStore: IConfigurationStore<T> | null,
