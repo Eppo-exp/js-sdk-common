@@ -119,6 +119,18 @@ export type EppoClientParameters = {
 
   configuration?: {
     /**
+     * When specified, will run the client in the "precomputed"
+     * mode. Instead of fetching the full configuration from the
+     * server, the client will fetch flags and bandits precomputed for
+     * the specified subject.
+     */
+    precompute?: {
+      subjectKey: string;
+      subjectAttributes: Attributes | ContextAttributes;
+      banditActions?: Record</* flagKey: */ string, BanditActions>;
+    };
+
+    /**
      * Strategy for fetching initial configuration.
      *
      * - `stale-while-revalidate`: serve assignments using cached
@@ -359,6 +371,24 @@ export default class EppoClient {
       this.configurationFeed,
       {
         wantsBandits: options.bandits?.enable ?? DEFAULT_ENABLE_BANDITS,
+        precomputed: options.configuration?.precompute
+          ? {
+              subjectKey: options.configuration.precompute.subjectKey,
+              subjectAttributes: ensureContextualSubjectAttributes(
+                options.configuration.precompute.subjectAttributes,
+              ),
+              banditActions: options.configuration.precompute.banditActions
+                ? Object.fromEntries(
+                    Object.entries(options.configuration.precompute.banditActions).map(
+                      ([banditKey, actions]) => [
+                        banditKey,
+                        ensureActionsWithContextualAttributes(actions),
+                      ],
+                    ),
+                  )
+                : undefined,
+            }
+          : undefined,
       },
     );
 

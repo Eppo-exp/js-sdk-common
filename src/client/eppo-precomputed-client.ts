@@ -362,10 +362,6 @@ export default class EppoPrecomputedClient {
   }
 
   private getPrecomputedFlag(flagKey: string): DecodedPrecomputedFlag | null {
-    return this.getObfuscatedFlag(flagKey);
-  }
-
-  private getObfuscatedFlag(flagKey: string): DecodedPrecomputedFlag | null {
     const salt = this.precomputedFlagStore.salt;
     const saltedAndHashedFlagKey = getMD5Hash(flagKey, salt);
     const precomputedFlag: PrecomputedFlag | null = this.precomputedFlagStore.get(
@@ -376,6 +372,7 @@ export default class EppoPrecomputedClient {
 
   private getPrecomputedBandit(banditKey: string): IPrecomputedBandit | null {
     const obfuscatedBandit = this.getObfuscatedPrecomputedBandit(banditKey);
+
     return obfuscatedBandit ? decodePrecomputedBandit(obfuscatedBandit) : null;
   }
 

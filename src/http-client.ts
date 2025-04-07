@@ -1,5 +1,5 @@
 import ApiEndpoints from './api-endpoints';
-import { BanditsConfig, FlagsConfig } from './configuration';
+import { BanditsConfig, FlagsConfig, PrecomputedConfig } from './configuration';
 import { IObfuscatedPrecomputedConfigurationResponse } from './configuration-wire/configuration-wire-types';
 import {
   BanditParameters,
@@ -22,12 +22,9 @@ export interface IQueryParamsWithSubject extends IQueryParams {
   subjectAttributes: Attributes;
 }
 
+/** @internal */
 export class HttpRequestError extends Error {
-  constructor(
-    public message: string,
-    public status: number,
-    public cause?: Error,
-  ) {
+  constructor(public message: string, public status?: number, public cause?: Error) {
     super(message);
     if (cause) {
       this.cause = cause;
@@ -47,27 +44,24 @@ export interface IBanditParametersResponse {
   bandits: Record<string, BanditParameters>;
 }
 
+/** @internal */
 export interface IHttpClient {
   getUniversalFlagConfiguration(): Promise<FlagsConfig | undefined>;
   getBanditParameters(): Promise<BanditsConfig | undefined>;
-  getPrecomputedFlags(
-    payload: PrecomputedFlagsPayload,
-  ): Promise<IObfuscatedPrecomputedConfigurationResponse | undefined>;
+  getPrecomputedFlags(payload: PrecomputedFlagsPayload): Promise<PrecomputedConfig | undefined>;
   rawGet<T>(url: string): Promise<T | undefined>;
   rawPost<T, P>(url: string, payload: P): Promise<T | undefined>;
 }
 
+/** @internal */
 export default class FetchHttpClient implements IHttpClient {
-  constructor(
-    private readonly apiEndpoints: ApiEndpoints,
-    private readonly timeout: number,
-  ) {}
+  constructor(private readonly apiEndpoints: ApiEndpoints, private readonly timeout: number) {}
 
-  async getUniversalFlagConfiguration(): Promise<FlagsConfig | undefined> {
+  async getUniversalFlagConfiguration(): Promise<FlagsConfig> {
     const url = this.apiEndpoints.ufcEndpoint();
     const response = await this.rawGet<IUniversalFlagConfigResponse>(url);
     if (!response) {
-      return undefined;
+      throw new HttpRequestError('Empty response');
     }
     return {
       response,
@@ -75,11 +69,11 @@ export default class FetchHttpClient implements IHttpClient {
     };
   }
 
-  async getBanditParameters(): Promise<BanditsConfig | undefined> {
+  async getBanditParameters(): Promise<BanditsConfig> {
     const url = this.apiEndpoints.banditParametersEndpoint();
     const response = await this.rawGet<IBanditParametersResponse>(url);
     if (!response) {
-      return undefined;
+      throw new HttpRequestError('Empty response');
     }
     return {
       response,
@@ -87,14 +81,22 @@ export default class FetchHttpClient implements IHttpClient {
     };
   }
 
-  async getPrecomputedFlags(
-    payload: PrecomputedFlagsPayload,
-  ): Promise<IObfuscatedPrecomputedConfigurationResponse | undefined> {
+  async getPrecomputedFlags(payload: PrecomputedFlagsPayload): Promise<PrecomputedConfig> {
     const url = this.apiEndpoints.precomputedFlagsEndpoint();
-    return await this.rawPost<IObfuscatedPrecomputedConfigurationResponse, PrecomputedFlagsPayload>(
-      url,
-      payload,
-    );
+    const response = await this.rawPost<
+      IObfuscatedPrecomputedConfigurationResponse,
+      PrecomputedFlagsPayload
+    >(url, payload);
+    if (!response) {
+      throw new HttpRequestError('Empty response');
+    }
+    return {
+      response,
+      fetchedAt: new Date().toISOString(),
+      subjectKey: payload.subjectKey,
+      subjectAttributes: payload.subjectAttributes,
+      banditActions: payload.banditActions,
+    };
   }
 
   async rawGet<T>(url: string): Promise<T | undefined> {

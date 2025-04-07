@@ -1,3 +1,4 @@
+import { IObfuscatedPrecomputedConfigurationResponse } from './configuration-wire/configuration-wire-types';
 import { decodeFlag } from './decoding';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from './http-client';
 import { BanditParameters, BanditVariation, Flag, FormatEnum, ObfuscatedFlag } from './interfaces';
@@ -20,25 +21,47 @@ export type BanditsConfig = {
   fetchedAt?: string;
 };
 
+/** @internal for SDK use only */
+export type PrecomputedConfig = {
+  response: IObfuscatedPrecomputedConfigurationResponse;
+  etag?: string;
+  /** ISO timestamp when configuration was fetched from the server. */
+  fetchedAt?: string;
+  subjectKey: string;
+  subjectAttributes?: ContextAttributes;
+  banditActions?: Record</* flagKey: */ string, Record</* actionKey: */ string, ContextAttributes>>;
+};
+
 /**
  * *The* Configuration.
  *
  * Note: configuration should be treated as immutable. Do not change
  * any of the fields or returned data. Otherwise, bad things will
  * happen.
+ *
+ * @public
  */
 export class Configuration {
   private flagBanditVariations: Record<string, BanditVariation[]>;
 
   private constructor(
-    private readonly flags?: FlagsConfig,
-    private readonly bandits?: BanditsConfig,
+    private readonly parts: {
+      readonly flags?: FlagsConfig;
+      readonly bandits?: BanditsConfig;
+      readonly precomputed?: PrecomputedConfig;
+    },
   ) {
-    this.flagBanditVariations = flags ? indexBanditVariationsByFlagKey(flags.response) : {};
+    this.flagBanditVariations = parts.flags
+      ? indexBanditVariationsByFlagKey(parts.flags.response)
+      : {};
   }
 
+  /**
+   * Creates a new empty configuration.
+   * @public
+   */
   public static empty(): Configuration {
-    return new Configuration();
+    return new Configuration({});
   }
 
   /**
@@ -52,14 +75,16 @@ export class Configuration {
     options: { obfuscated: boolean },
   ): Configuration {
     return new Configuration({
-      response: {
-        format: options.obfuscated ? FormatEnum.CLIENT : FormatEnum.SERVER,
-        flags,
-        createdAt: new Date().toISOString(),
-        environment: {
-          name: 'from-flags-configuration',
+      flags: {
+        response: {
+          format: options.obfuscated ? FormatEnum.CLIENT : FormatEnum.SERVER,
+          flags,
+          createdAt: new Date().toISOString(),
+          environment: {
+            name: 'from-flags-configuration',
+          },
+          banditReferences: {},
         },
-        banditReferences: {},
       },
     });
   }
@@ -68,11 +93,13 @@ export class Configuration {
   public static fromResponses({
     flags,
     bandits,
+    precomputed,
   }: {
     flags?: FlagsConfig;
     bandits?: BanditsConfig;
+    precomputed?: PrecomputedConfig;
   }): Configuration {
-    return new Configuration(flags, bandits);
+    return new Configuration({ flags, bandits, precomputed });
   }
 
   // TODO:
@@ -83,44 +110,66 @@ export class Configuration {
     const wire: ConfigurationWire = {
       version: 1,
     };
-    if (this.flags) {
+    if (this.parts.flags) {
       wire.config = {
-        ...this.flags,
-        response: JSON.stringify(this.flags.response),
+        ...this.parts.flags,
+        response: JSON.stringify(this.parts.flags.response),
       };
     }
-    if (this.bandits) {
+    if (this.parts.bandits) {
       wire.bandits = {
-        ...this.bandits,
-        response: JSON.stringify(this.bandits.response),
+        ...this.parts.bandits,
+        response: JSON.stringify(this.parts.bandits.response),
+      };
+    }
+    if (this.parts.precomputed) {
+      wire.precomputed = {
+        ...this.parts.precomputed,
+        response: JSON.stringify(this.parts.precomputed.response),
       };
     }
     return JSON.stringify(wire);
   }
 
-  public getFlagKeys(): FlagKey[] | HashedFlagKey[] {
-    if (!this.flags) {
-      return [];
+  /**
+   * Returns a list of known flag keys (for debugging purposes).
+   *
+   * If underlying flags configuration is obfuscated, the returned
+   * flag values will be obfuscated as well.
+   */
+  public getFlagKeys(): string[] {
+    if (this.parts.flags) {
+      return Object.keys(this.parts.flags.response.flags);
     }
-    return Object.keys(this.flags.response.flags);
+    if (this.parts.precomputed) {
+      return Object.keys(this.parts.precomputed.response.flags);
+    }
+    return [];
   }
 
   /** @internal */
   public getFlagsConfiguration(): FlagsConfig | undefined {
-    return this.flags;
+    return this.parts.flags;
   }
 
   /** @internal */
   public getFetchedAt(): Date | undefined {
-    const flagsFetchedAt = this.flags?.fetchedAt ? new Date(this.flags.fetchedAt).getTime() : 0;
-    const banditsFetchedAt = this.bandits?.fetchedAt ? new Date(this.bandits.fetchedAt).getTime() : 0;
-    const maxFetchedAt = Math.max(flagsFetchedAt, banditsFetchedAt);
+    const flagsFetchedAt = this.parts.flags?.fetchedAt
+      ? new Date(this.parts.flags.fetchedAt).getTime()
+      : 0;
+    const banditsFetchedAt = this.parts.bandits?.fetchedAt
+      ? new Date(this.parts.bandits.fetchedAt).getTime()
+      : 0;
+    const precomputedFetchedAt = this.parts.precomputed?.fetchedAt
+      ? new Date(this.parts.precomputed.fetchedAt).getTime()
+      : 0;
+    const maxFetchedAt = Math.max(flagsFetchedAt, banditsFetchedAt, precomputedFetchedAt);
     return maxFetchedAt > 0 ? new Date(maxFetchedAt) : undefined;
   }
 
   /** @internal */
   public isEmpty(): boolean {
-    return !this.flags;
+    return !this.parts.flags && !this.parts.precomputed;
   }
 
   /** @internal */
@@ -138,28 +187,34 @@ export class Configuration {
     return !!age && age > maxAgeSeconds * 1000;
   }
 
-  /** @internal
-   *
+  /**
    * Returns flag configuration for the given flag key. Obfuscation is
    * handled automatically.
+   *
+   * @internal
    */
   public getFlag(flagKey: string): Flag | null {
-    if (!this.flags) {
+    if (!this.parts.flags) {
       return null;
     }
 
-    if (this.flags.response.format === FormatEnum.SERVER) {
-      return this.flags.response.flags[flagKey] ?? null;
+    if (this.parts.flags.response.format === FormatEnum.SERVER) {
+      return this.parts.flags.response.flags[flagKey] ?? null;
     } else {
       // Obfuscated configuration
-      const flag = this.flags.response.flags[getMD5Hash(flagKey)];
+      const flag = this.parts.flags.response.flags[getMD5Hash(flagKey)];
       return flag ? decodeFlag(flag as ObfuscatedFlag) : null;
     }
   }
 
   /** @internal */
   public getBanditConfiguration(): BanditsConfig | undefined {
-    return this.bandits;
+    return this.parts.bandits;
+  }
+
+  /** @internal */
+  public getPrecomputedConfiguration(): PrecomputedConfig | undefined {
+    return this.parts.precomputed;
   }
 
   /** @internal */
@@ -175,7 +230,7 @@ export class Configuration {
     )?.key;
 
     if (banditKey) {
-      return this.bandits?.response.bandits[banditKey] ?? null;
+      return this.parts.bandits?.response.bandits[banditKey] ?? null;
     }
     return null;
   }
@@ -220,7 +275,13 @@ type ConfigurationWire = {
 
   precomputed?: {
     response: string;
+    etag?: string;
+    fetchedAt?: string;
     subjectKey: string;
     subjectAttributes?: ContextAttributes;
+    banditActions?: Record<
+      /* flagKey: */ string,
+      Record</* actionKey: */ string, ContextAttributes>
+    >;
   };
 };

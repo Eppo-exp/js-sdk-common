@@ -1,9 +1,24 @@
 import { BanditsConfig, Configuration, FlagsConfig } from './configuration';
 import { ConfigurationFeed, ConfigurationSource } from './configuration-feed';
 import { IHttpClient } from './http-client';
+import { ContextAttributes, FlagKey } from './types';
 
+export class ConfigurationError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = 'ConfigurationError';
+  }
+}
+
+/** @internal */
 export type ConfigurationRequestorOptions = {
   wantsBandits: boolean;
+
+  precomputed?: {
+    subjectKey: string;
+    subjectAttributes: ContextAttributes;
+    banditActions?: Record<FlagKey, Record<string, ContextAttributes>>;
+  };
 };
 
 /**
@@ -35,19 +50,37 @@ export default class ConfigurationRequestor {
     });
   }
 
-  public async fetchConfiguration(): Promise<Configuration | null> {
-    const flags = await this.httpClient.getUniversalFlagConfiguration();
-    if (!flags?.response.flags) {
-      return null;
-    }
+  public async fetchConfiguration(): Promise<Configuration> {
+    const configuration = this.options.precomputed
+      ? await this.fetchPrecomputedConfiguration(this.options.precomputed)
+      : await this.fetchRegularConfiguration();
 
-    const bandits = await this.getBanditsFor(flags);
-
-    const configuration = Configuration.fromResponses({ flags, bandits });
     this.latestConfiguration = configuration;
     this.configurationFeed.broadcast(configuration, ConfigurationSource.Network);
 
     return configuration;
+  }
+
+  private async fetchRegularConfiguration(): Promise<Configuration> {
+    const flags = await this.httpClient.getUniversalFlagConfiguration();
+    if (!flags?.response.flags) {
+      throw new ConfigurationError('empty response');
+    }
+
+    const bandits = await this.getBanditsFor(flags);
+
+    return Configuration.fromResponses({ flags, bandits });
+  }
+
+  private async fetchPrecomputedConfiguration(
+    precomputed: NonNullable<ConfigurationRequestorOptions['precomputed']>,
+  ): Promise<Configuration> {
+    const response = await this.httpClient.getPrecomputedFlags(precomputed);
+    if (!response) {
+      throw new ConfigurationError('empty response');
+    }
+
+    return Configuration.fromResponses({ precomputed: response });
   }
 
   /**

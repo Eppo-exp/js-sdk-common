@@ -6,6 +6,7 @@ import {
 } from '../test/testHelpers';
 
 import ApiEndpoints from './api-endpoints';
+import { ensureContextualSubjectAttributes } from './attributes';
 import { BroadcastChannel } from './broadcast';
 import { ConfigurationFeed } from './configuration-feed';
 import ConfigurationRequestor from './configuration-requestor';
@@ -18,6 +19,32 @@ import FetchHttpClient, {
 } from './http-client';
 import { StoreBackedConfiguration } from './i-configuration';
 import { BanditParameters, BanditVariation, Flag, VariationType } from './interfaces';
+
+const MOCK_PRECOMPUTED_RESPONSE = {
+  flags: {
+    'precomputed-flag-1': {
+      allocationKey: 'default',
+      variationKey: 'true-variation',
+      variationType: 'BOOLEAN',
+      variationValue: 'true',
+      extraLogging: {},
+      doLog: true,
+    },
+    'precomputed-flag-2': {
+      allocationKey: 'test-group',
+      variationKey: 'variation-a',
+      variationType: 'STRING',
+      variationValue: 'variation-a',
+      extraLogging: {},
+      doLog: true,
+    },
+  },
+  environment: {
+    name: 'production',
+  },
+  format: 'PRECOMPUTED',
+  createdAt: '2024-03-20T00:00:00Z',
+};
 
 describe('ConfigurationRequestor', () => {
   let configurationFeed: ConfigurationFeed;
@@ -530,6 +557,68 @@ describe('ConfigurationRequestor', () => {
         // Should only have one additional fetch (the UFC) and not the bandit parameters
         // expect(fetchSpy.mock.calls.length).toBe(initialFetchCount + 1);
       });
+    });
+  });
+
+  describe('Precomputed flags', () => {
+    let fetchSpy: jest.Mock;
+    beforeEach(() => {
+      configurationRequestor = new ConfigurationRequestor(httpClient, configurationFeed, {
+        precomputed: {
+          subjectKey: 'subject-key',
+          subjectAttributes: ensureContextualSubjectAttributes({
+            'attribute-key': 'attribute-value',
+          }),
+        },
+      });
+
+      fetchSpy = jest.fn(() => {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(MOCK_PRECOMPUTED_RESPONSE),
+        });
+      }) as jest.Mock;
+      global.fetch = fetchSpy;
+    });
+
+    afterEach(() => {
+      jest.clearAllMocks();
+    });
+
+    afterAll(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('Fetches precomputed flag configuration', async () => {
+      const configuration = await configurationRequestor.fetchConfiguration();
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      expect(configuration.getFlagKeys().length).toBe(2);
+
+      const precomputed = configuration.getPrecomputedConfiguration();
+
+      const flag1 = precomputed?.response.flags['precomputed-flag-1'];
+      expect(flag1?.allocationKey).toBe('default');
+      expect(flag1?.variationKey).toBe('true-variation');
+      expect(flag1?.variationType).toBe('BOOLEAN');
+      expect(flag1?.variationValue).toBe('true');
+      expect(flag1?.extraLogging).toEqual({});
+      expect(flag1?.doLog).toBe(true);
+
+      const flag2 = precomputed?.response.flags['precomputed-flag-2'];
+      expect(flag2?.allocationKey).toBe('test-group');
+      expect(flag2?.variationKey).toBe('variation-a');
+      expect(flag2?.variationType).toBe('STRING');
+      expect(flag2?.variationValue).toBe('variation-a');
+      expect(flag2?.extraLogging).toEqual({});
+      expect(flag2?.doLog).toBe(true);
+
+      expect(precomputed?.response.format).toBe('PRECOMPUTED');
+
+      expect(precomputed?.response.environment).toStrictEqual({ name: 'production' });
+      expect(precomputed?.response.createdAt).toBe('2024-03-20T00:00:00Z');
     });
   });
 });
