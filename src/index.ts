@@ -17,14 +17,10 @@ import { LRUInMemoryAssignmentCache } from './cache/lru-in-memory-assignment-cac
 import { NonExpiringInMemoryAssignmentCache } from './cache/non-expiring-in-memory-cache-assignment';
 import EppoClient, {
   EppoClientParameters,
-  FlagConfigurationRequestParameters,
   IAssignmentDetails,
   IContainerExperiment,
 } from './client/eppo-client';
-import EppoPrecomputedClient, {
-  PrecomputedFlagsRequestParameters,
-  Subject,
-} from './client/eppo-precomputed-client';
+import EppoPrecomputedClient, { Subject } from './client/eppo-precomputed-client';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,

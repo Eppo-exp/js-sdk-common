@@ -60,6 +60,7 @@ import {
 } from '../interfaces';
 import { OverridePayload, OverrideValidator } from '../override-validator';
 import { randomJitterMs } from '../poller';
+import SdkTokenDecoder from '../sdk-token-decoder';
 import {
   Attributes,
   AttributeType,
@@ -345,6 +346,7 @@ export default class EppoClient {
     this.configurationRequestor = new ConfigurationRequestor(
       new FetchHttpClient(
         new ApiEndpoints({
+          sdkTokenDecoder: new SdkTokenDecoder(options.sdkKey),
           baseUrl: options.baseUrl,
           queryParams: {
             apiKey: options.sdkKey,
@@ -487,7 +489,7 @@ export default class EppoClient {
    * @param listener Callback function that receives the fetched `Configuration` object
    * @returns A function that can be called to unsubscribe the listener.
    */
-  public onNewConfiguration(listener: (configuration: Configuration) => void): () =>void {
+  public onNewConfiguration(listener: (configuration: Configuration) => void): () => void {
     return this.configurationFeed.addListener(listener);
   }
 

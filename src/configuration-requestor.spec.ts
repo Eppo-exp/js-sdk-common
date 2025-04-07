@@ -17,7 +17,7 @@ import FetchHttpClient, {
   IUniversalFlagConfigResponse,
 } from './http-client';
 import { StoreBackedConfiguration } from './i-configuration';
-import { BanditParameters, BanditVariation, Flag } from './interfaces';
+import { BanditParameters, BanditVariation, Flag, VariationType } from './interfaces';
 
 describe('ConfigurationRequestor', () => {
   let configurationFeed: ConfigurationFeed;
@@ -38,10 +38,7 @@ describe('ConfigurationRequestor', () => {
       },
     });
     httpClient = new FetchHttpClient(apiEndpoints, 1000);
-    configurationRequestor = new ConfigurationRequestor(
-      httpClient,
-      configurationFeed,
-    );
+    configurationRequestor = new ConfigurationRequestor(httpClient, configurationFeed);
   });
 
   afterEach(() => {
@@ -280,7 +277,9 @@ describe('ConfigurationRequestor', () => {
           banditKey: string,
           expectedBanditParameters: BanditParameters,
         ) {
-          const bandit = store.getConfiguration()?.getBanditConfiguration()?.response.bandits[banditKey];
+          const bandit = store.getConfiguration()?.getBanditConfiguration()?.response.bandits[
+            banditKey
+          ];
           expect(bandit).toBeTruthy();
           expect(bandit?.banditKey).toBe(expectedBanditParameters.banditKey);
           expect(bandit?.modelVersion).toBe(expectedBanditParameters.modelVersion);

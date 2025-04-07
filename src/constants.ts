@@ -17,8 +17,12 @@ export const DEFAULT_ENABLE_BANDITS = true;
 export const BASE_URL = 'https://fscdn.eppo.cloud/api';
 export const UFC_ENDPOINT = '/flag-config/v1/config';
 export const BANDIT_ENDPOINT = '/flag-config/v1/bandits';
+export const EVENT_ENDPOINT = '/v0/i';
+
 export const PRECOMPUTED_BASE_URL = 'https://fs-edge-assignment.eppo.cloud';
 export const PRECOMPUTED_FLAGS_ENDPOINT = '/assignments';
+export const DEFAULT_EVENT_DOMAIN = 'e.eppo.cloud';
+
 export const SESSION_ASSIGNMENT_CONFIG_LOADED = 'eppo-session-assignment-config-loaded';
 export const NULL_SENTINEL = 'EPPO_NULL';
 // number of logging events that may be queued while waiting for initialization

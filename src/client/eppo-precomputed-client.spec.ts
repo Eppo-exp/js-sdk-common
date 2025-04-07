@@ -714,6 +714,84 @@ describe('EppoPrecomputedClient E2E test', () => {
         pollAfterFailedInitialization ? red : 'default',
       );
     });
+
+    describe('Enhanced SDK Token with encoded subdomain', () => {
+      let urlsRequested: string[] = [];
+      const SDK_PARAM_SUFFIX = 'sdkName=js-client-sdk-common&sdkVersion=1.0.0';
+
+      beforeEach(() => {
+        urlsRequested = [];
+        global.fetch = jest.fn((url) => {
+          urlsRequested.push(url.toString());
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(precomputedResponse),
+          } as Response);
+        });
+      });
+
+      it('should request from the encoded subdomain', async () => {
+        const client = new EppoPrecomputedClient({
+          precomputedFlagStore: new MemoryOnlyConfigurationStore<PrecomputedFlag>(),
+          subject,
+          requestParameters: {
+            apiKey: 'zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA==', // subdomain=experiment
+            sdkName: 'js-client-sdk-common',
+            sdkVersion: '1.0.0',
+          },
+        });
+
+        await client.fetchPrecomputedFlags();
+
+        expect(urlsRequested).toHaveLength(1);
+        expect(urlsRequested[0]).toEqual(
+          'https://experiment.fs-edge-assignment.eppo.cloud/assignments?apiKey=zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA%3D%3D&' +
+            SDK_PARAM_SUFFIX,
+        );
+      });
+
+      it('should request from the default domain if the encoded subdomain is not present', async () => {
+        const client = new EppoPrecomputedClient({
+          precomputedFlagStore: new MemoryOnlyConfigurationStore<PrecomputedFlag>(),
+          subject,
+          requestParameters: {
+            apiKey: 'old style key',
+            sdkName: 'js-client-sdk-common',
+            sdkVersion: '1.0.0',
+          },
+        });
+
+        await client.fetchPrecomputedFlags();
+
+        expect(urlsRequested).toHaveLength(1);
+        expect(urlsRequested[0]).toEqual(
+          'https://fs-edge-assignment.eppo.cloud/assignments?apiKey=old+style+key&' +
+            SDK_PARAM_SUFFIX,
+        );
+      });
+
+      it('should request from the provided baseUrl if present', async () => {
+        const client = new EppoPrecomputedClient({
+          precomputedFlagStore: new MemoryOnlyConfigurationStore<PrecomputedFlag>(),
+          subject,
+          requestParameters: {
+            apiKey: 'zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA==', // subdomain=experiment
+            sdkName: 'js-client-sdk-common',
+            sdkVersion: '1.0.0',
+            baseUrl: 'https://custom-base-url.com',
+          },
+        });
+
+        await client.fetchPrecomputedFlags();
+
+        expect(urlsRequested).toHaveLength(1);
+        expect(urlsRequested[0]).toEqual(
+          'https://custom-base-url.com/assignments?apiKey=zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA%3D%3D&' +
+            SDK_PARAM_SUFFIX,
+        );
+      });
+    });
   });
 
   describe('Obfuscated precomputed flags', () => {

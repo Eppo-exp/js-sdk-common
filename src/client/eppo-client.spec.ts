@@ -24,7 +24,11 @@ import {
   IObfuscatedPrecomputedConfigurationResponse,
   ObfuscatedPrecomputedConfigurationResponse,
 } from '../configuration-wire/configuration-wire-types';
-import { MAX_EVENT_QUEUE_SIZE, DEFAULT_BASE_POLLING_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
+import {
+  MAX_EVENT_QUEUE_SIZE,
+  DEFAULT_BASE_POLLING_INTERVAL_MS,
+  POLL_JITTER_PCT,
+} from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
@@ -396,7 +400,9 @@ describe('EppoClient E2E test', () => {
 
   it('exports flag configuration', async () => {
     const client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
-    expect(client.getConfiguration().getFlagsConfiguration()?.response.flags).toEqual({ [flagKey]: mockFlag });
+    expect(client.getConfiguration().getFlagsConfiguration()?.response.flags).toEqual({
+      [flagKey]: mockFlag,
+    });
   });
 
   describe('assignment logging deduplication', () => {
@@ -681,8 +687,7 @@ describe('EppoClient E2E test', () => {
         sdkKey: requestConfiguration.apiKey,
         sdkName: requestConfiguration.sdkName,
         sdkVersion: requestConfiguration.sdkVersion,
-        configuration: {
-        },
+        configuration: {},
       });
       client.setIsGracefulFailureMode(false);
       // no configuration loaded
@@ -765,120 +770,183 @@ describe('EppoClient E2E test', () => {
       expect(variation).toBe(0.0);
     });
 
-    it.each([
-      { enablePolling: false },
-      { enablePolling: true },
-    ])('retries initial configuration request with config %p', async (configModification) => {
-      let callCount = 0;
+    it.each([{ enablePolling: false }, { enablePolling: true }])(
+      'retries initial configuration request with config %p',
+      async (configModification) => {
+        let callCount = 0;
 
-      global.fetch = jest.fn(() => {
-        if (callCount++ === 0) {
-          // Simulate an error for the first call
-          return Promise.resolve({
-            ok: false,
-            status: 500,
-            json: () => Promise.reject(new Error('Server error')),
-          });
-        } else {
-          // Return a successful response for subsequent calls
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: () => {
-              return readMockUFCResponse(MOCK_UFC_RESPONSE_FILE);
-            },
-          });
-        }
-      }) as jest.Mock;
+        global.fetch = jest.fn(() => {
+          if (callCount++ === 0) {
+            // Simulate an error for the first call
+            return Promise.resolve({
+              ok: false,
+              status: 500,
+              json: () => Promise.reject(new Error('Server error')),
+            });
+          } else {
+            // Return a successful response for subsequent calls
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: () => {
+                return readMockUFCResponse(MOCK_UFC_RESPONSE_FILE);
+              },
+            });
+          }
+        }) as jest.Mock;
 
-      const { enablePolling } = configModification;
+        const { enablePolling } = configModification;
 
-      client = new EppoClient({
-        sdkKey: requestConfiguration.apiKey,
-        sdkName: requestConfiguration.sdkName,
-        sdkVersion: requestConfiguration.sdkVersion,
-        configuration: {
-          initializationTimeoutMs: 60_000,
-          enablePolling,
-        },
-      });
-      client.setIsGracefulFailureMode(false);
-      // no configuration loaded
-      let variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
-      expect(variation).toBe(0.0);
+        client = new EppoClient({
+          sdkKey: requestConfiguration.apiKey,
+          sdkName: requestConfiguration.sdkName,
+          sdkVersion: requestConfiguration.sdkVersion,
+          configuration: {
+            initializationTimeoutMs: 60_000,
+            enablePolling,
+          },
+        });
+        client.setIsGracefulFailureMode(false);
+        // no configuration loaded
+        let variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
+        expect(variation).toBe(0.0);
 
-      // By not awaiting (yet) only the first attempt should be fired off before test execution below resumes
-      const fetchPromise = client.waitForInitialization();
+        // By not awaiting (yet) only the first attempt should be fired off before test execution below resumes
+        const fetchPromise = client.waitForInitialization();
 
-      // Advance timers mid-init to allow retrying
-      await jest.advanceTimersByTimeAsync(maxRetryDelay);
+        // Advance timers mid-init to allow retrying
+        await jest.advanceTimersByTimeAsync(maxRetryDelay);
 
-      // Await so it can finish its initialization before this test proceeds
-      await fetchPromise;
+        // Await so it can finish its initialization before this test proceeds
+        await fetchPromise;
 
-      variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
-      expect(variation).toBe(pi);
-      expect(callCount).toBe(2);
+        variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
+        expect(variation).toBe(pi);
+        expect(callCount).toBe(2);
 
-      await jest.advanceTimersByTimeAsync(1.5 * DEFAULT_BASE_POLLING_INTERVAL_MS);
-      // By default, no more polling
-      expect(callCount).toBe(enablePolling ? 3 : 2);
+        await jest.advanceTimersByTimeAsync(1.5 * DEFAULT_BASE_POLLING_INTERVAL_MS);
+        // By default, no more polling
+        expect(callCount).toBe(enablePolling ? 3 : 2);
+      },
+    );
+
+    it.each([{ enablePolling: false }, { enablePolling: true }])(
+      'initial configuration request fails with config %p',
+      async (configModification) => {
+        let callCount = 0;
+
+        global.fetch = jest.fn(() => {
+          if (++callCount === 1) {
+            // Simulate an error for the first call
+            return Promise.resolve({
+              ok: false,
+              status: 500,
+              json: () => Promise.reject(new Error('Server error')),
+            } as Response);
+          } else {
+            // Return a successful response for subsequent calls
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: () => Promise.resolve(readMockUFCResponse(MOCK_UFC_RESPONSE_FILE)),
+            } as Response);
+          }
+        });
+
+        const { enablePolling } = configModification;
+
+        // This test specifically tests network fetching behavior
+        client = new EppoClient({
+          sdkKey: requestConfiguration.apiKey,
+          sdkName: requestConfiguration.sdkName,
+          sdkVersion: requestConfiguration.sdkVersion,
+          configuration: {
+            enablePolling,
+            // Very short initialization timeout to force an initialization failure
+            initializationTimeoutMs: 100,
+            activationStrategy: 'always',
+          },
+        });
+        client.setIsGracefulFailureMode(false);
+        // no configuration loaded
+        expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(0.0);
+
+        expect(callCount).toBe(1);
+        // still no configuration loaded
+        expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(0.0);
+
+        // Advance timers so a post-init poll can take place
+        await jest.advanceTimersByTimeAsync(DEFAULT_BASE_POLLING_INTERVAL_MS);
+
+        // if enablePolling = true, we will poll later and get a config, otherwise not
+        expect(callCount).toBe(enablePolling ? 2 : 1);
+        expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(
+          enablePolling ? pi : 0.0,
+        );
+      },
+    );
+  });
+
+  describe('Contstructed with enhanced SDK Token', () => {
+    let urlRequests: string[] = [];
+    beforeEach(() => {
+      urlRequests = [];
     });
 
-    it.each([
-      { enablePolling: false },
-      { enablePolling: true },
-    ])('initial configuration request fails with config %p', async (configModification) => {
-      let callCount = 0;
+    beforeAll(() => {
+      global.fetch = jest.fn((url) => {
+        urlRequests.push(url);
+        const ufc = readMockUFCResponse(MOCK_UFC_RESPONSE_FILE);
 
-      global.fetch = jest.fn(() => {
-        if (++callCount === 1) {
-          // Simulate an error for the first call
-          return Promise.resolve({
-            ok: false,
-            status: 500,
-            json: () => Promise.reject(new Error('Server error')),
-          } as Response);
-        } else {
-          // Return a successful response for subsequent calls
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve(readMockUFCResponse(MOCK_UFC_RESPONSE_FILE)),
-          } as Response);
-        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(ufc),
+        });
+      }) as jest.Mock;
+    });
+
+    it('uses the default base URL when the API Key is not an enhanced token', async () => {
+      const client = new EppoClient({
+        sdkKey: 'basic-token',
+        sdkName: '',
+        sdkVersion: '',
       });
 
-      const { enablePolling } = configModification;
+      await client.waitForInitialization();
 
-      // This test specifically tests network fetching behavior
-      client = new EppoClient({
-        sdkKey: requestConfiguration.apiKey,
-        sdkName: requestConfiguration.sdkName,
-        sdkVersion: requestConfiguration.sdkVersion,
-        configuration: {
-          enablePolling,
-          // Very short initialization timeout to force an initialization failure
-          initializationTimeoutMs: 100,
-          activationStrategy: 'always',
-        },
+      expect(urlRequests).toEqual([
+        'https://fscdn.eppo.cloud/api/flag-config/v1/config?apiKey=basic-token&sdkName=&sdkVersion=',
+      ]);
+    });
+
+    it('uses the customer-specific subdomain when provided', async () => {
+      const client = new EppoClient({
+        sdkKey: 'zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA==',
+        sdkName: '',
+        sdkVersion: '',
       });
-      client.setIsGracefulFailureMode(false);
-      // no configuration loaded
-      expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(0.0);
 
-      expect(callCount).toBe(1);
-      // still no configuration loaded
-      expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(0.0);
+      await client.waitForInitialization();
 
-      // Advance timers so a post-init poll can take place
-      await jest.advanceTimersByTimeAsync(DEFAULT_BASE_POLLING_INTERVAL_MS);
-
-      // if enablePolling = true, we will poll later and get a config, otherwise not
-      expect(callCount).toBe(enablePolling ? 2 : 1);
-      expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(
-        enablePolling ? pi : 0.0,
+      expect(urlRequests).toHaveLength(1);
+      expect(urlRequests[0]).toContain(
+        'https://experiment.fscdn.eppo.cloud/api/flag-config/v1/config',
       );
+    });
+
+    it('prefers a provided baseUrl over encoded subdomain', async () => {
+      const client = new EppoClient({
+        sdkKey: 'zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA==',
+        sdkName: '',
+        sdkVersion: '',
+        baseUrl: 'http://override.base.url',
+      });
+
+      await client.waitForInitialization();
+
+      expect(urlRequests).toHaveLength(1);
+      expect(urlRequests[0]).toContain('http://override.base.url/flag-config/v1/config');
     });
   });
 
