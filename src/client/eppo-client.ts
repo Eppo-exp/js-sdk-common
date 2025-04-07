@@ -14,7 +14,7 @@ import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
-import { Configuration } from '../configuration';
+import { Configuration, PrecomputedConfig } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { ConfigurationStore } from '../configuration-store';
 import { ISyncStore } from '../configuration-store/configuration-store';
@@ -40,7 +40,13 @@ import {
   DEFAULT_ENABLE_BANDITS,
 } from '../constants';
 import { EppoValue } from '../eppo_value';
-import { Evaluator, FlagEvaluation, noneResult, overrideResult } from '../evaluator';
+import {
+  Evaluator,
+  FlagEvaluation,
+  FlagEvaluationWithoutDetails,
+  noneResult,
+  overrideResult,
+} from '../evaluator';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
 import EventDispatcher from '../events/event-dispatcher';
 import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
@@ -53,6 +59,7 @@ import FetchHttpClient from '../http-client';
 import {
   BanditModelData,
   FormatEnum,
+  IObfuscatedPrecomputedBandit,
   IPrecomputedBandit,
   PrecomputedFlag,
   Variation,
@@ -80,6 +87,8 @@ import {
 import { ConfigurationPoller } from '../configuration-poller';
 import { ConfigurationFeed, ConfigurationSource } from '../configuration-feed';
 import { BroadcastChannel } from '../broadcast';
+import { getMD5Hash } from '../obfuscation';
+import { decodePrecomputedBandit, decodePrecomputedFlag } from '../decoding';
 
 export interface IAssignmentDetails<T extends Variation['value'] | object> {
   variation: T;
@@ -1297,6 +1306,19 @@ export default class EppoClient {
       );
     }
 
+    const precomputed = config.getPrecomputedConfiguration();
+    if (precomputed && precomputed.subjectKey === subjectKey) {
+      // Short-circuit evaluation if we have a matching precomputed configuration.
+      return this.evaluatePrecomputedAssignment(
+        precomputed,
+        flagKey,
+        subjectKey,
+        subjectAttributes,
+        expectedVariationType,
+        flagEvaluationDetailsBuilder,
+      );
+    }
+
     const flag = config.getFlag(flagKey);
 
     if (flag === null) {
@@ -1311,7 +1333,7 @@ export default class EppoClient {
         subjectKey,
         subjectAttributes,
         flagEvaluationDetails,
-        config.getFlagsConfiguration()?.response.environment.name ?? '',
+        config.getFlagsConfiguration()?.response.format ?? '',
       );
     }
 
@@ -1367,6 +1389,90 @@ export default class EppoClient {
     } catch (error) {
       logger.error(`${loggerPrefix} Error logging assignment event: ${error}`);
     }
+
+    return result;
+  }
+
+  private evaluatePrecomputedAssignment(
+    precomputed: PrecomputedConfig,
+    flagKey: string,
+    subjectKey: string,
+    subjectAttributes: Attributes,
+    expectedVariationType: VariationType | undefined,
+    flagEvaluationDetailsBuilder: FlagEvaluationDetailsBuilder,
+  ): FlagEvaluation {
+    const obfuscatedKey = getMD5Hash(flagKey, precomputed.response.salt);
+    const obfuscatedFlag: PrecomputedFlag | undefined = precomputed.response.flags[obfuscatedKey];
+    const obfuscatedBandit: IObfuscatedPrecomputedBandit | undefined =
+      precomputed.response.bandits[obfuscatedKey];
+    const flag = obfuscatedFlag && decodePrecomputedFlag(obfuscatedFlag);
+    const bandit = obfuscatedBandit && decodePrecomputedBandit(obfuscatedBandit);
+
+    if (!flag) {
+      logger.warn(`${loggerPrefix} No assigned variation. Flag not found: ${flagKey}`);
+      // note: this is different from the Python SDK, which returns None instead
+      const flagEvaluationDetails = flagEvaluationDetailsBuilder.buildForNoneResult(
+        'FLAG_UNRECOGNIZED_OR_DISABLED',
+        `Unrecognized or disabled flag: ${flagKey}`,
+      );
+      return noneResult(
+        flagKey,
+        subjectKey,
+        subjectAttributes,
+        flagEvaluationDetails,
+        precomputed.response.format,
+      );
+    }
+
+    if (!checkTypeMatch(expectedVariationType, flag.variationType)) {
+      const errorMessage = `Variation value does not have the correct type. Found ${flag.variationType}, but expected ${expectedVariationType} for flag ${flagKey}`;
+      if (this.isGracefulFailureMode) {
+        const flagEvaluationDetails = flagEvaluationDetailsBuilder.buildForNoneResult(
+          'TYPE_MISMATCH',
+          errorMessage,
+        );
+        return noneResult(
+          flagKey,
+          subjectKey,
+          subjectAttributes,
+          flagEvaluationDetails,
+          precomputed.response.format,
+        );
+      }
+      throw new TypeError(errorMessage);
+    }
+
+    const result: FlagEvaluation = {
+      flagKey,
+      format: precomputed.response.format,
+      subjectKey: precomputed.subjectKey,
+      subjectAttributes: precomputed.subjectAttributes
+        ? ensureNonContextualSubjectAttributes(precomputed.subjectAttributes)
+        : {},
+      variation: {
+        key: flag.variationKey ?? '',
+        value: flag.variationValue,
+      },
+      allocationKey: flag.allocationKey ?? '',
+      extraLogging: flag.extraLogging ?? {},
+      doLog: flag.doLog,
+      entityId: null,
+      flagEvaluationDetails: {
+        environmentName: precomputed.response.environment?.name ?? '',
+        flagEvaluationCode: 'MATCH',
+        flagEvaluationDescription: 'Matched precomputed flag',
+        variationKey: flag.variationKey ?? null,
+        variationValue: flag.variationValue,
+        banditKey: null,
+        banditAction: null,
+        configFetchedAt: precomputed.fetchedAt ?? '',
+        configPublishedAt: precomputed.response.createdAt,
+        matchedRule: null,
+        matchedAllocation: null,
+        unmatchedAllocations: [],
+        unevaluatedAllocations: [],
+      },
+    };
 
     return result;
   }
