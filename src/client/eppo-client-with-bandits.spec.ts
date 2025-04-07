@@ -69,6 +69,8 @@ describe('EppoClient Bandits E2E test', () => {
       flagStore,
       banditVariationStore,
       banditModelStore,
+      null,
+      null,
     );
     await configurationRequestor.fetchAndStoreConfigurations();
   });

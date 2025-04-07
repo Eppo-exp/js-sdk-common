@@ -28,11 +28,7 @@ export interface IQueryParamsWithSubject extends IQueryParams {
 }
 
 export class HttpRequestError extends Error {
-  constructor(
-    public message: string,
-    public status: number,
-    public cause?: Error,
-  ) {
+  constructor(public message: string, public status: number, public cause?: Error) {
     super(message);
     if (cause) {
       this.cause = cause;

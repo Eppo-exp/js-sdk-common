@@ -51,7 +51,6 @@ import {
   ObfuscatedFlag,
   PrecomputedFlag,
   Switchback,
-  SwitchbackSubjectAttributeValues,
   Variation,
   VariationType,
 } from '../interfaces';
@@ -64,6 +63,7 @@ import {
   AttributeType,
   BanditActions,
   BanditSubjectAttributes,
+  SwitchbackSubjectAttributeValues,
   ContextAttributes,
   FlagKey,
   ValueType,

@@ -42,6 +42,8 @@ describe('ConfigurationRequestor', () => {
       flagStore,
       banditVariationStore,
       banditModelStore,
+      null,
+      null,
     );
   });
 
@@ -218,7 +220,14 @@ describe('ConfigurationRequestor', () => {
       });
 
       it('Will not fetch bandit parameters if there is no store', async () => {
-        configurationRequestor = new ConfigurationRequestor(httpClient, flagStore, null, null);
+        configurationRequestor = new ConfigurationRequestor(
+          httpClient,
+          flagStore,
+          null,
+          null,
+          null,
+          null,
+        );
         await configurationRequestor.fetchAndStoreConfigurations();
         expect(fetchSpy).toHaveBeenCalledTimes(1);
       });
@@ -503,6 +512,8 @@ describe('ConfigurationRequestor', () => {
           flagStore,
           banditVariationStore,
           banditModelStore,
+          null,
+          null,
         );
 
         const config = requestor.getConfiguration();
@@ -516,6 +527,8 @@ describe('ConfigurationRequestor', () => {
           flagStore,
           banditVariationStore,
           banditModelStore,
+          null,
+          null,
         );
 
         await requestor.fetchAndStoreConfigurations();
@@ -533,6 +546,8 @@ describe('ConfigurationRequestor', () => {
           flagStore,
           banditVariationStore,
           banditModelStore,
+          null,
+          null,
         );
         const config = requestor.getConfiguration();
 
@@ -553,6 +568,8 @@ describe('ConfigurationRequestor', () => {
           flagStore,
           banditVariationStore,
           banditModelStore,
+          null,
+          null,
         );
         const config = requestor.getConfiguration();
 
@@ -608,8 +625,11 @@ describe('ConfigurationRequestor', () => {
           flagStore,
           banditVariationStore,
           banditModelStore,
+          null,
+          null,
         );
 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const ufcResponse = {
           flags: { test_flag: { key: 'test_flag', value: true } },
           banditReferences: {
@@ -700,6 +720,8 @@ describe('ConfigurationRequestor', () => {
           newFlagStore,
           newBanditVariationStore,
           newBanditModelStore,
+          null,
+          null,
         );
 
         // Get the configuration and verify it has the test flag

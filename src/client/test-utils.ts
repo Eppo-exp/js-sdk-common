@@ -21,6 +21,8 @@ export async function initConfiguration(
     configurationStore,
     null,
     null,
+    null,
+    null,
   );
   await configurationRequestor.fetchAndStoreConfigurations();
 }
