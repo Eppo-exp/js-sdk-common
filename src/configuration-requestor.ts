@@ -5,7 +5,7 @@ import {
   IConfiguration,
   StoreBackedConfiguration,
 } from './i-configuration';
-import { BanditVariation, BanditParameters, Flag, BanditReference } from './interfaces';
+import { BanditVariation, BanditParameters, Flag, BanditReference, Switchback } from './interfaces';
 
 // Requests AND stores flag configurations
 export default class ConfigurationRequestor {
@@ -17,11 +17,15 @@ export default class ConfigurationRequestor {
     private flagConfigurationStore: IConfigurationStore<Flag>,
     private banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]> | null,
     private banditModelConfigurationStore: IConfigurationStore<BanditParameters> | null,
+    private switchbackConfigurationStore: IConfigurationStore<Switchback> | null,
+    private switchbackSubjectAttributesConfigurationStore: IConfigurationStore<string[]> | null,
   ) {
     this.configuration = new StoreBackedConfiguration(
       this.flagConfigurationStore,
       this.banditVariationConfigurationStore,
       this.banditModelConfigurationStore,
+      this.switchbackConfigurationStore,
+      this.switchbackSubjectAttributesConfigurationStore,
     );
   }
 

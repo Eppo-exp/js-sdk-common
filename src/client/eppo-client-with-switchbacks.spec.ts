@@ -5,7 +5,7 @@ import FetchHttpClient, {
   ISwitchbacksConfigResponse,
   IUniversalFlagConfigResponse,
 } from '../http-client';
-import { BanditVariation, VariationType, Flag, BanditParameters, FormatEnum } from '../interfaces';
+import { BanditVariation, VariationType, Flag, BanditParameters, FormatEnum, Switchback } from '../interfaces';
 
 import EppoClient from './eppo-client';
 
@@ -13,6 +13,7 @@ describe('EppoClient Switchbacks E2E test', () => {
   const flagStore = new MemoryOnlyConfigurationStore<Flag>();
   const banditVariationStore = new MemoryOnlyConfigurationStore<BanditVariation[]>();
   const banditModelStore = new MemoryOnlyConfigurationStore<BanditParameters>();
+  const switchbackStore = new MemoryOnlyConfigurationStore<Switchback>();
   let client: EppoClient;
   let configurationRequestor: ConfigurationRequestor;
   let httpClient: FetchHttpClient;
@@ -126,6 +127,7 @@ describe('EppoClient Switchbacks E2E test', () => {
       flagStore,
       banditVariationStore,
       banditModelStore,
+      switchbackStore,
     );
     await configurationRequestor.fetchAndStoreConfigurations();
   });

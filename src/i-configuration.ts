@@ -8,6 +8,7 @@ import {
   Environment,
   Flag,
   ObfuscatedFlag,
+  Switchback,
 } from './interfaces';
 import { BanditKey, FlagKey, HashedFlagKey } from './types';
 
@@ -43,12 +44,18 @@ export class StoreBackedConfiguration implements IConfiguration {
       BanditVariation[]
     > | null,
     private readonly banditModelConfigurationStore?: IConfigurationStore<BanditParameters> | null,
+    private readonly switchbackConfigurationStore?: IConfigurationStore<Switchback> | null,
+    private readonly switchbackSubjectAttributesConfigurationStore?: IConfigurationStore<
+      string[]
+    > | null,
   ) {}
 
   public async hydrateConfigurationStores(
     flagConfig: ConfigStoreHydrationPacket<Flag>,
     banditVariationConfig?: ConfigStoreHydrationPacket<BanditVariation[]>,
     banditModelConfig?: ConfigStoreHydrationPacket<BanditParameters>,
+    switchbackConfig?: ConfigStoreHydrationPacket<Switchback>,
+    switchbackSubjectAttributesConfig?: ConfigStoreHydrationPacket<string[]>,
   ) {
     const didUpdateFlags = await hydrateConfigurationStore(this.flagConfigurationStore, flagConfig);
     const promises: Promise<boolean>[] = [];
@@ -60,6 +67,17 @@ export class StoreBackedConfiguration implements IConfiguration {
     if (this.banditModelConfigurationStore && banditModelConfig) {
       promises.push(
         hydrateConfigurationStore(this.banditModelConfigurationStore, banditModelConfig),
+      );
+    }
+    if (this.switchbackConfigurationStore && switchbackConfig) {
+      promises.push(hydrateConfigurationStore(this.switchbackConfigurationStore, switchbackConfig));
+    }
+    if (this.switchbackSubjectAttributesConfigurationStore && switchbackSubjectAttributesConfig) {
+      promises.push(
+        hydrateConfigurationStore(
+          this.switchbackSubjectAttributesConfigurationStore,
+          switchbackSubjectAttributesConfig,
+        ),
       );
     }
     await Promise.all(promises);

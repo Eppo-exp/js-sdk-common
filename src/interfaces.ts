@@ -159,7 +159,6 @@ export interface Switchback {
   variations: SwitchbackVariation[];
 }
 
-
 export enum FormatEnum {
   SERVER = 'SERVER',
   CLIENT = 'CLIENT',

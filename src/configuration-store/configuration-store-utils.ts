@@ -5,6 +5,7 @@ import {
   Flag,
   IObfuscatedPrecomputedBandit,
   PrecomputedFlag,
+  Switchback,
 } from '../interfaces';
 
 import { IConfigurationStore } from './configuration-store';
@@ -14,7 +15,9 @@ export type Entry =
   | BanditVariation[]
   | BanditParameters
   | PrecomputedFlag
-  | IObfuscatedPrecomputedBandit;
+  | IObfuscatedPrecomputedBandit
+  | Switchback
+  | string[];
 
 export async function hydrateConfigurationStore<T extends Entry>(
   configurationStore: IConfigurationStore<T> | null,
