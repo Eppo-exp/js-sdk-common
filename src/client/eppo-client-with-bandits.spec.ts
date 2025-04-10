@@ -8,7 +8,7 @@ import {
   BanditTestCase,
   BANDIT_TEST_DATA_DIR,
   readMockConfigurationWireResponse,
-  SHARED_BOOTSTRAP_BANDIT_FLAGS_FILE,
+  BANDITS_WIRE_FILE,
 } from '../../test/testHelpers';
 import ApiEndpoints from '../api-endpoints';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
@@ -21,7 +21,7 @@ import {
   IConfigurationWire,
   IPrecomputedConfiguration,
   IObfuscatedPrecomputedConfigurationResponse,
-  ConfigurationWireV1, configurationFromString,
+  configurationFromString,
 } from '../configuration-wire/configuration-wire-types';
 import { Evaluator, FlagEvaluation } from '../evaluator';
 import {
@@ -138,7 +138,7 @@ describe('EppoClient Bandits E2E test', () => {
 
     describe('bootstrapped client', () => {
       const banditFlagsConfig = configurationFromString(
-        readMockConfigurationWireResponse(SHARED_BOOTSTRAP_BANDIT_FLAGS_FILE),
+        readMockConfigurationWireResponse(BANDITS_WIRE_FILE),
       );
 
       let client: EppoClient;

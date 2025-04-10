@@ -10,8 +10,8 @@ import {
   OBFUSCATED_MOCK_UFC_RESPONSE_FILE,
   readMockConfigurationWireResponse,
   readMockUFCResponse,
-  SHARED_BOOTSTRAP_FLAGS_FILE,
-  SHARED_BOOTSTRAP_FLAGS_OBFUSCATED_FILE,
+  FLAGS_WIRE_FILE,
+  OBFUSCATED_FLAGS_WIRE_FILE,
   SubjectTestCase,
   testCasesByFileName,
   validateTestAssignments,
@@ -357,10 +357,10 @@ describe('EppoClient E2E test', () => {
 
     describe('boostrapped client', () => {
       const bootstrapFlagsConfig = configurationFromString(
-        readMockConfigurationWireResponse(SHARED_BOOTSTRAP_FLAGS_FILE),
+        readMockConfigurationWireResponse(FLAGS_WIRE_FILE),
       );
       const bootstrapFlagsObfuscatedConfig = configurationFromString(
-        readMockConfigurationWireResponse(SHARED_BOOTSTRAP_FLAGS_OBFUSCATED_FILE),
+        readMockConfigurationWireResponse(OBFUSCATED_FLAGS_WIRE_FILE),
       );
 
       describe('Not obfuscated', () => {
