@@ -10,8 +10,8 @@ import {
   OBFUSCATED_MOCK_UFC_RESPONSE_FILE,
   readMockConfigurationWireResponse,
   readMockUFCResponse,
-  SHARED_BOOTSTRAP_FLAGS_FILE,
-  SHARED_BOOTSTRAP_FLAGS_OBFUSCATED_FILE,
+  FLAGS_WIRE_FILE,
+  OBFUSCATED_FLAGS_WIRE_FILE,
   SubjectTestCase,
   testCasesByFileName,
   validateTestAssignments,
@@ -21,7 +21,7 @@ import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
-  ConfigurationWireV1,
+  configurationFromString,
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   ObfuscatedPrecomputedConfigurationResponse,
@@ -356,11 +356,11 @@ describe('EppoClient E2E test', () => {
     const testCases = testCasesByFileName<IAssignmentTestCase>(ASSIGNMENT_TEST_DATA_DIR);
 
     describe('boostrapped client', () => {
-      const bootstrapFlagsConfig = ConfigurationWireV1.fromString(
-        readMockConfigurationWireResponse(SHARED_BOOTSTRAP_FLAGS_FILE),
+      const bootstrapFlagsConfig = configurationFromString(
+        readMockConfigurationWireResponse(FLAGS_WIRE_FILE),
       );
-      const bootstrapFlagsObfuscatedConfig = ConfigurationWireV1.fromString(
-        readMockConfigurationWireResponse(SHARED_BOOTSTRAP_FLAGS_OBFUSCATED_FILE),
+      const bootstrapFlagsObfuscatedConfig = configurationFromString(
+        readMockConfigurationWireResponse(OBFUSCATED_FLAGS_WIRE_FILE),
       );
 
       describe('Not obfuscated', () => {
