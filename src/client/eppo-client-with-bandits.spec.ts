@@ -1,14 +1,14 @@
 import * as base64 from 'js-base64';
 
 import {
-  readMockUFCResponse,
+  BANDIT_TEST_DATA_DIR,
+  BANDITS_WIRE_FILE,
+  BanditTestCase,
   MOCK_BANDIT_MODELS_RESPONSE_FILE,
   MOCK_FLAGS_WITH_BANDITS_RESPONSE_FILE,
-  testCasesByFileName,
-  BanditTestCase,
-  BANDIT_TEST_DATA_DIR,
   readMockConfigurationWireResponse,
-  BANDITS_WIRE_FILE,
+  readMockUFCResponse,
+  testCasesByFileName,
 } from '../../test/testHelpers';
 import ApiEndpoints from '../api-endpoints';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
@@ -18,10 +18,10 @@ import ConfigurationRequestor from '../configuration-requestor';
 import { ConfigurationManager } from '../configuration-store/configuration-manager';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
+  ConfigurationWireV1,
   IConfigurationWire,
-  IPrecomputedConfiguration,
   IObfuscatedPrecomputedConfigurationResponse,
-  configurationFromString,
+  IPrecomputedConfiguration,
 } from '../configuration-wire/configuration-wire-types';
 import { Evaluator, FlagEvaluation } from '../evaluator';
 import {
@@ -29,7 +29,7 @@ import {
   IFlagEvaluationDetails,
 } from '../flag-evaluation-details-builder';
 import FetchHttpClient from '../http-client';
-import { BanditVariation, BanditParameters, Flag } from '../interfaces';
+import { BanditParameters, BanditVariation, Flag } from '../interfaces';
 import { attributeEncodeBase64 } from '../obfuscation';
 import { Attributes, BanditActions, ContextAttributes } from '../types';
 
@@ -137,7 +137,7 @@ describe('EppoClient Bandits E2E test', () => {
     }
 
     describe('bootstrapped client', () => {
-      const banditFlagsConfig = configurationFromString(
+      const banditFlagsConfig = ConfigurationWireV1.fromString(
         readMockConfigurationWireResponse(BANDITS_WIRE_FILE),
       );
 

@@ -11,18 +11,6 @@ import { ContextAttributes, FlagKey, HashedFlagKey } from '../types';
 
 import { deflateJsonObject, inflateJsonObject, JsonString } from './json-util';
 
-/**
- * Builds an `IConfigurationWire` instance from the payload string.
- * To generate the payload string, see `ConfigurationWireHelper.fetchBootstrapConfiguration`.
- *
- * @param payloadString
- */
-export function configurationFromString(
-  payloadString: string | JsonString<IConfigurationWire>,
-): IConfigurationWire {
-  return inflateJsonObject(payloadString as JsonString<IConfigurationWire>);
-}
-
 // Base interface for all configuration responses
 interface IBasePrecomputedConfigurationResponse {
   readonly format: FormatEnum.PRECOMPUTED;
@@ -202,6 +190,18 @@ export class ConfigurationWireV1 implements IConfigurationWire {
     readonly config?: IConfigResponse<IUniversalFlagConfigResponse>,
     readonly bandits?: IConfigResponse<IBanditParametersResponse>,
   ) {}
+
+  /**
+   * Builds an `IConfigurationWire` instance from the payload string.
+   * To generate the payload string, see `ConfigurationWireHelper.fetchBootstrapConfiguration`.
+   *
+   * @param payloadString
+   */
+  public static fromString(
+    payloadString: string | JsonString<IConfigurationWire>,
+  ): IConfigurationWire {
+    return inflateJsonObject(payloadString as JsonString<IConfigurationWire>);
+  }
 
   public static fromResponses(
     flagConfig: IUniversalFlagConfigResponse,

@@ -26,13 +26,13 @@ import EppoPrecomputedClient, {
   Subject,
 } from './client/eppo-precomputed-client';
 import FlagConfigRequestor from './configuration-requestor';
+import { ConfigurationStoreBundle } from './configuration-store/configuration-manager';
 import {
   IConfigurationStore,
   IAsyncStore,
   ISyncStore,
 } from './configuration-store/configuration-store';
 import { HybridConfigurationStore } from './configuration-store/hybrid.store';
-import { ConfigurationStoreBundle } from './configuration-store/i-configuration-manager';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import { ConfigurationWireHelper } from './configuration-wire/configuration-wire-helper';
 import {

@@ -21,7 +21,7 @@ import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { IConfigurationStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
-  configurationFromString,
+  ConfigurationWireV1,
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   ObfuscatedPrecomputedConfigurationResponse,
@@ -356,10 +356,10 @@ describe('EppoClient E2E test', () => {
     const testCases = testCasesByFileName<IAssignmentTestCase>(ASSIGNMENT_TEST_DATA_DIR);
 
     describe('boostrapped client', () => {
-      const bootstrapFlagsConfig = configurationFromString(
+      const bootstrapFlagsConfig = ConfigurationWireV1.fromString(
         readMockConfigurationWireResponse(FLAGS_WIRE_FILE),
       );
-      const bootstrapFlagsObfuscatedConfig = configurationFromString(
+      const bootstrapFlagsObfuscatedConfig = ConfigurationWireV1.fromString(
         readMockConfigurationWireResponse(OBFUSCATED_FLAGS_WIRE_FILE),
       );
 
