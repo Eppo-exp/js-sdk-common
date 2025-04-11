@@ -115,6 +115,9 @@ export default class ConfigurationRequestor {
       }
     }
 
+    let switchbackPacket: ConfigStoreHydrationPacket<Switchback> | undefined;
+    let switchbackSubjectAttributesPacket: ConfigStoreHydrationPacket<SwitchbackSubjectAttributeValues> | undefined;
+
     if (
       await this.configuration.hydrateConfigurationStores(
         flagResponsePacket,

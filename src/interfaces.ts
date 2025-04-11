@@ -104,12 +104,16 @@ export interface ObfuscatedShard {
   ranges: Range[];
 }
 
-export interface BanditVariation {
+export interface BaseVariation {
   key: string;
   flagKey: string;
+  allocationKey: string;
   variationKey: string;
   variationValue: string;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface BanditVariation extends BaseVariation {}
 
 export interface BanditReference {
   modelVersion: string;
@@ -151,9 +155,11 @@ export interface BanditCategoricalAttributeCoefficients {
   missingValueCoefficient: number;
 }
 
-interface SwitchbackVariation {
-  key: string;
-  value: string;
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface SwitchbackVariation extends BaseVariation {}
+
+export interface SwitchbackReference {
+  flagVariations: SwitchbackVariation[]; // In case multiple switchback variations are possible in a flag
 }
 export interface Switchback {
   key: SwitchbackKey;
@@ -161,7 +167,10 @@ export interface Switchback {
   startAt: string;
   endAt: string;
   assignmentWindowInMinutes: number;
-  variations: SwitchbackVariation[];
+  variations: {
+    key: string;
+    value: string;
+  };
 }
 
 export enum FormatEnum {
