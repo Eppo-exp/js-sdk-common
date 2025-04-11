@@ -20,8 +20,11 @@ import {
 import { Rule, matchesRule } from './rules';
 import { MD5Sharder, Sharder } from './sharders';
 import { Attributes } from './types';
+import { IAssignmentEvent } from './assignment-logger';
+import { IBanditEvent } from './bandit-logger';
+import { LIB_VERSION } from './version';
 
-export interface FlagEvaluationWithoutDetails {
+export interface AssignmentResult {
   flagKey: string;
   format: string;
   subjectKey: string;
@@ -29,20 +32,26 @@ export interface FlagEvaluationWithoutDetails {
   allocationKey: string | null;
   variation: Variation | null;
   extraLogging: Record<string, string>;
-  // whether to log assignment event
   doLog: boolean;
   entityId: number | null;
+  evaluationDetails: IFlagEvaluationDetails;
 }
 
-export interface FlagEvaluation extends FlagEvaluationWithoutDetails {
-  flagEvaluationDetails: IFlagEvaluationDetails;
+export interface FlagEvaluation {
+  assignmentDetails: AssignmentResult;
+  assignmentEvent?: IAssignmentEvent;
+  banditEvent?: IBanditEvent;
 }
 
 export class Evaluator {
   private readonly sharder: Sharder;
+  private readonly sdkName: string;
+  private readonly sdkVersion: string;
 
-  constructor(sharder?: Sharder) {
-    this.sharder = sharder ?? new MD5Sharder();
+  constructor(options?: { sharder?: Sharder; sdkName?: string; sdkVersion?: string }) {
+    this.sharder = options?.sharder ?? new MD5Sharder();
+    this.sdkName = options?.sdkName ?? '';
+    this.sdkVersion = options?.sdkVersion ?? '';
   }
 
   evaluateFlag(
@@ -116,7 +125,8 @@ export class Evaluator {
               const flagEvaluationDetails = flagEvaluationDetailsBuilder
                 .setMatch(i, variation, allocation, matchedRule, expectedVariationType)
                 .build(flagEvaluationCode, flagEvaluationDescription);
-              return {
+
+              const assignmentDetails: AssignmentResult = {
                 flagKey: flag.key,
                 format: configFormat ?? '',
                 subjectKey,
@@ -125,9 +135,37 @@ export class Evaluator {
                 variation,
                 extraLogging: split.extraLogging ?? {},
                 doLog: allocation.doLog,
-                flagEvaluationDetails,
                 entityId: flag.entityId ?? null,
+                evaluationDetails: flagEvaluationDetails,
               };
+
+              const result: FlagEvaluation = { assignmentDetails };
+
+              // Create assignment event if doLog is true
+              if (allocation.doLog) {
+                result.assignmentEvent = {
+                  ...split.extraLogging,
+                  allocation: allocation.key,
+                  experiment: `${flag.key}-${allocation.key}`,
+                  featureFlag: flag.key,
+                  format: configFormat ?? '',
+                  variation: variation?.key ?? null,
+                  subject: subjectKey,
+                  timestamp: new Date().toISOString(),
+                  subjectAttributes,
+                  metaData: {
+                    obfuscated: configFormat === FormatEnum.CLIENT,
+                    sdkLanguage: 'javascript',
+                    sdkLibVersion: LIB_VERSION,
+                    sdkName: this.sdkName,
+                    sdkVersion: this.sdkVersion,
+                  },
+                  evaluationDetails: flagEvaluationDetails,
+                  entityId: flag.entityId ?? null,
+                };
+              }
+
+              return result;
             }
           }
           // matched, but does not fall within split range
@@ -223,16 +261,18 @@ export function noneResult(
   format: string,
 ): FlagEvaluation {
   return {
-    flagKey,
-    format,
-    subjectKey,
-    subjectAttributes,
-    allocationKey: null,
-    variation: null,
-    extraLogging: {},
-    doLog: false,
-    flagEvaluationDetails,
-    entityId: null,
+    assignmentDetails: {
+      flagKey,
+      format,
+      subjectKey,
+      subjectAttributes,
+      allocationKey: null,
+      variation: null,
+      extraLogging: {},
+      doLog: false,
+      entityId: null,
+      evaluationDetails: flagEvaluationDetails,
+    },
   };
 }
 
@@ -285,15 +325,17 @@ export function overrideResult(
     .build('MATCH', 'Flag override applied');
 
   return {
-    flagKey,
-    subjectKey,
-    variation: overrideVariation,
-    subjectAttributes,
-    flagEvaluationDetails,
-    doLog: false,
-    format: '',
-    allocationKey: overrideAllocationKey,
-    extraLogging: {},
-    entityId: null,
+    assignmentDetails: {
+      flagKey,
+      subjectKey,
+      variation: overrideVariation,
+      subjectAttributes,
+      doLog: false,
+      format: '',
+      allocationKey: overrideAllocationKey,
+      extraLogging: {},
+      entityId: null,
+      evaluationDetails: flagEvaluationDetails,
+    },
   };
 }

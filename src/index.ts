@@ -20,7 +20,6 @@ import EppoClient, {
   IAssignmentDetails,
   IContainerExperiment,
 } from './client/eppo-client';
-import EppoPrecomputedClient, { Subject } from './client/eppo-precomputed-client';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -93,8 +92,6 @@ export {
   validation,
 
   // Precomputed Client
-  EppoPrecomputedClient,
-  PrecomputedFlagsRequestParameters,
   IObfuscatedPrecomputedConfigurationResponse,
   IObfuscatedPrecomputedBandit,
 
@@ -118,7 +115,6 @@ export {
   assignmentCacheValueToString,
 
   // Interfaces
-  FlagConfigurationRequestParameters,
   Flag,
   ObfuscatedFlag,
   Variation,
@@ -130,7 +126,6 @@ export {
   BanditActions,
   BanditVariation,
   BanditParameters,
-  Subject,
   Environment,
   FormatEnum,
 

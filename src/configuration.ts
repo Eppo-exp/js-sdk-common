@@ -102,8 +102,53 @@ export class Configuration {
     return new Configuration({ flags, bandits, precomputed });
   }
 
-  // TODO:
-  // public static fromString(configurationWire: string): Configuration {}
+  /**
+   * Initializes a Configuration from a "configuration wire" format (this is the format returned by
+   * `toString`).
+   *
+   * @public
+   */
+  public static fromString(configurationWire: string): Configuration {
+    // TODO: we're assuming that `configurationWire` is properly formatted.
+    const wire: ConfigurationWire = JSON.parse(configurationWire);
+
+    let flags: FlagsConfig | undefined;
+    let bandits: BanditsConfig | undefined;
+    let precomputed: PrecomputedConfig | undefined;
+
+    if (wire.config) {
+      flags = {
+        response: JSON.parse(wire.config.response),
+        etag: wire.config.etag,
+        fetchedAt: wire.config.fetchedAt,
+      };
+    }
+
+    if (wire.bandits) {
+      bandits = {
+        response: JSON.parse(wire.bandits.response),
+        etag: wire.bandits.etag,
+        fetchedAt: wire.bandits.fetchedAt,
+      };
+    }
+
+    if (wire.precomputed) {
+      precomputed = {
+        response: JSON.parse(wire.precomputed.response),
+        etag: wire.precomputed.etag,
+        fetchedAt: wire.precomputed.fetchedAt,
+        subjectKey: wire.precomputed.subjectKey,
+        subjectAttributes: wire.precomputed.subjectAttributes,
+        banditActions: wire.precomputed.banditActions,
+      };
+    }
+
+    return new Configuration({
+      flags,
+      bandits,
+      precomputed,
+    });
+  }
 
   /** Serializes configuration to "configuration wire" format. */
   public toString(): string {

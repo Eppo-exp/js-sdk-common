@@ -41,9 +41,9 @@ import {
 } from '../constants';
 import { EppoValue } from '../eppo_value';
 import {
+  AssignmentResult,
   Evaluator,
   FlagEvaluation,
-  FlagEvaluationWithoutDetails,
   noneResult,
   overrideResult,
 } from '../evaluator';
@@ -268,6 +268,18 @@ export type EppoClientParameters = {
   };
 };
 
+// Define a type mapping from VariationType to TypeScript types
+type VariationTypeMap = {
+  [VariationType.STRING]: string;
+  [VariationType.INTEGER]: number;
+  [VariationType.NUMERIC]: number;
+  [VariationType.BOOLEAN]: boolean;
+  [VariationType.JSON]: object;
+};
+
+// Helper type to extract the TypeScript type from a VariationType
+type TypeFromVariationType<T extends VariationType> = VariationTypeMap[T];
+
 /**
  * ## Initialization
  *
@@ -313,7 +325,7 @@ export default class EppoClient {
   private assignmentCache?: AssignmentCache;
   // whether to suppress any errors and return default values instead
   private isGracefulFailureMode = true;
-  private readonly evaluator = new Evaluator();
+  private readonly evaluator: Evaluator;
   private readonly overrideValidator = new OverrideValidator();
 
   private readonly configurationFeed;
@@ -329,6 +341,11 @@ export default class EppoClient {
 
     this.eventDispatcher = eventDispatcher;
     this.overrideStore = overrideStore;
+
+    this.evaluator = new Evaluator({
+      sdkName: options.sdkName,
+      sdkVersion: options.sdkVersion,
+    });
 
     const {
       configuration: {
@@ -938,9 +955,37 @@ export default class EppoClient {
       'ASSIGNMENT_ERROR',
       'Unexpected error getting assigned variation for bandit action',
     );
+
     try {
-      // Get the assigned variation for the flag with a possible bandit
-      // Note for getting assignments, we don't care about context
+      // Check if we have precomputed configuration for this subject
+      const precomputed = config.getPrecomputedConfiguration();
+      if (precomputed && precomputed.subjectKey === subjectKey) {
+        // Use precomputed results if available
+        const nonContextualSubjectAttributes =
+          ensureNonContextualSubjectAttributes(subjectAttributes);
+        const { flagEvaluation, banditAction, assignmentEvent, banditEvent } =
+          this.evaluatePrecomputedAssignment(precomputed, flagKey, VariationType.STRING);
+
+        if (flagEvaluation.assignmentDetails.variation) {
+          variation = flagEvaluation.assignmentDetails.variation.value.toString();
+          evaluationDetails = flagEvaluation.assignmentDetails.evaluationDetails;
+          action = banditAction;
+
+          this.maybeLogAssignment(assignmentEvent);
+
+          if (banditEvent) {
+            try {
+              this.logBanditAction(banditEvent);
+            } catch (err: any) {
+              logger.error('Error logging precomputed bandit event', err);
+            }
+          }
+
+          return { variation, action, evaluationDetails };
+        }
+      }
+
+      // If no precomputed result, continue with regular evaluation
       const nonContextualSubjectAttributes =
         ensureNonContextualSubjectAttributes(subjectAttributes);
       const { variation: assignedVariation, evaluationDetails: assignmentEvaluationDetails } =
@@ -952,10 +997,6 @@ export default class EppoClient {
         );
       variation = assignedVariation;
       evaluationDetails = assignmentEvaluationDetails;
-
-      if (!config) {
-        return { variation, action: null, evaluationDetails };
-      }
 
       // Check if the assigned variation is an active bandit
       // Note: the reason for non-bandit assignments include the subject being bucketed into a non-bandit variation or
@@ -1159,19 +1200,19 @@ export default class EppoClient {
   }
 
   private parseVariationWithDetails(
-    { flagEvaluationDetails, variation }: FlagEvaluation,
+    { assignmentDetails: { variation, evaluationDetails } }: FlagEvaluation,
     defaultValue: EppoValue,
     expectedVariationType: VariationType,
   ): { eppoValue: EppoValue; flagEvaluationDetails: IFlagEvaluationDetails } {
     try {
-      if (!variation || flagEvaluationDetails.flagEvaluationCode !== 'MATCH') {
-        return { eppoValue: defaultValue, flagEvaluationDetails };
+      if (!variation || evaluationDetails.flagEvaluationCode !== 'MATCH') {
+        return { eppoValue: defaultValue, flagEvaluationDetails: evaluationDetails };
       }
       const eppoValue = EppoValue.valueOf(variation.value, expectedVariationType);
-      return { eppoValue, flagEvaluationDetails };
+      return { eppoValue, flagEvaluationDetails: evaluationDetails };
     } catch (error: any) {
       const eppoValue = this.rethrowIfNotGraceful(error, defaultValue);
-      return { eppoValue, flagEvaluationDetails };
+      return { eppoValue, flagEvaluationDetails: evaluationDetails };
     }
   }
 
@@ -1201,9 +1242,10 @@ export default class EppoClient {
 
       // Evaluate the flag for this subject.
       const evaluation = this.evaluator.evaluateFlag(config, flag, subjectKey, subjectAttributes);
+      const { assignmentDetails } = evaluation;
 
       // allocationKey is set along with variation when there is a result. this check appeases typescript below
-      if (!evaluation.variation || !evaluation.allocationKey) {
+      if (!assignmentDetails.variation || !assignmentDetails.allocationKey) {
         logger.debug(`${loggerPrefix} No assigned variation: ${flagKey}`);
         return;
       }
@@ -1211,12 +1253,12 @@ export default class EppoClient {
       // Transform into a PrecomputedFlag
       flags[flagKey] = {
         flagKey,
-        allocationKey: evaluation.allocationKey,
-        doLog: evaluation.doLog,
-        extraLogging: evaluation.extraLogging,
-        variationKey: evaluation.variation.key,
+        allocationKey: assignmentDetails.allocationKey,
+        doLog: assignmentDetails.doLog,
+        extraLogging: assignmentDetails.extraLogging,
+        variationKey: assignmentDetails.variation.key,
         variationType: flag.variationType,
-        variationValue: evaluation.variation.value.toString(),
+        variationValue: assignmentDetails.variation.value.toString(),
       };
     });
 
@@ -1276,24 +1318,37 @@ export default class EppoClient {
    * @param expectedVariationType The expected variation type
    * @returns A detailed return of assignment for a particular subject and flag
    */
-  getAssignmentDetail(
+  getAssignmentDetail<T extends VariationType>(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Attributes = {},
-    expectedVariationType?: VariationType,
+    expectedVariationType?: T,
+  ): FlagEvaluation {
+    const result = this.evaluateAssignment(
+      flagKey,
+      subjectKey,
+      subjectAttributes,
+      expectedVariationType,
+    );
+    this.maybeLogAssignment(result.assignmentEvent);
+    return result;
+  }
+
+  /**
+   * Internal helper that evaluates a flag assignment without logging
+   * Returns the evaluation result that can be used for logging
+   */
+  private evaluateAssignment<T extends VariationType>(
+    flagKey: string,
+    subjectKey: string,
+    subjectAttributes: Attributes,
+    expectedVariationType: T | undefined,
   ): FlagEvaluation {
     validateNotBlank(subjectKey, 'Invalid argument: subjectKey cannot be blank');
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
     const config = this.getConfiguration();
 
     const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(config, flagKey);
-    if (!config) {
-      const flagEvaluationDetails = flagEvaluationDetailsBuilder.buildForNoneResult(
-        'FLAG_UNRECOGNIZED_OR_DISABLED',
-        "Configuration hasn't being fetched yet",
-      );
-      return noneResult(flagKey, subjectKey, subjectAttributes, flagEvaluationDetails, '');
-    }
 
     const overrideVariation = this.overrideStore?.get(flagKey);
     if (overrideVariation) {
@@ -1309,14 +1364,13 @@ export default class EppoClient {
     const precomputed = config.getPrecomputedConfiguration();
     if (precomputed && precomputed.subjectKey === subjectKey) {
       // Short-circuit evaluation if we have a matching precomputed configuration.
-      return this.evaluatePrecomputedAssignment(
+      const precomputedResult = this.evaluatePrecomputedAssignment(
         precomputed,
         flagKey,
-        subjectKey,
-        subjectAttributes,
         expectedVariationType,
-        flagEvaluationDetailsBuilder,
       );
+
+      return precomputedResult.flagEvaluation;
     }
 
     const flag = config.getFlag(flagKey);
@@ -1380,14 +1434,8 @@ export default class EppoClient {
     );
 
     // if flag.key is obfuscated, replace with requested flag key
-    result.flagKey = flagKey;
-
-    try {
-      if (result?.doLog) {
-        this.maybeLogAssignment(result);
-      }
-    } catch (error) {
-      logger.error(`${loggerPrefix} Error logging assignment event: ${error}`);
+    if (result.assignmentDetails) {
+      result.assignmentDetails.flagKey = flagKey;
     }
 
     return result;
@@ -1396,53 +1444,104 @@ export default class EppoClient {
   private evaluatePrecomputedAssignment(
     precomputed: PrecomputedConfig,
     flagKey: string,
-    subjectKey: string,
-    subjectAttributes: Attributes,
     expectedVariationType: VariationType | undefined,
-    flagEvaluationDetailsBuilder: FlagEvaluationDetailsBuilder,
-  ): FlagEvaluation {
+  ): {
+    flagEvaluation: FlagEvaluation;
+    banditAction: string | null;
+    assignmentEvent?: IAssignmentEvent;
+    banditEvent?: IBanditEvent;
+  } {
     const obfuscatedKey = getMD5Hash(flagKey, precomputed.response.salt);
     const obfuscatedFlag: PrecomputedFlag | undefined = precomputed.response.flags[obfuscatedKey];
     const obfuscatedBandit: IObfuscatedPrecomputedBandit | undefined =
       precomputed.response.bandits[obfuscatedKey];
-    const flag = obfuscatedFlag && decodePrecomputedFlag(obfuscatedFlag);
-    const bandit = obfuscatedBandit && decodePrecomputedBandit(obfuscatedBandit);
 
-    if (!flag) {
+    if (!obfuscatedFlag) {
       logger.warn(`${loggerPrefix} No assigned variation. Flag not found: ${flagKey}`);
-      // note: this is different from the Python SDK, which returns None instead
-      const flagEvaluationDetails = flagEvaluationDetailsBuilder.buildForNoneResult(
-        'FLAG_UNRECOGNIZED_OR_DISABLED',
-        `Unrecognized or disabled flag: ${flagKey}`,
-      );
-      return noneResult(
+      const flagEvaluationDetails: IFlagEvaluationDetails = {
+        environmentName: precomputed.response.environment?.name ?? '',
+        flagEvaluationCode: 'FLAG_UNRECOGNIZED_OR_DISABLED' as const,
+        flagEvaluationDescription: `Unrecognized or disabled flag: ${flagKey}`,
+        variationKey: null,
+        variationValue: null,
+        banditKey: null,
+        banditAction: null,
+        configFetchedAt: precomputed.fetchedAt ?? '',
+        configPublishedAt: precomputed.response.createdAt,
+        matchedRule: null,
+        matchedAllocation: null,
+        unmatchedAllocations: [],
+        unevaluatedAllocations: [],
+      };
+
+      const noneResultValue = noneResult(
         flagKey,
-        subjectKey,
-        subjectAttributes,
+        precomputed.subjectKey,
+        ensureNonContextualSubjectAttributes(precomputed.subjectAttributes ?? {}),
         flagEvaluationDetails,
         precomputed.response.format,
       );
+
+      return {
+        flagEvaluation: noneResultValue,
+        banditAction: null,
+      };
     }
+
+    const flag = decodePrecomputedFlag(obfuscatedFlag);
+    const bandit = obfuscatedBandit && decodePrecomputedBandit(obfuscatedBandit);
 
     if (!checkTypeMatch(expectedVariationType, flag.variationType)) {
       const errorMessage = `Variation value does not have the correct type. Found ${flag.variationType}, but expected ${expectedVariationType} for flag ${flagKey}`;
       if (this.isGracefulFailureMode) {
-        const flagEvaluationDetails = flagEvaluationDetailsBuilder.buildForNoneResult(
-          'TYPE_MISMATCH',
-          errorMessage,
-        );
-        return noneResult(
-          flagKey,
-          subjectKey,
-          subjectAttributes,
-          flagEvaluationDetails,
-          precomputed.response.format,
-        );
+        const flagEvaluationDetails: IFlagEvaluationDetails = {
+          environmentName: precomputed.response.environment?.name ?? '',
+          flagEvaluationCode: 'TYPE_MISMATCH' as const,
+          flagEvaluationDescription: errorMessage,
+          variationKey: null,
+          variationValue: null,
+          banditKey: null,
+          banditAction: null,
+          configFetchedAt: precomputed.fetchedAt ?? '',
+          configPublishedAt: precomputed.response.createdAt,
+          matchedRule: null,
+          matchedAllocation: null,
+          unmatchedAllocations: [],
+          unevaluatedAllocations: [],
+        };
+
+        return {
+          flagEvaluation: noneResult(
+            flagKey,
+            precomputed.subjectKey,
+            ensureNonContextualSubjectAttributes(precomputed.subjectAttributes ?? {}),
+            flagEvaluationDetails,
+            precomputed.response.format,
+          ),
+          banditAction: null,
+        };
       }
       throw new TypeError(errorMessage);
     }
 
-    const result: FlagEvaluation = {
+    // Prepare flag evaluation details
+    const flagEvaluationDetails: IFlagEvaluationDetails = {
+      environmentName: precomputed.response.environment?.name ?? '',
+      flagEvaluationCode: 'MATCH' as const,
+      flagEvaluationDescription: 'Matched precomputed flag',
+      variationKey: flag.variationKey ?? null,
+      variationValue: flag.variationValue,
+      banditKey: bandit?.banditKey ?? null,
+      banditAction: bandit?.action ?? null,
+      configFetchedAt: precomputed.fetchedAt ?? '',
+      configPublishedAt: precomputed.response.createdAt,
+      matchedRule: null,
+      matchedAllocation: null,
+      unmatchedAllocations: [],
+      unevaluatedAllocations: [],
+    };
+
+    const assignmentDetails: AssignmentResult = {
       flagKey,
       format: precomputed.response.format,
       subjectKey: precomputed.subjectKey,
@@ -1457,24 +1556,60 @@ export default class EppoClient {
       extraLogging: flag.extraLogging ?? {},
       doLog: flag.doLog,
       entityId: null,
-      flagEvaluationDetails: {
-        environmentName: precomputed.response.environment?.name ?? '',
-        flagEvaluationCode: 'MATCH',
-        flagEvaluationDescription: 'Matched precomputed flag',
-        variationKey: flag.variationKey ?? null,
-        variationValue: flag.variationValue,
-        banditKey: null,
-        banditAction: null,
-        configFetchedAt: precomputed.fetchedAt ?? '',
-        configPublishedAt: precomputed.response.createdAt,
-        matchedRule: null,
-        matchedAllocation: null,
-        unmatchedAllocations: [],
-        unevaluatedAllocations: [],
-      },
+      evaluationDetails: flagEvaluationDetails,
     };
 
-    return result;
+    const flagEvaluation: FlagEvaluation = {
+      assignmentDetails,
+    };
+
+    // Create assignment event if needed
+    if (flag.doLog) {
+      flagEvaluation.assignmentEvent = {
+        ...flag.extraLogging,
+        allocation: flag.allocationKey ?? null,
+        experiment: flag.allocationKey ? `${flagKey}-${flag.allocationKey}` : null,
+        featureFlag: flagKey,
+        format: precomputed.response.format,
+        variation: flag.variationKey ?? null,
+        subject: precomputed.subjectKey,
+        timestamp: new Date().toISOString(),
+        subjectAttributes: precomputed.subjectAttributes
+          ? ensureNonContextualSubjectAttributes(precomputed.subjectAttributes)
+          : {},
+        metaData: this.buildLoggerMetadata(),
+        evaluationDetails: flagEvaluationDetails,
+        entityId: null,
+      };
+    }
+
+    // Create bandit event if present
+    let banditEvent: IBanditEvent | undefined;
+    if (bandit) {
+      flagEvaluation.banditEvent = {
+        timestamp: new Date().toISOString(),
+        featureFlag: flagKey,
+        bandit: bandit.banditKey,
+        subject: precomputed.subjectKey,
+        action: bandit.action,
+        actionProbability: bandit.actionProbability,
+        optimalityGap: bandit.optimalityGap,
+        modelVersion: bandit.modelVersion,
+        subjectNumericAttributes: precomputed.subjectAttributes?.numericAttributes ?? {},
+        subjectCategoricalAttributes: precomputed.subjectAttributes?.categoricalAttributes ?? {},
+        actionNumericAttributes: bandit.actionNumericAttributes,
+        actionCategoricalAttributes: bandit.actionCategoricalAttributes,
+        metaData: this.buildLoggerMetadata(),
+        evaluationDetails: flagEvaluationDetails,
+      };
+    }
+
+    return {
+      flagEvaluation,
+      banditAction: bandit?.action ?? null,
+      assignmentEvent: flagEvaluation.assignmentEvent,
+      banditEvent: flagEvaluation.banditEvent,
+    };
   }
 
   /**
@@ -1579,47 +1714,28 @@ export default class EppoClient {
     });
   }
 
-  private maybeLogAssignment(result: FlagEvaluation) {
-    const {
-      flagKey,
-      format,
-      subjectKey,
-      allocationKey = null,
-      subjectAttributes,
-      variation,
-      flagEvaluationDetails,
-      extraLogging = {},
-      entityId,
-    } = result;
-    const event: IAssignmentEvent = {
-      ...extraLogging,
-      allocation: allocationKey,
-      experiment: allocationKey ? `${flagKey}-${allocationKey}` : null,
-      featureFlag: flagKey,
-      format,
-      variation: variation?.key ?? null,
-      subject: subjectKey,
-      timestamp: new Date().toISOString(),
-      subjectAttributes,
-      metaData: this.buildLoggerMetadata(),
-      evaluationDetails: flagEvaluationDetails,
-      entityId,
-    };
-
-    if (variation && allocationKey) {
-      // If already logged, don't log again
-      const hasLoggedAssignment = this.assignmentCache?.has({
-        flagKey,
-        subjectKey,
-        allocationKey,
-        variationKey: variation.key,
-      });
-      if (hasLoggedAssignment) {
-        return;
-      }
-    }
-
+  private maybeLogAssignment(event: IAssignmentEvent | undefined) {
     try {
+      if (!event) return;
+
+      const flagKey = event.featureFlag;
+      const subjectKey = event.subject;
+      const allocationKey = event.allocation;
+      const variationKey = event.variation;
+
+      if (variationKey && allocationKey) {
+        // If already logged, don't log again
+        const hasLoggedAssignment = this.assignmentCache?.has({
+          flagKey,
+          subjectKey,
+          allocationKey,
+          variationKey,
+        });
+        if (hasLoggedAssignment) {
+          return;
+        }
+      }
+
       if (this.assignmentLogger) {
         this.assignmentLogger.logAssignment(event);
       } else {
@@ -1631,7 +1747,7 @@ export default class EppoClient {
         flagKey,
         subjectKey,
         allocationKey: allocationKey ?? '__eppo_no_allocation',
-        variationKey: variation?.key ?? '__eppo_no_variation',
+        variationKey: variationKey ?? '__eppo_no_variation',
       });
     } catch (error: any) {
       logger.error(`${loggerPrefix} Error logging assignment event: ${error.message}`);
@@ -1716,6 +1832,7 @@ export function checkTypeMatch(expectedType?: VariationType, actualType?: Variat
   return expectedType === undefined || actualType === expectedType;
 }
 
+/** @internal */
 export function checkValueTypeMatch(
   expectedType: VariationType | undefined,
   value: ValueType,

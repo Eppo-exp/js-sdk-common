@@ -13,10 +13,7 @@ import ApiEndpoints from '../api-endpoints';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
-import ConfigurationRequestor from '../configuration-requestor';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
-  IConfigurationWire,
   IPrecomputedConfiguration,
   IObfuscatedPrecomputedConfigurationResponse,
 } from '../configuration-wire/configuration-wire-types';
@@ -25,8 +22,6 @@ import {
   AllocationEvaluationCode,
   IFlagEvaluationDetails,
 } from '../flag-evaluation-details-builder';
-import FetchHttpClient from '../http-client';
-import { BanditVariation, BanditParameters, Flag } from '../interfaces';
 import { attributeEncodeBase64 } from '../obfuscation';
 import { Attributes, BanditActions, ContextAttributes } from '../types';
 
@@ -511,19 +506,59 @@ describe('EppoClient Bandits E2E test', () => {
         mockEvaluateFlag = jest
           .spyOn(Evaluator.prototype, 'evaluateFlag')
           .mockImplementation(() => {
-            return {
-              flagKey,
-              subjectKey,
-              subjectAttributes,
-              allocationKey: 'mock-allocation',
-              variation: { key: variationToReturn, value: variationToReturn },
-              extraLogging: {},
-              doLog: true,
-              flagEvaluationDetails: {
-                flagEvaluationCode: 'MATCH',
-                flagEvaluationDescription: 'Mocked evaluation',
+            const evaluationDetails = {
+              flagEvaluationCode: 'MATCH' as const,
+              flagEvaluationDescription: 'Mocked evaluation',
+              configFetchedAt: new Date().toISOString(),
+              configPublishedAt: new Date().toISOString(),
+              environmentName: 'test',
+              variationKey: variationToReturn,
+              variationValue: variationToReturn,
+              banditKey: null,
+              banditAction: null,
+              matchedRule: null,
+              matchedAllocation: {
+                key: 'mock-allocation',
+                allocationEvaluationCode: AllocationEvaluationCode.MATCH,
+                orderPosition: 1,
               },
-            } as FlagEvaluation;
+              unmatchedAllocations: [],
+              unevaluatedAllocations: [],
+            };
+            
+            return {
+              assignmentDetails: {
+                flagKey,
+                format: 'SERVER',
+                subjectKey,
+                subjectAttributes,
+                allocationKey: 'mock-allocation',
+                variation: { key: variationToReturn, value: variationToReturn },
+                extraLogging: {},
+                doLog: true,
+                entityId: null,
+                evaluationDetails,
+              },
+              assignmentEvent: {
+                allocation: 'mock-allocation',
+                experiment: `${flagKey}-mock-allocation`,
+                featureFlag: flagKey,
+                format: 'SERVER',
+                variation: variationToReturn,
+                subject: subjectKey,
+                timestamp: new Date().toISOString(),
+                subjectAttributes,
+                metaData: {
+                  obfuscated: false,
+                  sdkLanguage: 'javascript',
+                  sdkLibVersion: '1.0.0',
+                  sdkName: 'js-client-sdk-common',
+                  sdkVersion: '1.0.0',
+                },
+                evaluationDetails,
+                entityId: null,
+              }
+            };
           });
 
         mockEvaluateBandit = jest
@@ -662,7 +697,7 @@ describe('EppoClient Bandits E2E test', () => {
         salt,
       );
 
-      const { precomputed } = JSON.parse(precomputedResults) as IConfigurationWire;
+      const { precomputed } = JSON.parse(precomputedResults);
       if (!precomputed) {
         fail('precomputed result was not parsed');
       }
