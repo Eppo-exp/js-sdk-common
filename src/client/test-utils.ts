@@ -1,12 +1,10 @@
 import ApiEndpoints from '../api-endpoints';
+import { BroadcastChannel } from '../broadcast';
+import { Configuration } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
-import { IConfigurationStore } from '../configuration-store/configuration-store';
 import FetchHttpClient from '../http-client';
-import { Flag, ObfuscatedFlag } from '../interfaces';
 
-export async function initConfiguration(
-  configurationStore: IConfigurationStore<Flag | ObfuscatedFlag>,
-) {
+export async function initConfiguration(): Promise<Configuration | null> {
   const apiEndpoints = new ApiEndpoints({
     baseUrl: 'http://127.0.0.1:4000',
     queryParams: {
@@ -16,11 +14,6 @@ export async function initConfiguration(
     },
   });
   const httpClient = new FetchHttpClient(apiEndpoints, 1000);
-  const configurationRequestor = new ConfigurationRequestor(
-    httpClient,
-    configurationStore,
-    null,
-    null,
-  );
-  await configurationRequestor.fetchAndStoreConfigurations();
+  const configurationRequestor = new ConfigurationRequestor(httpClient, new BroadcastChannel());
+  return await configurationRequestor.fetchConfiguration();
 }

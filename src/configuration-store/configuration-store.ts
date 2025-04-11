@@ -21,6 +21,8 @@ import { Environment } from '../interfaces';
  *
  * The policy choices surrounding the use of one or more underlying storages are
  * implementation specific and handled upstream.
+ *
+ * @deprecated To be replaced with ConfigurationStore and PersistentStorage.
  */
 export interface IConfigurationStore<T> {
   init(): Promise<void>;
@@ -41,6 +43,7 @@ export interface IConfigurationStore<T> {
   salt?: string;
 }
 
+/** @deprecated To be replaced with ConfigurationStore and PersistentStorage. */
 export interface ISyncStore<T> {
   get(key: string): T | null;
   entries(): Record<string, T>;
@@ -49,6 +52,7 @@ export interface ISyncStore<T> {
   setEntries(entries: Record<string, T>): void;
 }
 
+/** @deprecated To be replaced with ConfigurationStore and PersistentStorage. */
 export interface IAsyncStore<T> {
   isInitialized(): boolean;
   isExpired(): Promise<boolean>;

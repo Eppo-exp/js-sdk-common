@@ -17,14 +17,9 @@ import { LRUInMemoryAssignmentCache } from './cache/lru-in-memory-assignment-cac
 import { NonExpiringInMemoryAssignmentCache } from './cache/non-expiring-in-memory-cache-assignment';
 import EppoClient, {
   EppoClientParameters,
-  FlagConfigurationRequestParameters,
   IAssignmentDetails,
   IContainerExperiment,
 } from './client/eppo-client';
-import EppoPrecomputedClient, {
-  PrecomputedFlagsRequestParameters,
-  Subject,
-} from './client/eppo-precomputed-client';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -33,7 +28,6 @@ import {
 } from './configuration-store/configuration-store';
 import { HybridConfigurationStore } from './configuration-store/hybrid.store';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
-import { ConfigurationWireHelper } from './configuration-wire/configuration-wire-helper';
 import {
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
@@ -98,8 +92,6 @@ export {
   validation,
 
   // Precomputed Client
-  EppoPrecomputedClient,
-  PrecomputedFlagsRequestParameters,
   IObfuscatedPrecomputedConfigurationResponse,
   IObfuscatedPrecomputedBandit,
 
@@ -123,7 +115,6 @@ export {
   assignmentCacheValueToString,
 
   // Interfaces
-  FlagConfigurationRequestParameters,
   Flag,
   ObfuscatedFlag,
   Variation,
@@ -135,7 +126,6 @@ export {
   BanditActions,
   BanditVariation,
   BanditParameters,
-  Subject,
   Environment,
   FormatEnum,
 
@@ -156,7 +146,6 @@ export {
   IPrecomputedConfigurationResponse,
   PrecomputedFlag,
   FlagKey,
-  ConfigurationWireHelper,
 
   // Test helpers
   decodePrecomputedFlag,
