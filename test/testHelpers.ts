@@ -159,7 +159,10 @@ export function validateTestAssignments(
 
     expect(assignedVariation).toEqual(subject.assignment);
 
-    if (withDetails && assignmentDetails) {
+    if (withDetails) {
+      if (!assignmentDetails) {
+        throw new Error('Expected assignmentDetails to be populated');
+      }
       expect(assignmentDetails.environmentName).toBe(subject.evaluationDetails.environmentName);
       expect(assignmentDetails.flagEvaluationCode).toBe(
         subject.evaluationDetails.flagEvaluationCode,
