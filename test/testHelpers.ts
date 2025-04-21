@@ -5,6 +5,7 @@ import { isEqual } from 'lodash';
 import { AttributeType, ContextAttributes, IAssignmentDetails, Variation, VariationType } from '../src';
 import { IFlagEvaluationDetails } from '../src/flag-evaluation-details-builder';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from '../src/http-client';
+import { getMD5Hash } from '../src/obfuscation';
 
 export const TEST_DATA_DIR = './test/data/ufc/';
 export const ASSIGNMENT_TEST_DATA_DIR = TEST_DATA_DIR + 'tests/';
@@ -113,29 +114,6 @@ export function getTestAssignments(
   return assignments;
 }
 
-export function getTestAssignmentDetails(
-  testCase: IAssignmentTestCase,
-  assignmentDetailsFn: (
-    flagKey: string,
-    subjectKey: string,
-    subjectAttributes: Record<string, AttributeType>,
-    defaultValue: string | number | boolean | object,
-  ) => never,
-): {
-  subject: SubjectTestCase;
-  assignmentDetails: IAssignmentDetails<string | boolean | number | object>;
-}[] {
-  return testCase.subjects.map((subject) => ({
-    subject,
-    assignmentDetails: assignmentDetailsFn(
-      testCase.flag,
-      subject.subjectKey,
-      subject.subjectAttributes,
-      testCase.defaultValue,
-    ),
-  }));
-}
-
 export function validateTestAssignments(
   assignments: {
     subject: SubjectTestCase;
@@ -149,6 +127,7 @@ export function validateTestAssignments(
   }[],
   flag: string,
   withDetails: boolean,
+  isObfuscated: boolean,
 ) {
   for (const { subject, assignment } of assignments) {
     let assignedVariation = assignment;
@@ -192,7 +171,17 @@ export function validateTestAssignments(
       // TODO: below needs to be fixed
       //expect(assignmentDetails.configFetchedAt).toBe(subject.evaluationDetails.configFetchedAt);
       //expect(assignmentDetails.configPublishedAt).toBe(subject.evaluationDetails.configPublishedAt);
-      expect(assignmentDetails.matchedRule).toEqual(subject.evaluationDetails.matchedRule);
+
+      if (!isObfuscated) {
+        expect(assignmentDetails.matchedRule).toEqual(subject.evaluationDetails.matchedRule);
+      } else {
+        // When obfuscated, rules may be one-way hashed (e.g., for ONE_OF checks) so cannot be unobfuscated
+        // Thus we'll just check that the number of conditions is equal
+        expect(assignmentDetails.matchedRule?.conditions || []).toHaveLength(
+          subject.evaluationDetails.matchedRule?.conditions.length || 0,
+        );
+      }
+
       expect(assignmentDetails.matchedAllocation).toEqual(
         subject.evaluationDetails.matchedAllocation,
       );

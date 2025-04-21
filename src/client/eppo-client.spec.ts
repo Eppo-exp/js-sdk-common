@@ -386,7 +386,7 @@ describe('EppoClient E2E test', () => {
           assignmentFn,
         );
 
-        validateTestAssignments(assignments, flag, assignmentWithDetails);
+        validateTestAssignments(assignments, flag, assignmentWithDetails, isObfuscated);
       });
     });
   });
