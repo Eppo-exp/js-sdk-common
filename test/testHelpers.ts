@@ -2,7 +2,7 @@ import * as fs from 'fs';
 
 import { isEqual } from 'lodash';
 
-import { AttributeType, ContextAttributes, IAssignmentDetails, VariationType } from '../src';
+import { AttributeType, ContextAttributes, IAssignmentDetails, Variation, VariationType } from '../src';
 import { IFlagEvaluationDetails } from '../src/flag-evaluation-details-builder';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from '../src/http-client';
 
@@ -87,7 +87,16 @@ export function getTestAssignments(
     subjectAttributes: Record<string, AttributeType>,
     defaultValue: string | number | boolean | object,
   ) => never,
-): { subject: SubjectTestCase; assignment: string | boolean | number | null | object }[] {
+): {
+  subject: SubjectTestCase;
+  assignment:
+    | string
+    | boolean
+    | number
+    | null
+    | object
+    | IAssignmentDetails<typeof testCase.defaultValue>;
+}[] {
   const assignments: {
     subject: SubjectTestCase;
     assignment: string | boolean | number | null | object;
@@ -130,22 +139,69 @@ export function getTestAssignmentDetails(
 export function validateTestAssignments(
   assignments: {
     subject: SubjectTestCase;
-    assignment: string | boolean | number | object | null;
+    assignment:
+      | string
+      | boolean
+      | number
+      | object
+      | null
+      | IAssignmentDetails<string | boolean | number | object>;
   }[],
   flag: string,
+  withDetails: boolean,
 ) {
   for (const { subject, assignment } of assignments) {
-    if (!isEqual(assignment, subject.assignment)) {
+    let assignedVariation = assignment;
+    let assignmentDetails: IFlagEvaluationDetails | null = null;
+    if (
+      withDetails === true &&
+      typeof assignment === 'object' &&
+      assignment !== null &&
+      'variation' in assignment
+    ) {
+      assignedVariation = assignment.variation;
+      assignmentDetails = assignment.evaluationDetails;
+    }
+
+    if (!isEqual(assignedVariation, subject.assignment)) {
       // More friendly error message
       console.error(
         `subject ${subject.subjectKey} was assigned ${JSON.stringify(
-          assignment,
+          assignedVariation,
           undefined,
           2,
         )} when expected ${JSON.stringify(subject.assignment, undefined, 2)} for flag ${flag}`,
       );
     }
 
-    expect(assignment).toEqual(subject.assignment);
+    expect(assignedVariation).toEqual(subject.assignment);
+
+    if (withDetails && assignmentDetails) {
+      expect(assignmentDetails.environmentName).toBe(subject.evaluationDetails.environmentName);
+      expect(assignmentDetails.flagEvaluationCode).toBe(
+        subject.evaluationDetails.flagEvaluationCode,
+      );
+      expect(assignmentDetails.flagEvaluationDescription).toBe(
+        subject.evaluationDetails.flagEvaluationDescription,
+      );
+      expect(assignmentDetails.variationKey).toBe(subject.evaluationDetails.variationKey);
+      // Use toString() to handle comparing JSON
+      expect(assignmentDetails.variationValue?.toString()).toBe(
+        subject.evaluationDetails.variationValue?.toString(),
+      );
+      // TODO: below needs to be fixed
+      //expect(assignmentDetails.configFetchedAt).toBe(subject.evaluationDetails.configFetchedAt);
+      //expect(assignmentDetails.configPublishedAt).toBe(subject.evaluationDetails.configPublishedAt);
+      expect(assignmentDetails.matchedRule).toEqual(subject.evaluationDetails.matchedRule);
+      expect(assignmentDetails.matchedAllocation).toEqual(
+        subject.evaluationDetails.matchedAllocation,
+      );
+      expect(assignmentDetails.unmatchedAllocations).toEqual(
+        subject.evaluationDetails.unmatchedAllocations,
+      );
+      expect(assignmentDetails.unevaluatedAllocations).toEqual(
+        subject.evaluationDetails.unevaluatedAllocations,
+      );
+    }
   }
 }
