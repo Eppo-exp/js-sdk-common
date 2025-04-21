@@ -2,10 +2,9 @@ import * as fs from 'fs';
 
 import { isEqual } from 'lodash';
 
-import { AttributeType, ContextAttributes, IAssignmentDetails, Variation, VariationType } from '../src';
+import { AttributeType, ContextAttributes, IAssignmentDetails, VariationType } from '../src';
 import { IFlagEvaluationDetails } from '../src/flag-evaluation-details-builder';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from '../src/http-client';
-import { getMD5Hash } from '../src/obfuscation';
 
 export const TEST_DATA_DIR = './test/data/ufc/';
 export const ASSIGNMENT_TEST_DATA_DIR = TEST_DATA_DIR + 'tests/';
@@ -114,6 +113,9 @@ export function getTestAssignments(
   return assignments;
 }
 
+const configCreatedAt = readMockUFCResponse(MOCK_UFC_RESPONSE_FILE).createdAt;
+const testHelperInstantiationDate = new Date();
+
 export function validateTestAssignments(
   assignments: {
     subject: SubjectTestCase;
@@ -168,15 +170,18 @@ export function validateTestAssignments(
       expect(assignmentDetails.variationValue?.toString()).toBe(
         subject.evaluationDetails.variationValue?.toString(),
       );
-      // TODO: below needs to be fixed
-      //expect(assignmentDetails.configFetchedAt).toBe(subject.evaluationDetails.configFetchedAt);
-      //expect(assignmentDetails.configPublishedAt).toBe(subject.evaluationDetails.configPublishedAt);
+      expect(assignmentDetails.configPublishedAt).toBe(configCreatedAt);
+      // cannot do an exact match for configFetchedAt because it will change based on fetch
+      expect(new Date(assignmentDetails.configFetchedAt).getTime()).toBeGreaterThan(
+        testHelperInstantiationDate.getTime(),
+      );
 
       if (!isObfuscated) {
         expect(assignmentDetails.matchedRule).toEqual(subject.evaluationDetails.matchedRule);
       } else {
         // When obfuscated, rules may be one-way hashed (e.g., for ONE_OF checks) so cannot be unobfuscated
-        // Thus we'll just check that the number of conditions is equal
+        // Thus we'll just check that the number of conditions is equal and relay on the unobfuscated
+        // tests for correctness
         expect(assignmentDetails.matchedRule?.conditions || []).toHaveLength(
           subject.evaluationDetails.matchedRule?.conditions.length || 0,
         );

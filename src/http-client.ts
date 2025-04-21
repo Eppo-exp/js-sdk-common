@@ -43,6 +43,7 @@ export interface IUniversalFlagConfigResponse {
 }
 
 export interface IBanditParametersResponse {
+  createdAt: string; // ISO formatted string
   bandits: Record<string, BanditParameters>;
 }
 
