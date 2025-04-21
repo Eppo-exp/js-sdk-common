@@ -113,7 +113,9 @@ export function getTestAssignments(
   return assignments;
 }
 
-const configCreatedAt = readMockUFCResponse(MOCK_UFC_RESPONSE_FILE).createdAt;
+const configCreatedAt = (
+  readMockUFCResponse(MOCK_UFC_RESPONSE_FILE) as IUniversalFlagConfigResponse
+).createdAt;
 const testHelperInstantiationDate = new Date();
 
 export function validateTestAssignments(
