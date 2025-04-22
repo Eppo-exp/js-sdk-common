@@ -4,6 +4,7 @@ import * as td from 'testdouble';
 
 import {
   ASSIGNMENT_TEST_DATA_DIR,
+  AssignmentVariationValue,
   getTestAssignments,
   IAssignmentTestCase,
   MOCK_UFC_RESPONSE_FILE,
@@ -28,7 +29,11 @@ import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../i
 import { getMD5Hash } from '../obfuscation';
 import { AttributeType } from '../types';
 
-import EppoClient, { checkTypeMatch, FlagConfigurationRequestParameters } from './eppo-client';
+import EppoClient, {
+  checkTypeMatch,
+  FlagConfigurationRequestParameters,
+  IAssignmentDetails,
+} from './eppo-client';
 import { initConfiguration } from './test-utils';
 
 // Use a known salt to produce deterministic hashes
@@ -352,7 +357,7 @@ describe('EppoClient E2E test', () => {
 
         let assignments: {
           subject: SubjectTestCase;
-          assignment: string | boolean | number | null | object;
+          assignment: AssignmentVariationValue;
         }[] = [];
 
         const typeAssignmentFunctions = assignmentWithDetails
@@ -375,8 +380,8 @@ describe('EppoClient E2E test', () => {
           flagKey: string,
           subjectKey: string,
           subjectAttributes: Record<string, AttributeType>,
-          defaultValue: boolean | string | number | object,
-        ) => never;
+          defaultValue: AssignmentVariationValue,
+        ) => AssignmentVariationValue | IAssignmentDetails<AssignmentVariationValue>;
         if (!assignmentFn) {
           throw new Error(`Unknown variation type: ${variationType}`);
         }

@@ -2,7 +2,13 @@ import * as fs from 'fs';
 
 import { isEqual } from 'lodash';
 
-import { AttributeType, ContextAttributes, IAssignmentDetails, VariationType } from '../src';
+import {
+  AttributeType,
+  ContextAttributes,
+  IAssignmentDetails,
+  Variation,
+  VariationType,
+} from '../src';
 import { IFlagEvaluationDetails } from '../src/flag-evaluation-details-builder';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from '../src/http-client';
 
@@ -20,17 +26,19 @@ const MOCK_PRECOMPUTED_FILENAME = 'precomputed-v1';
 export const MOCK_PRECOMPUTED_WIRE_FILE = `${MOCK_PRECOMPUTED_FILENAME}.json`;
 export const MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE = `${MOCK_PRECOMPUTED_FILENAME}-deobfuscated.json`;
 
+export type AssignmentVariationValue = Variation['value'] | object;
+
 export interface SubjectTestCase {
   subjectKey: string;
   subjectAttributes: Record<string, AttributeType>;
-  assignment: string | number | boolean | object;
+  assignment: AssignmentVariationValue;
   evaluationDetails: IFlagEvaluationDetails;
 }
 
 export interface IAssignmentTestCase {
   flag: string;
   variationType: VariationType;
-  defaultValue: string | number | boolean | object;
+  defaultValue: AssignmentVariationValue;
   subjects: SubjectTestCase[];
 }
 
@@ -85,21 +93,15 @@ export function getTestAssignments(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Record<string, AttributeType>,
-    defaultValue: string | number | boolean | object,
-  ) => never,
+    defaultValue: AssignmentVariationValue,
+  ) => AssignmentVariationValue | IAssignmentDetails<AssignmentVariationValue>,
 ): {
   subject: SubjectTestCase;
-  assignment:
-    | string
-    | boolean
-    | number
-    | null
-    | object
-    | IAssignmentDetails<typeof testCase.defaultValue>;
+  assignment: AssignmentVariationValue | IAssignmentDetails<AssignmentVariationValue>;
 }[] {
   const assignments: {
     subject: SubjectTestCase;
-    assignment: string | boolean | number | null | object;
+    assignment: AssignmentVariationValue;
   }[] = [];
   for (const subject of testCase.subjects) {
     const assignment = assignmentFn(
@@ -121,13 +123,7 @@ const testHelperInstantiationDate = new Date();
 export function validateTestAssignments(
   assignments: {
     subject: SubjectTestCase;
-    assignment:
-      | string
-      | boolean
-      | number
-      | object
-      | null
-      | IAssignmentDetails<string | boolean | number | object>;
+    assignment: AssignmentVariationValue | IAssignmentDetails<AssignmentVariationValue>;
   }[],
   flag: string,
   withDetails: boolean,

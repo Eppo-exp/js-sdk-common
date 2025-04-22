@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 
 import {
+  AssignmentVariationValue,
   IAssignmentTestCase,
   MOCK_UFC_RESPONSE_FILE,
   readMockUFCResponse,
@@ -328,8 +329,8 @@ describe('EppoClient get*AssignmentDetails', () => {
                 flagKey: string,
                 subjectKey: string,
                 subjectAttributes: Record<string, AttributeType>,
-                defaultValue: boolean | string | number | object,
-              ) => IAssignmentDetails<boolean | string | number | object>;
+                defaultValue: AssignmentVariationValue,
+              ) => IAssignmentDetails<AssignmentVariationValue>;
               if (!assignmentFn) {
                 throw new Error(`Unknown variation type: ${variationType}`);
               }
