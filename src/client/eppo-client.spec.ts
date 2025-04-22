@@ -970,6 +970,87 @@ describe('EppoClient E2E test', () => {
     });
   });
 
+  describe('Contstructed with enhanced SDK Token', () => {
+    let urlRequests: string[] = [];
+    beforeEach(() => {
+      urlRequests = [];
+    });
+
+    beforeAll(() => {
+      global.fetch = jest.fn((url) => {
+        urlRequests.push(url);
+        const ufc = readMockUFCResponse(MOCK_UFC_RESPONSE_FILE);
+
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(ufc),
+        });
+      }) as jest.Mock;
+    });
+
+    it('uses the default base URL when the API Key is not an enhanced token', async () => {
+      const client = new EppoClient({
+        configurationRequestParameters: {
+          apiKey: 'basic-token',
+          pollAfterSuccessfulInitialization: false,
+          pollAfterFailedInitialization: false,
+          sdkVersion: '',
+          sdkName: '',
+        },
+
+        flagConfigurationStore: storage,
+      });
+
+      await client.fetchFlagConfigurations();
+
+      expect(urlRequests).toEqual([
+        'https://fscdn.eppo.cloud/api/flag-config/v1/config?apiKey=basic-token&sdkName=&sdkVersion=',
+      ]);
+    });
+
+    it('uses the customer-specific subdomain when provided', async () => {
+      const client = new EppoClient({
+        configurationRequestParameters: {
+          apiKey: 'zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA==',
+          pollAfterSuccessfulInitialization: false,
+          pollAfterFailedInitialization: false,
+          sdkVersion: '',
+          sdkName: '',
+        },
+
+        flagConfigurationStore: storage,
+      });
+
+      await client.fetchFlagConfigurations();
+
+      expect(urlRequests).toHaveLength(1);
+      expect(urlRequests[0]).toContain(
+        'https://experiment.fscdn.eppo.cloud/api/flag-config/v1/config',
+      );
+    });
+
+    it('prefers a provided baseUrl over encoded subdomain', async () => {
+      const client = new EppoClient({
+        configurationRequestParameters: {
+          baseUrl: 'http://override.base.url',
+          apiKey: 'zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA==',
+          pollAfterSuccessfulInitialization: false,
+          pollAfterFailedInitialization: false,
+          sdkVersion: '',
+          sdkName: '',
+        },
+
+        flagConfigurationStore: storage,
+      });
+
+      await client.fetchFlagConfigurations();
+
+      expect(urlRequests).toHaveLength(1);
+      expect(urlRequests[0]).toContain('http://override.base.url/flag-config/v1/config');
+    });
+  });
+
   describe('flag overrides', () => {
     let client: EppoClient;
     let mockLogger: IAssignmentLogger;
