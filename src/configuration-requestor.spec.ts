@@ -655,5 +655,72 @@ describe('ConfigurationRequestor', () => {
         expect(Object.keys(config.getBandits())).toEqual(['test-bandit']);
       });
     });
+
+    describe('IConfigurationStore updates', () => {
+      it('should update configuration when stores are changed', async () => {
+        // Create new stores
+        const newFlagStore = new MemoryOnlyConfigurationStore<Flag>();
+        const newBanditVariationStore = new MemoryOnlyConfigurationStore<BanditVariation[]>();
+        const newBanditModelStore = new MemoryOnlyConfigurationStore<BanditParameters>();
+
+        // Add a test flag to the new flag store
+        await newFlagStore.setEntries({
+          'test-flag': {
+            key: 'test-flag',
+            enabled: true,
+            variationType: VariationType.STRING,
+            variations: {
+              control: { key: 'control', value: 'control-value' },
+              treatment: { key: 'treatment', value: 'treatment-value' },
+            },
+            allocations: [
+              {
+                key: 'allocation-1',
+                rules: [],
+                splits: [
+                  {
+                    shards: [{ salt: '', ranges: [{ start: 0, end: 10000 }] }],
+                    variationKey: 'treatment',
+                  },
+                ],
+                doLog: true,
+              },
+            ],
+            totalShards: 10000,
+          },
+        });
+
+        await newBanditModelStore.setEntries({
+          'test-bandit': {
+            banditKey: 'test-bandt',
+            modelVersion: 'v123',
+            modelName: 'falcon',
+            modelData: {
+              coefficients: {},
+              gamma: 0,
+              defaultActionScore: 0,
+              actionProbabilityFloor: 0,
+            },
+          },
+        });
+
+        // Get the configuration and verify it has the test flag
+        const initialConfig = configurationRequestor.getConfiguration();
+        expect(initialConfig.getFlagKeys()).toEqual([]);
+        expect(Object.keys(initialConfig.getBandits())).toEqual([]);
+
+        // Update the stores
+        configurationRequestor.setConfigurationStores(
+          newFlagStore,
+          newBanditVariationStore,
+          newBanditModelStore,
+        );
+
+        // Get the configuration and verify it has the test flag
+        const config = configurationRequestor.getConfiguration();
+        expect(config.getFlagKeys()).toEqual(['test-flag']);
+        expect(Object.keys(config.getBandits())).toEqual(['test-bandit']);
+      });
+    });
   });
 });

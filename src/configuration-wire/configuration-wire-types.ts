@@ -203,6 +203,10 @@ export class ConfigurationWireV1 implements IConfigurationWire {
     return inflateJsonObject(payloadString as JsonString<IConfigurationWire>);
   }
 
+  public toString(): string {
+    return JSON.stringify(this as IConfigurationWire);
+  }
+
   public static fromResponses(
     flagConfig: IUniversalFlagConfigResponse,
     banditConfig?: IBanditParametersResponse,
