@@ -167,7 +167,6 @@ export default class EppoClient {
       );
     }
 
-
     // Initialize the configuration manager
     this.configurationManager = new ConfigurationManager(
       this.flagConfigurationStore,
