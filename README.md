@@ -67,11 +67,9 @@ the intended SDK, as this determines whether the configuration is obfuscated (fo
 ```bash
 # Install as a dependency
 npm install --save-dev @eppo/js-client-sdk-common
+
 # or, with yarn
 yarn add --dev @eppo/js-client-sdk-common
-
-# Or via yarn
-yarn bootstrap-config --key <sdkKey>
 ```
 
 Common usage examples:
