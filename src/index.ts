@@ -26,6 +26,7 @@ import EppoPrecomputedClient, {
   Subject,
 } from './client/eppo-precomputed-client';
 import FlagConfigRequestor from './configuration-requestor';
+import { ConfigurationStoreBundle } from './configuration-store/configuration-manager';
 import {
   IConfigurationStore,
   IAsyncStore,
@@ -35,6 +36,7 @@ import { HybridConfigurationStore } from './configuration-store/hybrid.store';
 import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import { ConfigurationWireHelper } from './configuration-wire/configuration-wire-helper';
 import {
+  configurationFromString,
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   IPrecomputedConfigurationResponse,
@@ -110,6 +112,7 @@ export {
   MemoryStore,
   HybridConfigurationStore,
   MemoryOnlyConfigurationStore,
+  ConfigurationStoreBundle,
 
   // Assignment cache
   AssignmentCacheKey,
@@ -157,6 +160,7 @@ export {
   PrecomputedFlag,
   FlagKey,
   ConfigurationWireHelper,
+  configurationFromString,
 
   // Test helpers
   decodePrecomputedFlag,

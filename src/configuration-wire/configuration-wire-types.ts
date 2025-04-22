@@ -1,4 +1,4 @@
-import { IUniversalFlagConfigResponse, IBanditParametersResponse } from '../http-client';
+import { IBanditParametersResponse, IUniversalFlagConfigResponse } from '../http-client';
 import {
   Environment,
   FormatEnum,
@@ -8,6 +8,8 @@ import {
 } from '../interfaces';
 import { obfuscatePrecomputedBanditMap, obfuscatePrecomputedFlags } from '../obfuscation';
 import { ContextAttributes, FlagKey, HashedFlagKey } from '../types';
+
+import { deflateJsonObject, inflateJsonObject, JsonString } from './json-util';
 
 // Base interface for all configuration responses
 interface IBasePrecomputedConfigurationResponse {
@@ -169,26 +171,15 @@ export interface IConfigurationWire {
 type UfcResponseType = IUniversalFlagConfigResponse | IBanditParametersResponse;
 
 // The UFC responses are JSON-encoded strings so we can treat them as opaque blobs, but we also want to enforce type safety.
-type ResponseString<T extends UfcResponseType> = string & {
-  readonly __brand: unique symbol;
-  readonly __type: T;
-};
+type UFCResponseString<T extends UfcResponseType> = JsonString<T>;
 
 /**
  * A wrapper around a server response that includes the response, etag, and fetchedAt timestamp.
  */
 interface IConfigResponse<T extends UfcResponseType> {
-  readonly response: ResponseString<T>; // JSON-encoded server response
+  readonly response: UFCResponseString<T>; // JSON-encoded server response
   readonly etag?: string; // Entity Tag - denotes a snapshot or version of the config.
   readonly fetchedAt?: string; // ISO timestamp for when this config was fetched
-}
-
-export function inflateResponse<T extends UfcResponseType>(response: ResponseString<T>): T {
-  return JSON.parse(response) as T;
-}
-
-export function deflateResponse<T extends UfcResponseType>(value: T): ResponseString<T> {
-  return JSON.stringify(value) as ResponseString<T>;
 }
 
 export class ConfigurationWireV1 implements IConfigurationWire {
@@ -199,6 +190,18 @@ export class ConfigurationWireV1 implements IConfigurationWire {
     readonly config?: IConfigResponse<IUniversalFlagConfigResponse>,
     readonly bandits?: IConfigResponse<IBanditParametersResponse>,
   ) {}
+
+  /**
+   * Builds an `IConfigurationWire` instance from the payload string.
+   * To generate the payload string, see `ConfigurationWireHelper.fetchBootstrapConfiguration`.
+   *
+   * @param payloadString
+   */
+  public static fromString(
+    payloadString: string | JsonString<IConfigurationWire>,
+  ): IConfigurationWire {
+    return inflateJsonObject(payloadString as JsonString<IConfigurationWire>);
+  }
 
   public toString(): string {
     return JSON.stringify(this as IConfigurationWire);
@@ -213,13 +216,13 @@ export class ConfigurationWireV1 implements IConfigurationWire {
     return new ConfigurationWireV1(
       undefined,
       {
-        response: deflateResponse(flagConfig),
+        response: deflateJsonObject(flagConfig),
         fetchedAt: new Date().toISOString(),
         etag: flagConfigEtag,
       },
       banditConfig
         ? {
-            response: deflateResponse(banditConfig),
+            response: deflateJsonObject(banditConfig),
             fetchedAt: new Date().toISOString(),
             etag: banditConfigEtag,
           }

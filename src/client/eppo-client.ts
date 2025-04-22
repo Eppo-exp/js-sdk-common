@@ -15,6 +15,7 @@ import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-ca
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
 import ConfigurationRequestor from '../configuration-requestor';
+import { ConfigurationManager } from '../configuration-store/configuration-manager';
 import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import {
@@ -23,6 +24,7 @@ import {
   IPrecomputedConfiguration,
   PrecomputedConfiguration,
 } from '../configuration-wire/configuration-wire-types';
+import { inflateJsonObject } from '../configuration-wire/json-util';
 import {
   DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
   DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
@@ -40,8 +42,11 @@ import {
   IFlagEvaluationDetails,
 } from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
-import FetchHttpClient from '../http-client';
-import { IConfiguration, StoreBackedConfiguration } from '../i-configuration';
+import FetchHttpClient, {
+  IBanditParametersResponse,
+  IUniversalFlagConfigResponse,
+} from '../http-client';
+import { IConfiguration } from '../i-configuration';
 import {
   BanditModelData,
   BanditParameters,
@@ -137,6 +142,7 @@ export default class EppoClient {
   private readonly evaluator = new Evaluator();
   private configurationRequestor?: ConfigurationRequestor;
   private readonly overrideValidator = new OverrideValidator();
+  private configurationManager: ConfigurationManager;
 
   constructor({
     eventDispatcher = new NoOpEventDispatcher(),
@@ -160,16 +166,17 @@ export default class EppoClient {
           'is now inferred from the configuration, so you can safely remove the option.',
       );
     }
+
+    // Initialize the configuration manager
+    this.configurationManager = new ConfigurationManager(
+      this.flagConfigurationStore,
+      this.banditVariationConfigurationStore,
+      this.banditModelConfigurationStore,
+    );
   }
 
   private getConfiguration(): IConfiguration {
-    return this.configurationRequestor
-      ? this.configurationRequestor.getConfiguration()
-      : new StoreBackedConfiguration(
-          this.flagConfigurationStore,
-          this.banditVariationConfigurationStore,
-          this.banditModelConfigurationStore,
-        );
+    return this.configurationManager.getConfiguration();
   }
 
   /**
@@ -210,8 +217,8 @@ export default class EppoClient {
   // noinspection JSUnusedGlobalSymbols
   setFlagConfigurationStore(flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>) {
     this.flagConfigurationStore = flagConfigurationStore;
-
-    this.updateConfigRequestorIfExists();
+    // Update the configuration manager
+    this.innerSetConfigurationStores();
   }
 
   // noinspection JSUnusedGlobalSymbols
@@ -220,11 +227,30 @@ export default class EppoClient {
   ) {
     this.banditVariationConfigurationStore = banditVariationConfigurationStore;
 
-    this.updateConfigRequestorIfExists();
+    // Update the configuration manager
+    this.innerSetConfigurationStores();
+  }
+
+  // noinspection JSUnusedGlobalSymbols
+  setBanditModelConfigurationStore(
+    banditModelConfigurationStore: IConfigurationStore<BanditParameters>,
+  ) {
+    this.banditModelConfigurationStore = banditModelConfigurationStore;
+
+    // Update the configuration manager
+    this.innerSetConfigurationStores();
+  }
+
+  private innerSetConfigurationStores() {
+    // Set the set of configuration stores to those owned by the `this`.
+    this.configurationManager.setConfigurationStores({
+      flagConfigurationStore: this.flagConfigurationStore,
+      banditReferenceConfigurationStore: this.banditVariationConfigurationStore,
+      banditConfigurationStore: this.banditModelConfigurationStore,
+    });
   }
 
   /** Sets the EventDispatcher instance to use when tracking events with {@link track}. */
-  // noinspection JSUnusedGlobalSymbols
   setEventDispatcher(eventDispatcher: EventDispatcher) {
     this.eventDispatcher = eventDispatcher;
   }
@@ -242,26 +268,6 @@ export default class EppoClient {
    */
   setContext(key: string, value: string | number | boolean | null) {
     this.eventDispatcher?.attachContext(key, value);
-  }
-
-  // noinspection JSUnusedGlobalSymbols
-  setBanditModelConfigurationStore(
-    banditModelConfigurationStore: IConfigurationStore<BanditParameters>,
-  ) {
-    this.banditModelConfigurationStore = banditModelConfigurationStore;
-
-    this.updateConfigRequestorIfExists();
-  }
-
-  private updateConfigRequestorIfExists() {
-    // Update the ConfigurationRequestor if it exists
-    if (this.configurationRequestor) {
-      this.configurationRequestor.setConfigurationStores(
-        this.flagConfigurationStore,
-        this.banditVariationConfigurationStore || null,
-        this.banditModelConfigurationStore || null,
-      );
-    }
   }
 
   // noinspection JSUnusedGlobalSymbols
@@ -295,6 +301,32 @@ export default class EppoClient {
         flagKey,
         value.key,
       ]),
+    );
+  }
+
+  /**
+   * Initializes the `EppoClient` from the provided configuration. This method is async only to
+   * accommodate writing to a persistent store. For fastest initialization, (at the cost of persisting configuration),
+   * use `bootstrap` in conjunction with `MemoryOnlyConfigurationStore` instances which won't do an async write.
+   */
+  bootstrap(configuration: IConfigurationWire): void {
+    if (!configuration.config) {
+      throw new Error('Flag configuration not provided');
+    }
+    const flagConfigResponse: IUniversalFlagConfigResponse = inflateJsonObject(
+      configuration.config.response,
+    );
+    const banditParamResponse: IBanditParametersResponse | undefined = configuration.bandits
+      ? inflateJsonObject(configuration.bandits.response)
+      : undefined;
+
+    // This method runs async because the configuration stores potentially have an async write at the end of updating
+    // the configuration. Most instances of offlineInit will use `MemoryOnlyConfigurationStore` instances which actually
+    // accomplish the config write synchronously.
+    // `void` keyword here suppresses warnings about leaving the promise hanging.
+    void this.configurationManager.hydrateConfigurationStoresFromUfc(
+      flagConfigResponse,
+      banditParamResponse,
     );
   }
 
@@ -334,16 +366,17 @@ export default class EppoClient {
     });
 
     const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
+
+    // Use the configuration manager when creating the requestor
     const configurationRequestor = new ConfigurationRequestor(
       httpClient,
-      this.flagConfigurationStore,
-      this.banditVariationConfigurationStore ?? null,
-      this.banditModelConfigurationStore ?? null,
+      this.configurationManager,
+      !!this.banditModelConfigurationStore && !!this.banditVariationConfigurationStore,
     );
     this.configurationRequestor = configurationRequestor;
 
     const pollingCallback = async () => {
-      if (await configurationRequestor.isFlagConfigExpired()) {
+      if (await this.flagConfigurationStore.isExpired()) {
         return configurationRequestor.fetchAndStoreConfigurations();
       }
     };

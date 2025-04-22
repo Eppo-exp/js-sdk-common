@@ -7,6 +7,7 @@ import {
 
 import ApiEndpoints from './api-endpoints';
 import ConfigurationRequestor from './configuration-requestor';
+import { ConfigurationManager } from './configuration-store/configuration-manager';
 import { IConfigurationStore } from './configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
 import FetchHttpClient, {
@@ -15,13 +16,14 @@ import FetchHttpClient, {
   IUniversalFlagConfigResponse,
 } from './http-client';
 import { StoreBackedConfiguration } from './i-configuration';
-import { BanditParameters, BanditVariation, Flag, VariationType } from './interfaces';
+import { BanditParameters, BanditVariation, Flag } from './interfaces';
 
 describe('ConfigurationRequestor', () => {
   let flagStore: IConfigurationStore<Flag>;
   let banditVariationStore: IConfigurationStore<BanditVariation[]>;
   let banditModelStore: IConfigurationStore<BanditParameters>;
   let httpClient: IHttpClient;
+  let configurationManager: ConfigurationManager;
   let configurationRequestor: ConfigurationRequestor;
 
   beforeEach(async () => {
@@ -34,15 +36,21 @@ describe('ConfigurationRequestor', () => {
       },
     });
     httpClient = new FetchHttpClient(apiEndpoints, 1000);
+
+    // Create fresh stores for each test
     flagStore = new MemoryOnlyConfigurationStore<Flag>();
     banditVariationStore = new MemoryOnlyConfigurationStore<BanditVariation[]>();
     banditModelStore = new MemoryOnlyConfigurationStore<BanditParameters>();
-    configurationRequestor = new ConfigurationRequestor(
-      httpClient,
+
+    // Create a ConfigurationManager instance
+    configurationManager = new ConfigurationManager(
       flagStore,
       banditVariationStore,
       banditModelStore,
     );
+
+    // Create ConfigurationRequestor with the manager
+    configurationRequestor = new ConfigurationRequestor(httpClient, configurationManager, true);
   });
 
   afterEach(() => {
@@ -218,7 +226,11 @@ describe('ConfigurationRequestor', () => {
       });
 
       it('Will not fetch bandit parameters if there is no store', async () => {
-        configurationRequestor = new ConfigurationRequestor(httpClient, flagStore, null, null);
+        configurationRequestor = new ConfigurationRequestor(
+          httpClient,
+          configurationManager,
+          false,
+        );
         await configurationRequestor.fetchAndStoreConfigurations();
         expect(fetchSpy).toHaveBeenCalledTimes(1);
       });
@@ -498,29 +510,15 @@ describe('ConfigurationRequestor', () => {
 
     describe('getConfiguration', () => {
       it('should return an empty configuration instance before a config has been loaded', async () => {
-        const requestor = new ConfigurationRequestor(
-          httpClient,
-          flagStore,
-          banditVariationStore,
-          banditModelStore,
-        );
-
-        const config = requestor.getConfiguration();
+        const config = configurationRequestor.getConfiguration();
         expect(config).toBeInstanceOf(StoreBackedConfiguration);
         expect(config.getFlagKeys()).toEqual([]);
       });
 
       it('should return a populated configuration instance', async () => {
-        const requestor = new ConfigurationRequestor(
-          httpClient,
-          flagStore,
-          banditVariationStore,
-          banditModelStore,
-        );
+        await configurationRequestor.fetchAndStoreConfigurations();
 
-        await requestor.fetchAndStoreConfigurations();
-
-        const config = requestor.getConfiguration();
+        const config = configurationRequestor.getConfiguration();
         expect(config).toBeInstanceOf(StoreBackedConfiguration);
         expect(config.getFlagKeys()).toEqual(['test_flag']);
       });
@@ -528,15 +526,9 @@ describe('ConfigurationRequestor', () => {
 
     describe('fetchAndStoreConfigurations', () => {
       it('should update configuration with flag data', async () => {
-        const requestor = new ConfigurationRequestor(
-          httpClient,
-          flagStore,
-          banditVariationStore,
-          banditModelStore,
-        );
-        const config = requestor.getConfiguration();
+        const config = configurationRequestor.getConfiguration();
 
-        await requestor.fetchAndStoreConfigurations();
+        await configurationRequestor.fetchAndStoreConfigurations();
 
         expect(config.getFlagKeys()).toEqual(['test_flag']);
         expect(config.getFlagConfigDetails()).toEqual({
@@ -548,33 +540,14 @@ describe('ConfigurationRequestor', () => {
       });
 
       it('should update configuration with bandit data when present', async () => {
-        const requestor = new ConfigurationRequestor(
-          httpClient,
-          flagStore,
-          banditVariationStore,
-          banditModelStore,
-        );
-        const config = requestor.getConfiguration();
+        const config = configurationRequestor.getConfiguration();
 
-        await requestor.fetchAndStoreConfigurations();
+        await configurationRequestor.fetchAndStoreConfigurations();
 
         // Verify flag configuration
         expect(config.getFlagKeys()).toEqual(['test_flag']);
 
         // Verify bandit variation configuration
-        // expect(banditVariationDetails.entries).toEqual({
-        //   'test_flag': [
-        //     {
-        //       flagKey: 'test_flag',
-        //       variationId: 'variation-1',
-        //       // Add other expected properties based on your mock data
-        //     }
-        //   ]
-        // });
-        // expect(banditVariationDetails.environment).toBe('test-env');
-        // expect(banditVariationDetails.configFormat).toBe('SERVER');
-
-        // Verify bandit model configuration
         const banditVariations = config.getFlagBanditVariations('test_flag');
         expect(banditVariations).toEqual([
           {
@@ -598,114 +571,21 @@ describe('ConfigurationRequestor', () => {
           modelName: 'falcon',
           modelVersion: '123',
           updatedAt: '2023-09-13T04:52:06.462Z',
-          // Add other expected properties based on your mock data
         });
       });
 
       it('should not fetch bandit parameters if model versions are already loaded', async () => {
-        const requestor = new ConfigurationRequestor(
-          httpClient,
-          flagStore,
-          banditVariationStore,
-          banditModelStore,
-        );
+        // First call to load the initial data
+        await configurationRequestor.fetchAndStoreConfigurations();
 
-        const ufcResponse = {
-          flags: { test_flag: { key: 'test_flag', value: true } },
-          banditReferences: {
-            bandit: {
-              modelVersion: 'v1',
-              flagVariations: [{ flagKey: 'test_flag', variationId: '1' }],
-            },
-          },
-          environment: 'test',
-          createdAt: '2024-01-01',
-          format: 'SERVER',
-        };
-
-        await requestor.fetchAndStoreConfigurations();
-        // const initialFetchCount = fetchSpy.mock.calls.length;
+        // Reset the mock call count
+        fetchSpy.mockClear();
 
         // Second call with same model version
-        // fetchSpy.mockImplementationOnce(() =>
-        //   Promise.resolve({
-        //     ok: true,
-        //     status: 200,
-        //     json: () => Promise.resolve(ufcResponse)
-        //   })
-        // );
+        await configurationRequestor.fetchAndStoreConfigurations();
 
-        await requestor.fetchAndStoreConfigurations();
-
-        // Should only have one additional fetch (the UFC) and not the bandit parameters
-        // expect(fetchSpy.mock.calls.length).toBe(initialFetchCount + 1);
-      });
-    });
-
-    describe('IConfigurationStore updates', () => {
-      it('should update configuration when stores are changed', async () => {
-        // Create new stores
-        const newFlagStore = new MemoryOnlyConfigurationStore<Flag>();
-        const newBanditVariationStore = new MemoryOnlyConfigurationStore<BanditVariation[]>();
-        const newBanditModelStore = new MemoryOnlyConfigurationStore<BanditParameters>();
-
-        // Add a test flag to the new flag store
-        await newFlagStore.setEntries({
-          'test-flag': {
-            key: 'test-flag',
-            enabled: true,
-            variationType: VariationType.STRING,
-            variations: {
-              control: { key: 'control', value: 'control-value' },
-              treatment: { key: 'treatment', value: 'treatment-value' },
-            },
-            allocations: [
-              {
-                key: 'allocation-1',
-                rules: [],
-                splits: [
-                  {
-                    shards: [{ salt: '', ranges: [{ start: 0, end: 10000 }] }],
-                    variationKey: 'treatment',
-                  },
-                ],
-                doLog: true,
-              },
-            ],
-            totalShards: 10000,
-          },
-        });
-
-        await newBanditModelStore.setEntries({
-          'test-bandit': {
-            banditKey: 'test-bandt',
-            modelVersion: 'v123',
-            modelName: 'falcon',
-            modelData: {
-              coefficients: {},
-              gamma: 0,
-              defaultActionScore: 0,
-              actionProbabilityFloor: 0,
-            },
-          },
-        });
-
-        // Get the configuration and verify it has the test flag
-        const initialConfig = configurationRequestor.getConfiguration();
-        expect(initialConfig.getFlagKeys()).toEqual([]);
-        expect(Object.keys(initialConfig.getBandits())).toEqual([]);
-
-        // Update the stores
-        configurationRequestor.setConfigurationStores(
-          newFlagStore,
-          newBanditVariationStore,
-          newBanditModelStore,
-        );
-
-        // Get the configuration and verify it has the test flag
-        const config = configurationRequestor.getConfiguration();
-        expect(config.getFlagKeys()).toEqual(['test-flag']);
-        expect(Object.keys(config.getBandits())).toEqual(['test-bandit']);
+        // Should only have one fetch (the UFC) and not the bandit parameters
+        expect(fetchSpy.mock.calls.length).toBe(1);
       });
     });
   });
