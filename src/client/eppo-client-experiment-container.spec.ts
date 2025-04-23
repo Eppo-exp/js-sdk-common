@@ -1,10 +1,7 @@
-import { MOCK_UFC_RESPONSE_FILE, readMockUfcConfiguration, readMockUFCResponse } from '../../test/testHelpers';
+import { readMockUfcConfiguration } from '../../test/testHelpers';
 import * as applicationLogger from '../application-logger';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
-import { Flag, ObfuscatedFlag } from '../interfaces';
 
 import EppoClient, { IContainerExperiment } from './eppo-client';
-import { initConfiguration } from './test-utils';
 
 type Container = { name: string };
 

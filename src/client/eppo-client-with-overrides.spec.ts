@@ -1,6 +1,5 @@
 import { Configuration } from '../configuration';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
-import { Flag, FormatEnum, ObfuscatedFlag, VariationType } from '../interfaces';
+import { Flag, FormatEnum, VariationType } from '../interfaces';
 import * as overrideValidatorModule from '../override-validator';
 
 import EppoClient from './eppo-client';

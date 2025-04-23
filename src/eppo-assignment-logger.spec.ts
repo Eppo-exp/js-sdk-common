@@ -1,8 +1,6 @@
 import { IAssignmentEvent } from './assignment-logger';
 import EppoClient from './client/eppo-client';
-import { IConfigurationStore } from './configuration-store/configuration-store';
 import { EppoAssignmentLogger } from './eppo-assignment-logger';
-import { Flag } from './interfaces';
 
 jest.mock('./client/eppo-client');
 

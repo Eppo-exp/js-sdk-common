@@ -1,7 +1,7 @@
-import { logger } from '../application-logger';
-import { Configuration } from '../configuration';
-import { ConfigurationFeed } from '../configuration-feed';
-import { BroadcastChannel } from '../broadcast';
+import { logger } from './application-logger';
+import { Configuration } from './configuration';
+import { ConfigurationFeed } from './configuration-feed';
+import { BroadcastChannel } from './broadcast';
 
 export type ActivationStrategy = {
   /**

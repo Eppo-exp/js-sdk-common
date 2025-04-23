@@ -17,8 +17,6 @@ import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-
 import { Configuration, PrecomputedConfig } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { ConfigurationStore } from '../configuration-store';
-import { ISyncStore } from '../configuration-store/configuration-store';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { IObfuscatedPrecomputedConfigurationResponse } from '../configuration-wire/configuration-wire-types';
 import {
   DEFAULT_BASE_POLLING_INTERVAL_MS,
@@ -88,6 +86,7 @@ import {
 import { decodePrecomputedBandit, decodePrecomputedFlag } from '../decoding';
 import { Subject } from './subject';
 import { generateSalt } from '../salt';
+import { KVStore, MemoryStore } from '../kvstore';
 
 export interface IAssignmentDetails<T extends Variation['value'] | object> {
   variation: T;
@@ -110,7 +109,7 @@ export type EppoClientParameters = {
   // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
   // or bandit events). These events are application-specific and captures by EppoClient#track API.
   eventDispatcher?: EventDispatcher;
-  overrideStore?: ISyncStore<Variation>;
+  overrideStore?: KVStore<Variation>;
 
   bandits?: {
     /**
@@ -315,7 +314,7 @@ export default class EppoClient {
   private readonly banditEvaluator = new BanditEvaluator();
   private banditLogger?: IBanditLogger;
   private banditAssignmentCache?: AssignmentCache;
-  private overrideStore?: ISyncStore<Variation>;
+  private overrideStore?: KVStore<Variation>;
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
   // whether to suppress any errors and return default values instead
@@ -638,7 +637,7 @@ export default class EppoClient {
   withOverrides(overrides: Record<FlagKey, Variation> | undefined): EppoClient {
     if (overrides && Object.keys(overrides).length) {
       const copy = shallowClone(this);
-      copy.overrideStore = new MemoryOnlyConfigurationStore<Variation>();
+      copy.overrideStore = new MemoryStore<Variation>();
       copy.overrideStore.setEntries(overrides);
       return copy;
     }
@@ -666,7 +665,7 @@ export default class EppoClient {
     this.eventDispatcher?.attachContext(key, value);
   }
 
-  setOverrideStore(store: ISyncStore<Variation>): void {
+  setOverrideStore(store: KVStore<Variation>): void {
     this.overrideStore = store;
   }
 

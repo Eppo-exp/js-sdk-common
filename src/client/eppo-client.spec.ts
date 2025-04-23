@@ -3,27 +3,11 @@ import { times } from 'lodash';
 import * as td from 'testdouble';
 
 import {
-  ASSIGNMENT_TEST_DATA_DIR,
-  getTestAssignments,
-  IAssignmentTestCase,
   MOCK_UFC_RESPONSE_FILE,
-  OBFUSCATED_MOCK_UFC_RESPONSE_FILE,
-  readMockUfcConfiguration,
-  readMockUfcObfuscatedConfiguration,
   readMockUFCResponse,
-  SubjectTestCase,
-  testCasesByFileName,
-  validateTestAssignments,
 } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
-import { ConfigurationStore } from '../configuration-store';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
-import {
-  IConfigurationWire,
-  IObfuscatedPrecomputedConfigurationResponse,
-  ObfuscatedPrecomputedConfigurationResponse,
-} from '../configuration-wire/configuration-wire-types';
 import {
   MAX_EVENT_QUEUE_SIZE,
   DEFAULT_BASE_POLLING_INTERVAL_MS,
@@ -32,12 +16,10 @@ import {
 import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
-import { AttributeType } from '../types';
 
 import EppoClient, { checkTypeMatch } from './eppo-client';
 import { Configuration } from '../configuration';
-import { IUniversalFlagConfigResponse } from '../http-client';
-import { ISyncStore } from '../configuration-store/configuration-store';
+import { KVStore, MemoryStore } from '../kvstore';
 
 // Use a known salt to produce deterministic hashes
 const salt = base64.fromUint8Array(new Uint8Array([7, 53, 17, 78]));
@@ -748,12 +730,6 @@ describe('EppoClient E2E test', () => {
     });
 
     it('Does not fetch configurations if the configuration store is unexpired', async () => {
-      class MockStore<T> extends MemoryOnlyConfigurationStore<T> {
-        async isExpired(): Promise<boolean> {
-          return false;
-        }
-      }
-
       // Test needs network fetching approach
       client = new EppoClient({
         sdkKey: requestConfiguration.apiKey,
@@ -953,11 +929,11 @@ describe('EppoClient E2E test', () => {
   describe('flag overrides', () => {
     let client: EppoClient;
     let mockLogger: IAssignmentLogger;
-    let overrideStore: ISyncStore<Variation>;
+    let overrideStore: KVStore<Variation>;
 
     beforeEach(() => {
       mockLogger = td.object<IAssignmentLogger>();
-      overrideStore = new MemoryOnlyConfigurationStore<Variation>();
+      overrideStore = new MemoryStore<Variation>();
       client = new EppoClient({
         sdkKey: 'test',
         sdkName: 'test',

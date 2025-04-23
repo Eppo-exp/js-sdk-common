@@ -23,13 +23,6 @@ import EppoClient, {
 import { Subject } from './client/subject';
 import FlagConfigRequestor from './configuration-requestor';
 import {
-  IConfigurationStore,
-  IAsyncStore,
-  ISyncStore,
-} from './configuration-store/configuration-store';
-import { HybridConfigurationStore } from './configuration-store/hybrid.store';
-import { MemoryStore, MemoryOnlyConfigurationStore } from './configuration-store/memory.store';
-import {
   IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   IPrecomputedConfigurationResponse,
@@ -61,6 +54,7 @@ import {
   Variation,
   Environment,
 } from './interfaces';
+import { KVStore, MemoryStore } from './kvstore';
 import { buildStorageKeySuffix } from './obfuscation';
 import {
   AttributeType,
@@ -97,12 +91,8 @@ export {
   IObfuscatedPrecomputedBandit,
 
   // Configuration store
-  IConfigurationStore,
-  IAsyncStore,
-  ISyncStore,
+  KVStore,
   MemoryStore,
-  HybridConfigurationStore,
-  MemoryOnlyConfigurationStore,
 
   // Assignment cache
   AssignmentCacheKey,

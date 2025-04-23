@@ -2,19 +2,14 @@ import * as fs from 'fs';
 
 import {
   IAssignmentTestCase,
-  MOCK_UFC_RESPONSE_FILE,
   readMockUfcConfiguration,
-  readMockUFCResponse,
 } from '../../test/testHelpers';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { AllocationEvaluationCode } from '../flag-evaluation-details-builder';
-import { Flag, ObfuscatedFlag, Variation, VariationType } from '../interfaces';
+import { Variation, VariationType } from '../interfaces';
 import { OperatorType } from '../rules';
 import { AttributeType } from '../types';
 
 import EppoClient, { IAssignmentDetails } from './eppo-client';
-import { initConfiguration } from './test-utils';
-import { read } from 'fs';
 
 describe('EppoClient get*AssignmentDetails', () => {
   const testStart = Date.now();

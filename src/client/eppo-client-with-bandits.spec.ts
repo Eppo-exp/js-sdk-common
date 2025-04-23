@@ -13,10 +13,6 @@ import ApiEndpoints from '../api-endpoints';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
-import {
-  IPrecomputedConfiguration,
-  IObfuscatedPrecomputedConfigurationResponse,
-} from '../configuration-wire/configuration-wire-types';
 import { Evaluator, FlagEvaluation } from '../evaluator';
 import {
   AllocationEvaluationCode,
@@ -52,16 +48,6 @@ describe('EppoClient Bandits E2E test', () => {
         json: () => Promise.resolve(response),
       });
     }) as jest.Mock;
-
-    // Initialize a configuration requestor
-    const apiEndpoints = new ApiEndpoints({
-      baseUrl: 'http://127.0.0.1:4000',
-      queryParams: {
-        apiKey: 'dummy',
-        sdkName: 'js-client-sdk-common',
-        sdkVersion: '1.0.0',
-      },
-    });
   });
 
   beforeEach(() => {

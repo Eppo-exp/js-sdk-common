@@ -1,17 +1,11 @@
-import * as td from 'testdouble';
-
 import {
   MOCK_PRECOMPUTED_WIRE_FILE,
   MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE,
   readMockConfigurationWireResponse,
 } from '../../test/testHelpers';
-import { logger } from '../application-logger';
 import { IAssignmentLogger } from '../assignment-logger';
 import { IBanditLogger } from '../bandit-logger';
 import { Configuration } from '../configuration';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
-import { FormatEnum, VariationType, Variation } from '../interfaces';
-import { BanditActions } from '../types';
 
 import EppoClient from './eppo-client';
 
@@ -19,10 +13,7 @@ describe('EppoClient Precomputed Mode', () => {
   // Read both configurations for test reference
   const precomputedConfigurationWire = readMockConfigurationWireResponse(MOCK_PRECOMPUTED_WIRE_FILE);
   const initialConfiguration = Configuration.fromString(precomputedConfigurationWire);
-  
-  // We only use deobfuscated configuration as a reference, not for creating a client
-  const deobfuscatedPrecomputedWire = readMockConfigurationWireResponse(MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE);
-  
+
   let client: EppoClient;
   let mockAssignmentLogger: jest.Mocked<IAssignmentLogger>;
   let mockBanditLogger: jest.Mocked<IBanditLogger>;

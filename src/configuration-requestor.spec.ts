@@ -11,14 +11,12 @@ import { BroadcastChannel } from './broadcast';
 import { ConfigurationFeed } from './configuration-feed';
 import ConfigurationRequestor from './configuration-requestor';
 import { ConfigurationStore } from './configuration-store';
-import { IConfigurationStore } from './configuration-store/configuration-store';
 import FetchHttpClient, {
   IBanditParametersResponse,
   IHttpClient,
   IUniversalFlagConfigResponse,
 } from './http-client';
-import { StoreBackedConfiguration } from './i-configuration';
-import { BanditParameters, BanditVariation, Flag, VariationType } from './interfaces';
+import { BanditParameters } from './interfaces';
 
 const MOCK_PRECOMPUTED_RESPONSE = {
   flags: {
