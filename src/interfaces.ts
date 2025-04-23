@@ -44,15 +44,6 @@ export interface Environment {
 }
 export const UNKNOWN_ENVIRONMENT_NAME = 'UNKNOWN';
 
-/** @deprecated(v5) `ConfigDetails` is too naive about how configurations actually work. */
-export interface ConfigDetails {
-  configFetchedAt: string;
-  configPublishedAt: string;
-  configEnvironment: Environment;
-  configFormat: string;
-  salt?: string;
-}
-
 export interface Flag {
   key: string;
   enabled: boolean;
