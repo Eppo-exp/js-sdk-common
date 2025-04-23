@@ -383,10 +383,10 @@ export default class EppoClient {
       activationStrategy === 'always'
         ? { type: 'always' }
         : activationStrategy === 'stale'
-        ? { type: 'stale', maxAgeSeconds }
-        : activationStrategy === 'empty'
-        ? { type: 'empty' }
-        : { type: 'never' },
+          ? { type: 'stale', maxAgeSeconds }
+          : activationStrategy === 'empty'
+            ? { type: 'empty' }
+            : { type: 'never' },
     );
 
     if (persistentStorage) {

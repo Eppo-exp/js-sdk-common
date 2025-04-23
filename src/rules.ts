@@ -173,10 +173,10 @@ function evaluateCondition(subjectAttributes: Record<string, any>, condition: Co
             condition.operator === OperatorType.GTE
               ? semverGte
               : condition.operator === OperatorType.GT
-              ? semverGt
-              : condition.operator === OperatorType.LTE
-              ? semverLte
-              : semverLt;
+                ? semverGt
+                : condition.operator === OperatorType.LTE
+                  ? semverLte
+                  : semverLt;
           return compareSemVer(value, condition.value, comparator);
         }
 
@@ -184,10 +184,10 @@ function evaluateCondition(subjectAttributes: Record<string, any>, condition: Co
           condition.operator === OperatorType.GTE
             ? a >= b
             : condition.operator === OperatorType.GT
-            ? a > b
-            : condition.operator === OperatorType.LTE
-            ? a <= b
-            : a < b;
+              ? a > b
+              : condition.operator === OperatorType.LTE
+                ? a <= b
+                : a < b;
         return compareNumber(value, condition.value, comparator);
       }
       case OperatorType.MATCHES:
@@ -229,10 +229,10 @@ function evaluateObfuscatedCondition(
             condition.operator === ObfuscatedOperatorType.GTE
               ? semverGte
               : condition.operator === ObfuscatedOperatorType.GT
-              ? semverGt
-              : condition.operator === ObfuscatedOperatorType.LTE
-              ? semverLte
-              : semverLt;
+                ? semverGt
+                : condition.operator === ObfuscatedOperatorType.LTE
+                  ? semverLte
+                  : semverLt;
           return compareSemVer(value, conditionValue, comparator);
         }
 
@@ -240,10 +240,10 @@ function evaluateObfuscatedCondition(
           condition.operator === ObfuscatedOperatorType.GTE
             ? a >= b
             : condition.operator === ObfuscatedOperatorType.GT
-            ? a > b
-            : condition.operator === ObfuscatedOperatorType.LTE
-            ? a <= b
-            : a < b;
+              ? a > b
+              : condition.operator === ObfuscatedOperatorType.LTE
+                ? a <= b
+                : a < b;
         return compareNumber(value, Number(conditionValue), comparator);
       }
       case ObfuscatedOperatorType.MATCHES:

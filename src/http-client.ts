@@ -24,7 +24,11 @@ export interface IQueryParamsWithSubject extends IQueryParams {
 
 /** @internal */
 export class HttpRequestError extends Error {
-  constructor(public message: string, public status?: number, public cause?: Error) {
+  constructor(
+    public message: string,
+    public status?: number,
+    public cause?: Error,
+  ) {
     super(message);
     if (cause) {
       this.cause = cause;
@@ -56,7 +60,10 @@ export interface IHttpClient {
 
 /** @internal */
 export default class FetchHttpClient implements IHttpClient {
-  constructor(private readonly apiEndpoints: ApiEndpoints, private readonly timeout: number) {}
+  constructor(
+    private readonly apiEndpoints: ApiEndpoints,
+    private readonly timeout: number,
+  ) {}
 
   async getUniversalFlagConfiguration(): Promise<FlagsConfig> {
     const url = this.apiEndpoints.ufcEndpoint();
