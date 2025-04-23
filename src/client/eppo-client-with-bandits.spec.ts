@@ -26,6 +26,12 @@ import { attributeEncodeBase64 } from '../obfuscation';
 import { Attributes, BanditActions, ContextAttributes } from '../types';
 
 import EppoClient, { IAssignmentDetails } from './eppo-client';
+import { Configuration } from '../configuration';
+
+const salt = base64.fromUint8Array(new Uint8Array([101, 112, 112, 111]));
+jest.mock('../salt', () => ({
+  generateSalt: () => salt,
+}));
 
 describe('EppoClient Bandits E2E test', () => {
   let client: EppoClient;
@@ -688,20 +694,12 @@ describe('EppoClient Bandits E2E test', () => {
       subjectKey: string,
       subjectAttributes: ContextAttributes,
       banditActions: Record<string, BanditActions>,
-    ): IPrecomputedConfiguration {
-      const salt = base64.fromUint8Array(new Uint8Array([101, 112, 112, 111]));
-      const precomputedResults = client.getPrecomputedConfiguration(
+    ): Configuration {
+      return client.getPrecomputedConfiguration(
         subjectKey,
         subjectAttributes,
         banditActions,
-        salt,
       );
-
-      const { precomputed } = JSON.parse(precomputedResults);
-      if (!precomputed) {
-        fail('precomputed result was not parsed');
-      }
-      return precomputed;
     }
 
     describe('obfuscated results', () => {
@@ -713,11 +711,11 @@ describe('EppoClient Bandits E2E test', () => {
         const adidasB64 = 'YWRpZGFz';
         const modelB64 = 'MTIz'; // 123
 
-        const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions);
-
-        const response = JSON.parse(
-          precomputed.response,
-        ) as IObfuscatedPrecomputedConfigurationResponse;
+        const configuration = client.getPrecomputedConfiguration(bob, bobInfo, bobActions);
+        const response = configuration.getPrecomputedConfiguration()?.response;
+        if (!response) {
+          fail('precomputed result was not parsed');
+        }
 
         const numericAttrs = response.bandits[bannerBanditFlagMd5]['actionNumericAttributes'];
         const categoricalAttrs =

@@ -20,6 +20,7 @@ import EppoClient, {
   IAssignmentDetails,
   IContainerExperiment,
 } from './client/eppo-client';
+import { Subject } from './client/subject';
 import FlagConfigRequestor from './configuration-requestor';
 import {
   IConfigurationStore,
@@ -152,4 +153,5 @@ export {
 
   // Utilities
   buildStorageKeySuffix,
+  Subject,
 };

@@ -41,8 +41,12 @@ import { ISyncStore } from '../configuration-store/configuration-store';
 
 // Use a known salt to produce deterministic hashes
 const salt = base64.fromUint8Array(new Uint8Array([7, 53, 17, 78]));
+jest.mock('../salt', () => ({
+  generateSalt: () => salt,
+}));
 
 describe('EppoClient E2E test', () => {
+
   // Configure fetch mock for tests that still need it
   global.fetch = jest.fn(() => {
     const ufc = readMockUFCResponse(MOCK_UFC_RESPONSE_FILE);
@@ -254,14 +258,12 @@ describe('EppoClient E2E test', () => {
     });
 
     it('skips disabled flags', () => {
-      const encodedPrecomputedWire = client.getPrecomputedConfiguration('subject', {}, {}, salt);
-      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
+      const configuration = client.getPrecomputedConfiguration('subject', {}, {});
+      const precomputed = configuration.getPrecomputedConfiguration();
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
       }
-      const precomputedResponse = JSON.parse(
-        precomputed.response,
-      ) as ObfuscatedPrecomputedConfigurationResponse;
+      const precomputedResponse = precomputed.response;
 
       expect(precomputedResponse).toBeTruthy();
       const precomputedFlags = precomputedResponse?.flags ?? {};
@@ -273,14 +275,12 @@ describe('EppoClient E2E test', () => {
     });
 
     it('evaluates and returns assignments', () => {
-      const encodedPrecomputedWire = client.getPrecomputedConfiguration('subject', {}, {}, salt);
-      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
+      const configuration = client.getPrecomputedConfiguration('subject', {}, {});
+      const precomputed = configuration.getPrecomputedConfiguration();
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
       }
-      const precomputedResponse = JSON.parse(
-        precomputed.response,
-      ) as IObfuscatedPrecomputedConfigurationResponse;
+      const precomputedResponse = precomputed.response;
 
       expect(precomputedResponse).toBeTruthy();
       const precomputedFlags = precomputedResponse?.flags ?? {};
@@ -291,12 +291,12 @@ describe('EppoClient E2E test', () => {
     });
 
     it('obfuscates assignments', () => {
-      const encodedPrecomputedWire = client.getPrecomputedConfiguration('subject', {}, {}, salt);
-      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
+      const configuration = client.getPrecomputedConfiguration('subject', {}, {});
+      const precomputed = configuration.getPrecomputedConfiguration();
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
       }
-      const precomputedResponse = JSON.parse(precomputed.response);
+      const precomputedResponse = precomputed.response;
 
       expect(precomputedResponse).toBeTruthy();
       expect(precomputedResponse.salt).toEqual('BzURTg==');

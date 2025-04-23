@@ -19,15 +19,8 @@ import ConfigurationRequestor from '../configuration-requestor';
 import { ConfigurationStore } from '../configuration-store';
 import { ISyncStore } from '../configuration-store/configuration-store';
 import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
+import { IObfuscatedPrecomputedConfigurationResponse } from '../configuration-wire/configuration-wire-types';
 import {
-  ConfigurationWireV1,
-  IConfigurationWire,
-  IPrecomputedConfiguration,
-  PrecomputedConfiguration,
-} from '../configuration-wire/configuration-wire-types';
-import {
-  DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
-  DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
   DEFAULT_BASE_POLLING_INTERVAL_MS,
   DEFAULT_MAX_POLLING_INTERVAL_MS,
   DEFAULT_REQUEST_TIMEOUT_MS,
@@ -36,7 +29,7 @@ import {
   DEFAULT_MAX_STALE_SECONDS,
   DEFAULT_INITIALIZATION_STRATEGY,
   DEFAULT_ACTIVATION_STRATEGY,
-  DEFAULT_ENABLE_POLLING_CLIENT,
+  DEFAULT_ENABLE_POLLING,
   DEFAULT_ENABLE_BANDITS,
 } from '../constants';
 import { EppoValue } from '../eppo_value';
@@ -66,7 +59,7 @@ import {
   VariationType,
 } from '../interfaces';
 import { OverridePayload, OverrideValidator } from '../override-validator';
-import { randomJitterMs } from '../poller';
+import { randomJitterMs } from '../configuration-poller';
 import SdkTokenDecoder from '../sdk-token-decoder';
 import {
   Attributes,
@@ -85,10 +78,16 @@ import {
   PersistentConfigurationStorage,
 } from '../persistent-configuration-cache';
 import { ConfigurationPoller } from '../configuration-poller';
-import { ConfigurationFeed, ConfigurationSource } from '../configuration-feed';
+import { ConfigurationSource } from '../configuration-feed';
 import { BroadcastChannel } from '../broadcast';
-import { getMD5Hash } from '../obfuscation';
+import {
+  getMD5Hash,
+  obfuscatePrecomputedBanditMap,
+  obfuscatePrecomputedFlags,
+} from '../obfuscation';
 import { decodePrecomputedBandit, decodePrecomputedFlag } from '../decoding';
+import { Subject } from './subject';
+import { generateSalt } from '../salt';
 
 export interface IAssignmentDetails<T extends Variation['value'] | object> {
   variation: T;
@@ -218,8 +217,7 @@ export type EppoClientParameters = {
      * determines whether configuration is activated (i.e., becomes
      * used for evaluating assignments and bandits).
      *
-     * @default true (for Node.js SDK)
-     * @default false (for Client SDK)
+     * @default false
      */
     enablePolling?: boolean;
     /**
@@ -254,8 +252,7 @@ export type EppoClientParameters = {
      *
      * - `always`: always activate the latest fetched configuration.
      *
-     * @default 'always' (for Node.js SDK)
-     * @default 'stale' (for Client SDK)
+     * @default 'next-load'
      */
     activationStrategy?: 'always' | 'stale' | 'empty' | 'next-load';
 
@@ -268,7 +265,6 @@ export type EppoClientParameters = {
   };
 };
 
-// Define a type mapping from VariationType to TypeScript types
 type VariationTypeMap = {
   [VariationType.STRING]: string;
   [VariationType.INTEGER]: number;
@@ -277,7 +273,6 @@ type VariationTypeMap = {
   [VariationType.JSON]: object;
 };
 
-// Helper type to extract the TypeScript type from a VariationType
 type TypeFromVariationType<T extends VariationType> = VariationTypeMap[T];
 
 /**
@@ -341,6 +336,11 @@ export default class EppoClient {
     banditActions?: Record<FlagKey, BanditActions>;
   };
 
+  /**
+   * @internal This method is intended to be used by downstream SDKs. The constructor requires
+   * `sdkName` and `sdkVersion` parameters, and default options may differ from defaults for
+   * client/node SDKs.
+   */
   constructor(options: EppoClientParameters) {
     const { eventDispatcher = new NoOpEventDispatcher(), overrideStore, configuration } = options;
 
@@ -359,7 +359,7 @@ export default class EppoClient {
         requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
         basePollingIntervalMs = DEFAULT_BASE_POLLING_INTERVAL_MS,
         maxPollingIntervalMs = DEFAULT_MAX_POLLING_INTERVAL_MS,
-        enablePolling = DEFAULT_ENABLE_POLLING_CLIENT,
+        enablePolling = DEFAULT_ENABLE_POLLING,
         maxAgeSeconds = DEFAULT_MAX_AGE_SECONDS,
         activationStrategy = DEFAULT_ACTIVATION_STRATEGY,
       } = {},
@@ -1329,39 +1329,46 @@ export default class EppoClient {
    * @param subjectKey an identifier of the experiment subject, for example a user ID.
    * @param subjectAttributes optional attributes associated with the subject, for example name and email.
    * @param banditActions optional attributes associated with the bandit actions
-   * @param salt a salt to use for obfuscation
    */
-  getPrecomputedConfiguration(
+  public getPrecomputedConfiguration(
     subjectKey: string,
     subjectAttributes: Attributes | ContextAttributes = {},
     banditActions: Record<FlagKey, BanditActions> = {},
-    salt?: string,
-  ): string {
-    const config = this.getConfiguration();
+  ): Configuration {
+    const configuration = this.getConfiguration();
 
     const subjectContextualAttributes = ensureContextualSubjectAttributes(subjectAttributes);
     const subjectFlatAttributes = ensureNonContextualSubjectAttributes(subjectAttributes);
-    const flags = this.getAllAssignments(subjectKey, subjectFlatAttributes);
 
+    const flags = this.getAllAssignments(subjectKey, subjectFlatAttributes);
     const bandits = this.computeBanditsForFlags(
-      config,
+      configuration,
       subjectKey,
       subjectContextualAttributes,
       banditActions,
       flags,
     );
 
-    const precomputedConfig: IPrecomputedConfiguration = PrecomputedConfiguration.obfuscated(
-      subjectKey,
-      flags,
-      bandits,
-      salt ?? '', // no salt if not provided
-      subjectContextualAttributes,
-      config.getFlagsConfiguration()?.response.environment,
-    );
+    const salt = generateSalt();
+    const obfuscatedFlags = obfuscatePrecomputedFlags(salt, flags);
+    const obfuscatedBandits = obfuscatePrecomputedBanditMap(salt, bandits);
 
-    const configWire: IConfigurationWire = ConfigurationWireV1.precomputed(precomputedConfig);
-    return JSON.stringify(configWire);
+    const response: IObfuscatedPrecomputedConfigurationResponse = {
+      format: FormatEnum.PRECOMPUTED,
+      createdAt: new Date().toISOString(),
+      obfuscated: true,
+      salt,
+      flags: obfuscatedFlags,
+      bandits: obfuscatedBandits,
+    };
+
+    return Configuration.fromResponses({
+      precomputed: {
+        response,
+        subjectKey,
+        subjectAttributes: subjectContextualAttributes,
+      },
+    });
   }
 
   /**
@@ -1376,11 +1383,11 @@ export default class EppoClient {
    * @param expectedVariationType The expected variation type
    * @returns A detailed return of assignment for a particular subject and flag
    */
-  getAssignmentDetail<T extends VariationType>(
+  public getAssignmentDetail(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Attributes = {},
-    expectedVariationType?: T,
+    expectedVariationType?: VariationType,
   ): FlagEvaluation {
     const result = this.evaluateAssignment(
       flagKey,
@@ -1396,11 +1403,11 @@ export default class EppoClient {
    * Internal helper that evaluates a flag assignment without logging
    * Returns the evaluation result that can be used for logging
    */
-  private evaluateAssignment<T extends VariationType>(
+  private evaluateAssignment(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Attributes,
-    expectedVariationType: T | undefined,
+    expectedVariationType: VariationType | undefined,
   ): FlagEvaluation {
     validateNotBlank(subjectKey, 'Invalid argument: subjectKey cannot be blank');
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
@@ -1641,8 +1648,6 @@ export default class EppoClient {
       };
     }
 
-    // Create bandit event if present
-    let banditEvent: IBanditEvent | undefined;
     if (bandit) {
       flagEvaluation.banditEvent = {
         timestamp: new Date().toISOString(),
@@ -1673,7 +1678,7 @@ export default class EppoClient {
   /**
    * Enqueues an arbitrary event. Events must have a type and a payload.
    */
-  track(type: string, payload: Record<string, unknown>) {
+  public track(type: string, payload: Record<string, unknown>) {
     this.eventDispatcher.dispatch({
       uuid: randomUUID(),
       type,
@@ -1696,17 +1701,17 @@ export default class EppoClient {
     );
   }
 
-  isInitialized() {
+  public isInitialized() {
     return this.initialized;
   }
 
-  setAssignmentLogger(logger: IAssignmentLogger) {
+  public setAssignmentLogger(logger: IAssignmentLogger) {
     this.assignmentLogger = logger;
     // log any assignment events that may have been queued while initializing
     this.flushQueuedEvents(this.assignmentEventsQueue, this.assignmentLogger?.logAssignment);
   }
 
-  setBanditLogger(logger: IBanditLogger) {
+  public setBanditLogger(logger: IBanditLogger) {
     this.banditLogger = logger;
     // log any bandit events that may have been queued while initializing
     this.flushQueuedEvents(this.banditEventsQueue, this.banditLogger?.logBanditAction);
@@ -1715,28 +1720,28 @@ export default class EppoClient {
   /**
    * Assignment cache methods.
    */
-  disableAssignmentCache() {
+  public disableAssignmentCache() {
     this.assignmentCache = undefined;
   }
 
-  useNonExpiringInMemoryAssignmentCache() {
+  public useNonExpiringInMemoryAssignmentCache() {
     this.assignmentCache = new NonExpiringInMemoryAssignmentCache();
   }
 
-  useLRUInMemoryAssignmentCache(maxSize: number) {
+  public useLRUInMemoryAssignmentCache(maxSize: number) {
     this.assignmentCache = new LRUInMemoryAssignmentCache(maxSize);
   }
 
   // noinspection JSUnusedGlobalSymbols
-  useCustomAssignmentCache(cache: AssignmentCache) {
+  public useCustomAssignmentCache(cache: AssignmentCache) {
     this.assignmentCache = cache;
   }
 
-  disableBanditAssignmentCache() {
+  public disableBanditAssignmentCache() {
     this.banditAssignmentCache = undefined;
   }
 
-  useNonExpiringInMemoryBanditAssignmentCache() {
+  public useNonExpiringInMemoryBanditAssignmentCache() {
     this.banditAssignmentCache = new NonExpiringInMemoryAssignmentCache();
   }
 
@@ -1744,16 +1749,16 @@ export default class EppoClient {
    * @param {number} maxSize - Maximum cache size
    * @param {number} timeout - TTL of cache entries
    */
-  useExpiringInMemoryBanditAssignmentCache(maxSize: number, timeout?: number) {
+  public useExpiringInMemoryBanditAssignmentCache(maxSize: number, timeout?: number) {
     this.banditAssignmentCache = new TLRUInMemoryAssignmentCache(maxSize, timeout);
   }
 
   // noinspection JSUnusedGlobalSymbols
-  useCustomBanditAssignmentCache(cache: AssignmentCache) {
+  public useCustomBanditAssignmentCache(cache: AssignmentCache) {
     this.banditAssignmentCache = cache;
   }
 
-  setIsGracefulFailureMode(gracefulFailureMode: boolean) {
+  public setIsGracefulFailureMode(gracefulFailureMode: boolean) {
     this.isGracefulFailureMode = gracefulFailureMode;
   }
 
@@ -1886,6 +1891,7 @@ export default class EppoClient {
   }
 }
 
+/** @internal */
 export function checkTypeMatch(expectedType?: VariationType, actualType?: VariationType): boolean {
   return expectedType === undefined || actualType === expectedType;
 }

@@ -128,10 +128,12 @@ function timeout(ms: number) {
 }
 
 /**
+ * @internal
+ *
  * Compute a random jitter as a percentage of the polling interval.
  * Will be (5%,10%) of the interval assuming POLL_JITTER_PCT = 0.1
  */
-function randomJitterMs(intervalMs: number) {
+export function randomJitterMs(intervalMs: number) {
   const halfPossibleJitter = (intervalMs * POLL_JITTER_PCT) / 2;
   // We want the randomly chosen jitter to be at least 1ms so total jitter is slightly more than
   // half the max possible.
