@@ -1,17 +1,33 @@
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
-import { Flag, FormatEnum, ObfuscatedFlag, VariationType } from '../interfaces';
+import { Configuration } from '../configuration';
+import { Flag, FormatEnum, VariationType } from '../interfaces';
 import * as overrideValidatorModule from '../override-validator';
 
 import EppoClient from './eppo-client';
 
 describe('EppoClient', () => {
-  const storage = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
-
-  function setUnobfuscatedFlagEntries(
-    entries: Record<string, Flag | ObfuscatedFlag>,
-  ): Promise<boolean> {
-    storage.setFormat(FormatEnum.SERVER);
-    return storage.setEntries(entries);
+  function setUnobfuscatedFlagEntries(entries: Record<string, Flag>): EppoClient {
+    return new EppoClient({
+      sdkKey: 'dummy',
+      sdkName: 'js-client-sdk-common',
+      sdkVersion: '1.0.0',
+      baseUrl: 'http://127.0.0.1:4000',
+      configuration: {
+        initialConfiguration: Configuration.fromResponses({
+          flags: {
+            fetchedAt: new Date().toISOString(),
+            response: {
+              format: FormatEnum.SERVER,
+              flags: entries,
+              createdAt: new Date().toISOString(),
+              environment: {
+                name: 'test',
+              },
+              banditReferences: {},
+            },
+          },
+        }),
+      },
+    });
   }
 
   const flagKey = 'mock-flag';
@@ -51,9 +67,8 @@ describe('EppoClient', () => {
   let subjectKey: string;
 
   beforeEach(async () => {
-    await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
+    client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
     subjectKey = 'subject-10';
-    client = new EppoClient({ flagConfigurationStore: storage });
   });
 
   describe('parseOverrides', () => {

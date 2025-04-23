@@ -10,28 +10,37 @@ import {
 } from '../attributes';
 import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
+import { BroadcastChannel } from '../broadcast';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
+import { Configuration, PrecomputedConfig } from '../configuration';
+import { ConfigurationSource } from '../configuration-feed';
+import { randomJitterMs, ConfigurationPoller } from '../configuration-poller';
 import ConfigurationRequestor from '../configuration-requestor';
-import { IConfigurationStore, ISyncStore } from '../configuration-store/configuration-store';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
+import { ConfigurationStore } from '../configuration-store';
 import {
-  ConfigurationWireV1,
-  IConfigurationWire,
-  IPrecomputedConfiguration,
-  PrecomputedConfiguration,
-} from '../configuration-wire/configuration-wire-types';
-import {
-  DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
-  DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
-  DEFAULT_POLL_INTERVAL_MS,
+  DEFAULT_BASE_POLLING_INTERVAL_MS,
+  DEFAULT_MAX_POLLING_INTERVAL_MS,
   DEFAULT_REQUEST_TIMEOUT_MS,
+  DEFAULT_INITIALIZATION_TIMEOUT_MS,
+  DEFAULT_MAX_AGE_SECONDS,
+  DEFAULT_MAX_STALE_SECONDS,
+  DEFAULT_INITIALIZATION_STRATEGY,
+  DEFAULT_ACTIVATION_STRATEGY,
+  DEFAULT_ENABLE_POLLING,
+  DEFAULT_ENABLE_BANDITS,
 } from '../constants';
-import { decodeFlag } from '../decoding';
+import { decodePrecomputedBandit, decodePrecomputedFlag } from '../decoding';
 import { EppoValue } from '../eppo_value';
-import { Evaluator, FlagEvaluation, noneResult, overrideResult } from '../evaluator';
+import {
+  AssignmentResult,
+  Evaluator,
+  FlagEvaluation,
+  noneResult,
+  overrideResult,
+} from '../evaluator';
 import { BoundedEventQueue } from '../events/bounded-event-queue';
 import EventDispatcher from '../events/event-dispatcher';
 import NoOpEventDispatcher from '../events/no-op-event-dispatcher';
@@ -41,21 +50,28 @@ import {
 } from '../flag-evaluation-details-builder';
 import { FlagEvaluationError } from '../flag-evaluation-error';
 import FetchHttpClient from '../http-client';
-import { IConfiguration, StoreBackedConfiguration } from '../i-configuration';
 import {
   BanditModelData,
-  BanditParameters,
-  BanditVariation,
-  Flag,
+  FormatEnum,
+  IObfuscatedPrecomputedBandit,
   IPrecomputedBandit,
-  ObfuscatedFlag,
   PrecomputedFlag,
   Variation,
   VariationType,
 } from '../interfaces';
-import { getMD5Hash } from '../obfuscation';
+import { KVStore, MemoryStore } from '../kvstore';
+import {
+  getMD5Hash,
+  obfuscatePrecomputedBanditMap,
+  obfuscatePrecomputedFlags,
+} from '../obfuscation';
 import { OverridePayload, OverrideValidator } from '../override-validator';
-import initPoller, { IPoller } from '../poller';
+import {
+  PersistentConfigurationCache,
+  PersistentConfigurationStorage,
+} from '../persistent-configuration-cache';
+import { IObfuscatedPrecomputedConfigurationResponse } from '../precomputed-configuration';
+import { generateSalt } from '../salt';
 import SdkTokenDecoder from '../sdk-token-decoder';
 import {
   Attributes,
@@ -70,26 +86,13 @@ import { shallowClone } from '../util';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
+import { Subject } from './subject';
+
 export interface IAssignmentDetails<T extends Variation['value'] | object> {
   variation: T;
   action: string | null;
   evaluationDetails: IFlagEvaluationDetails;
 }
-
-export type FlagConfigurationRequestParameters = {
-  apiKey: string;
-  sdkVersion: string;
-  sdkName: string;
-  baseUrl?: string;
-  requestTimeoutMs?: number;
-  pollingIntervalMs?: number;
-  numInitialRequestRetries?: number;
-  numPollRequestRetries?: number;
-  pollAfterSuccessfulInitialization?: boolean;
-  pollAfterFailedInitialization?: boolean;
-  throwOnFailedInitialization?: boolean;
-  skipInitialPoll?: boolean;
-};
 
 export interface IContainerExperiment<T> {
   flagKey: string;
@@ -98,23 +101,200 @@ export interface IContainerExperiment<T> {
 }
 
 export type EppoClientParameters = {
+  sdkKey: string;
+  sdkName: string;
+  sdkVersion: string;
+  baseUrl?: string;
+
   // Dispatcher for arbitrary, application-level events (not to be confused with Eppo specific assignment
   // or bandit events). These events are application-specific and captures by EppoClient#track API.
   eventDispatcher?: EventDispatcher;
-  flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
-  banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
-  banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
-  overrideStore?: ISyncStore<Variation>;
-  configurationRequestParameters?: FlagConfigurationRequestParameters;
-  /**
-   * Setting this value will have no side effects other than triggering a warning when the actual
-   * configuration's obfuscated does not match the value set here.
-   *
-   * @deprecated obfuscation is determined by inspecting the `format` field of the UFC response.
-   */
-  isObfuscated?: boolean;
+  overrideStore?: KVStore<Variation>;
+
+  bandits?: {
+    /**
+     * Whether to enable bandits.
+     *
+     * This influences whether bandits configuration is fetched.
+     * Disabling bandits helps to save network bandwidth if bandits
+     * are unused.
+     *
+     * @default true
+     */
+    enable?: boolean;
+  };
+
+  configuration?: {
+    /**
+     * When specified, will run the client in the "precomputed"
+     * mode. Instead of fetching the full configuration from the
+     * server, the client will fetch flags and bandits precomputed for
+     * the specified subject.
+     */
+    precompute?: {
+      subjectKey: string;
+      subjectAttributes: Attributes | ContextAttributes;
+      banditActions?: Record</* flagKey: */ string, BanditActions>;
+    };
+
+    /**
+     * Strategy for fetching initial configuration.
+     *
+     * - `stale-while-revalidate`: serve assignments using cached
+     *   configuration (within `maxStaleSeconds`), while fetching a
+     *   fresh configuration (if cached one is stale). If fetch fails
+     *   or times out, use the cached/stale configuration.
+     *
+     * - `only-if-cached`: use cached configuration, even if stale. If
+     *   no cached configuration is available, use default
+     *   configuration.
+     *
+     * - `no-cache`: ignore cached configuration and always fetch a
+     *   fresh configuration. If fetching fails, use default (empty)
+     *   configuration.
+     *
+     * - `none`: consider client initialized without loading any
+     *   configuration (except `initialConfiguration`). Can be useful
+     *   if you want to manually control configuration.
+     *
+     * @default 'stale-while-revalidate'
+     */
+    initializationStrategy?: 'stale-while-revalidate' | 'only-if-cached' | 'no-cache' | 'none';
+
+    persistentStorage?: PersistentConfigurationStorage;
+
+    /**
+     * You may speed-up initialization process by bootstrapping client
+     * using `Configuration` received from another Eppo client (e.g.,
+     * initialize client SDK using configuration from server SDK).
+     *
+     * For the purposes of initialization, this configuration is
+     * considered as cached, so the client may still issue a fetch
+     * request if it detects that configuration is too old. If you
+     * want to disable any network requests during initialization, set
+     * `initializationStrategy` to `none`.
+     *
+     * @default undefined
+     */
+    initialConfiguration?: Configuration;
+
+    /**
+     * Maximum time the client is allowed to spend in
+     * initialization. After timeout is reached, the client will use
+     * the best configuration that it got and consider initialization
+     * finished.
+     *
+     * @default 5_000 (5 seconds)
+     */
+    initializationTimeoutMs?: number;
+
+    /**
+     * Allow using cached configuration that is `maxAgeSeconds` old,
+     * without attempting to fetch a fresh configuration.
+     *
+     * @default 30
+     */
+    maxAgeSeconds?: number;
+
+    /**
+     * Allow using a stale configuration that is stale within
+     * `maxStaleSeconds`. Stale configuration may be used if server is
+     * unreachable.
+     *
+     * @default Infinity
+     */
+    maxStaleSeconds?: number;
+
+    /**
+     * Whether to enable periodic polling for configuration.
+     *
+     * If enabled, the client will try to fetch a new configuration
+     * every `basePollingIntervalMs` milliseconds.
+     *
+     * When configuration is successfully fetched, it is stored in
+     * persistent storage (cache) if available. `activationStrategy`
+     * determines whether configuration is activated (i.e., becomes
+     * used for evaluating assignments and bandits).
+     *
+     * @default false
+     */
+    enablePolling?: boolean;
+    /**
+     * How often to poll for configuration.
+     *
+     * @default 30_000 (30 seconds)
+     */
+    basePollingIntervalMs?: number;
+    /**
+     * Maximum polling interval.
+     *
+     * @default 300_000 (5 minutes)
+     */
+    maxPollingIntervalMs?: number;
+
+    /**
+     * When to activate the fetched configuration, allowing it to be
+     * used to evaluate assignments and bandits.
+     *
+     * - `next-load`: the fetched configuration is stored in persistent storage and
+     *   will be activated on next client initialization. Assignments
+     *   and bandits continue to be served using the currently active
+     *   configuration. This is helpful in client application if you
+     *   want to ensure that user experience is not disrupted in the
+     *   middle of the session.
+     *
+     * - `stale`: activate fetched configuration if the current one
+     *   exceeds `maxStaleSeconds`.
+     *
+     * - `empty`: activate fetched configuration if the current
+     *   configuration is empty (serving default assignments).
+     *
+     * - `always`: always activate the latest fetched configuration.
+     *
+     * @default 'next-load'
+     */
+    activationStrategy?: 'always' | 'stale' | 'empty' | 'next-load';
+
+    /**
+     * Timeout for individual network requests.
+     *
+     * @default 5_000 (5 seconds)
+     */
+    requestTimeoutMs?: number;
+  };
 };
 
+/**
+ * ## Initialization
+ *
+ * During initialization, the client will:
+ * 1. Load initial configuration from `configuration.initialConfiguration` if provided
+ * 2. If no initial configuration and `configuration.persistentStorage` is provided and strategy is
+ *    not 'no-cache' or 'none', attempt to load cached configuration
+ * 3. Based on `configuration.initializationStrategy`:
+ *    - 'stale-while-revalidate': Use cached config if within `maxStaleSeconds`, fetch fresh in
+ *      background
+ *    - 'only-if-cached': Use cached config only, no network requests
+ *    - 'no-cache': Always fetch fresh config
+ *    - 'none': Use only initial config, no loading/fetching
+ * 4. If fetching enabled, attempt fetches until success or `initializationTimeoutMs` reached
+ * 5. If `configuration.enablePolling` is true, begin polling for updates every
+ *    `basePollingIntervalMs`
+ * 6. When new configs are fetched, activate based on `configuration.activationStrategy`:
+ *    - 'always': Activate immediately
+ *    - 'stale': Activate if current config exceeds `maxStaleSeconds`
+ *    - 'empty': Activate if current config is empty
+ *    - 'next-load': Store for next initialization
+ *
+ * Initialization is considered complete when either:
+ * - For 'stale-while-revalidate': Fresh configuration is fetched
+ * - For 'only-if-cached': Cache is loaded or initial configuration applied
+ * - For 'no-cache': Fresh configuration is fetched
+ * - For 'none': Immediately
+ *
+ * If `configuration.initializationTimeoutMs` is reached before completion, initialization finishes
+ * with the best available configuration (from cache, initial configuration, or empty).
+ */
 export default class EppoClient {
   private eventDispatcher: EventDispatcher;
   private readonly assignmentEventsQueue: BoundedEventQueue<IAssignmentEvent> =
@@ -124,52 +304,305 @@ export default class EppoClient {
   private readonly banditEvaluator = new BanditEvaluator();
   private banditLogger?: IBanditLogger;
   private banditAssignmentCache?: AssignmentCache;
-  private configurationRequestParameters?: FlagConfigurationRequestParameters;
-  private banditModelConfigurationStore?: IConfigurationStore<BanditParameters>;
-  private banditVariationConfigurationStore?: IConfigurationStore<BanditVariation[]>;
-  private overrideStore?: ISyncStore<Variation>;
-  private flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>;
+  private overrideStore?: KVStore<Variation>;
   private assignmentLogger?: IAssignmentLogger;
   private assignmentCache?: AssignmentCache;
   // whether to suppress any errors and return default values instead
   private isGracefulFailureMode = true;
-  private requestPoller?: IPoller;
-  private readonly evaluator = new Evaluator();
-  private configurationRequestor?: ConfigurationRequestor;
+  private readonly evaluator: Evaluator;
   private readonly overrideValidator = new OverrideValidator();
 
-  constructor({
-    eventDispatcher = new NoOpEventDispatcher(),
-    isObfuscated,
-    flagConfigurationStore,
-    banditVariationConfigurationStore,
-    banditModelConfigurationStore,
-    overrideStore,
-    configurationRequestParameters,
-  }: EppoClientParameters) {
-    this.eventDispatcher = eventDispatcher;
-    this.flagConfigurationStore = flagConfigurationStore;
-    this.banditVariationConfigurationStore = banditVariationConfigurationStore;
-    this.banditModelConfigurationStore = banditModelConfigurationStore;
-    this.overrideStore = overrideStore;
-    this.configurationRequestParameters = configurationRequestParameters;
+  private readonly configurationFeed;
+  private readonly configurationStore: ConfigurationStore;
+  private readonly configurationCache?: PersistentConfigurationCache;
+  private readonly configurationRequestor: ConfigurationRequestor;
+  private readonly configurationPoller: ConfigurationPoller;
+  private initialized = false;
+  private readonly initializationPromise: Promise<void>;
+  private readonly precomputedConfig?: {
+    subjectKey: string;
+    subjectAttributes: ContextAttributes;
+    banditActions?: Record<FlagKey, BanditActions>;
+  };
 
-    if (isObfuscated !== undefined) {
-      logger.warn(
-        '[Eppo SDK] specifying isObfuscated no longer has an effect and will be removed in the next major release; obfuscation ' +
-          'is now inferred from the configuration, so you can safely remove the option.',
+  /**
+   * @internal This method is intended to be used by downstream SDKs. The constructor requires
+   * `sdkName` and `sdkVersion` parameters, and default options may differ from defaults for
+   * client/node SDKs.
+   */
+  constructor(options: EppoClientParameters) {
+    const { eventDispatcher = new NoOpEventDispatcher(), overrideStore, configuration } = options;
+
+    this.eventDispatcher = eventDispatcher;
+    this.overrideStore = overrideStore;
+
+    this.evaluator = new Evaluator({
+      sdkName: options.sdkName,
+      sdkVersion: options.sdkVersion,
+    });
+
+    const {
+      configuration: {
+        persistentStorage,
+        initializationTimeoutMs = DEFAULT_INITIALIZATION_TIMEOUT_MS,
+        requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+        basePollingIntervalMs = DEFAULT_BASE_POLLING_INTERVAL_MS,
+        maxPollingIntervalMs = DEFAULT_MAX_POLLING_INTERVAL_MS,
+        enablePolling = DEFAULT_ENABLE_POLLING,
+        maxAgeSeconds = DEFAULT_MAX_AGE_SECONDS,
+        activationStrategy = DEFAULT_ACTIVATION_STRATEGY,
+      } = {},
+    } = options;
+
+    // Store precomputed config options for later use in getPrecomputedSubject().
+    if (options.configuration?.precompute) {
+      this.precomputedConfig = {
+        subjectKey: options.configuration.precompute.subjectKey,
+        subjectAttributes: ensureContextualSubjectAttributes(
+          options.configuration.precompute.subjectAttributes,
+        ),
+        banditActions: options.configuration.precompute.banditActions,
+      };
+    }
+
+    this.configurationFeed = new BroadcastChannel<[Configuration, ConfigurationSource]>();
+
+    this.configurationStore = new ConfigurationStore(configuration?.initialConfiguration);
+    this.configurationStore.register(
+      this.configurationFeed,
+      activationStrategy === 'always'
+        ? { type: 'always' }
+        : activationStrategy === 'stale'
+          ? { type: 'stale', maxAgeSeconds }
+          : activationStrategy === 'empty'
+            ? { type: 'empty' }
+            : { type: 'never' },
+    );
+
+    if (persistentStorage) {
+      this.configurationCache = new PersistentConfigurationCache(
+        persistentStorage,
+        this.configurationFeed,
       );
+    }
+
+    this.configurationRequestor = new ConfigurationRequestor(
+      new FetchHttpClient(
+        new ApiEndpoints({
+          sdkTokenDecoder: new SdkTokenDecoder(options.sdkKey),
+          baseUrl: options.baseUrl,
+          queryParams: {
+            apiKey: options.sdkKey,
+            sdkName: options.sdkName,
+            sdkVersion: options.sdkVersion,
+          },
+        }),
+        requestTimeoutMs,
+      ),
+      this.configurationFeed,
+      {
+        wantsBandits: options.bandits?.enable ?? DEFAULT_ENABLE_BANDITS,
+        precomputed: options.configuration?.precompute
+          ? {
+              subjectKey: options.configuration.precompute.subjectKey,
+              subjectAttributes: ensureContextualSubjectAttributes(
+                options.configuration.precompute.subjectAttributes,
+              ),
+              banditActions: options.configuration.precompute.banditActions
+                ? Object.fromEntries(
+                    Object.entries(options.configuration.precompute.banditActions).map(
+                      ([banditKey, actions]) => [
+                        banditKey,
+                        ensureActionsWithContextualAttributes(actions),
+                      ],
+                    ),
+                  )
+                : undefined,
+            }
+          : undefined,
+      },
+    );
+
+    this.configurationPoller = new ConfigurationPoller(this.configurationRequestor, {
+      configurationFeed: this.configurationFeed,
+      basePollingIntervalMs,
+      maxPollingIntervalMs,
+      maxAgeMs: maxAgeSeconds * 1000,
+    });
+
+    this.initializationPromise = withTimeout(this.initialize(options), initializationTimeoutMs)
+      .catch((err) => {
+        logger.warn({ err }, '[Eppo SDK] Encountered an error during initialization');
+      })
+      .finally(() => {
+        logger.debug('[Eppo SDK] Finished initialization');
+        this.initialized = true;
+        if (enablePolling) {
+          this.configurationPoller.start();
+        }
+      });
+  }
+
+  private async initialize(options: EppoClientParameters): Promise<void> {
+    logger.debug('[Eppo SDK] Initializing EppoClient');
+    const {
+      configuration: {
+        initializationStrategy = DEFAULT_INITIALIZATION_STRATEGY,
+        initialConfiguration,
+        basePollingIntervalMs = DEFAULT_BASE_POLLING_INTERVAL_MS,
+        maxAgeSeconds = DEFAULT_MAX_AGE_SECONDS,
+        maxStaleSeconds = DEFAULT_MAX_STALE_SECONDS,
+      } = {},
+    } = options;
+
+    if (initialConfiguration) {
+      this.configurationStore.setConfiguration(initialConfiguration);
+      this.configurationFeed.broadcast(initialConfiguration, ConfigurationSource.Cache);
+    }
+
+    if (initializationStrategy === 'none') {
+      this.initialized = true;
+      return;
+    }
+
+    if (
+      !initialConfiguration && // initial configuration overrides persistent storage for initialization
+      this.configurationCache &&
+      (initializationStrategy === 'stale-while-revalidate' ||
+        initializationStrategy === 'only-if-cached')
+    ) {
+      try {
+        const configuration = await this.configurationCache.loadConfiguration({ maxStaleSeconds });
+        if (configuration && !this.initialized) {
+          this.configurationStore.setConfiguration(configuration);
+        }
+      } catch (err) {
+        logger.warn('Eppo SDK failed to load configuration from persistent store', { err });
+      }
+    }
+
+    if (initializationStrategy === 'only-if-cached') {
+      return;
+    }
+
+    // Finish initialization early if cached configuration is fresh.
+    const cachedConfiguration = this.configurationStore.getConfiguration();
+    const configurationAgeMs = cachedConfiguration?.getAgeMs();
+    if (configurationAgeMs !== undefined && configurationAgeMs < maxAgeSeconds * 1000) {
+      logger.debug(
+        { configurationAgeMs, maxAgeSeconds },
+        '[Eppo SDK] The cached configuration is fresh, skipping fetch',
+      );
+      return;
+    } else if (cachedConfiguration) {
+      logger.debug(
+        { configurationAgeMs, maxAgeSeconds },
+        '[Eppo SDK] The cached configuration is stale, fetching new configuration',
+      );
+    } else {
+      logger.debug('[Eppo SDK] No cached configuration found, fetching new configuration');
+    }
+
+    // Loop until we sucessfully fetch configuration or initialization deadline is reached (and sets
+    // this.initialized to true).
+    while (!this.initialized) {
+      try {
+        logger.debug('[Eppo SDK] Fetching initial configuration');
+        const configuration = await this.configurationRequestor.fetchConfiguration();
+        if (configuration) {
+          this.configurationFeed.broadcast(configuration, ConfigurationSource.Network);
+          this.configurationStore.setConfiguration(configuration);
+
+          // The fetch was successful, so we can exit the loop.
+          return;
+        }
+      } catch (err) {
+        logger.warn({ err }, '[Eppo SDK] Failed to fetch initial configuration');
+      }
+
+      // Note: this is only using the jitter without the base polling interval.
+      await new Promise((resolve) => setTimeout(resolve, randomJitterMs(basePollingIntervalMs)));
     }
   }
 
-  private getConfiguration(): IConfiguration {
-    return this.configurationRequestor
-      ? this.configurationRequestor.getConfiguration()
-      : new StoreBackedConfiguration(
-          this.flagConfigurationStore,
-          this.banditVariationConfigurationStore,
-          this.banditModelConfigurationStore,
-        );
+  /**
+   * Waits for the client to finish initialization sequence and be ready to serve assignments.
+   *
+   * @returns A promise that resolves when the client is initialized.
+   */
+  public waitForInitialization(): Promise<void> {
+    return this.initializationPromise;
+  }
+
+  public getConfiguration(): Configuration {
+    return this.configurationStore.getConfiguration();
+  }
+
+  /**
+   * Activates a new configuration.
+   */
+  public activateConfiguration(configuration: Configuration) {
+    this.configurationStore.setConfiguration(configuration);
+  }
+
+  /**
+   * Register a listener to be notified when a new configuration is received.
+   * @param listener Callback function that receives the fetched `Configuration` object
+   * @returns A function that can be called to unsubscribe the listener.
+   */
+  public onNewConfiguration(listener: (configuration: Configuration) => void): () => void {
+    return this.configurationFeed.addListener(listener);
+  }
+
+  /**
+   * Register a listener to be notified when a new configuration is activated.
+   * @param listener Callback function that receives the activated `Configuration` object
+   * @returns A function that can be called to unsubscribe the listener.
+   */
+  public onConfigurationActivated(listener: (configuration: Configuration) => void): () => void {
+    return this.configurationStore.onConfigurationChange(listener);
+  }
+
+  /**
+   * Creates a Subject-scoped instance.
+   *
+   * This is useful if you need to evaluate multiple assignments for the same subject. Returned
+   * Subject is connected to the EppoClient instance and will use the same configuration.
+   */
+  public getSubject(
+    subjectKey: string,
+    subjectAttributes: Attributes | ContextAttributes = {},
+    banditActions: Record<FlagKey, BanditActions> = {},
+  ): Subject {
+    return new Subject(this, subjectKey, subjectAttributes, banditActions);
+  }
+
+  /**
+   * If the client is configured to precompute, returns a Subject-scoped instance for the
+   * precomputed configuration.
+   */
+  public getPrecomputedSubject(): Subject | undefined {
+    const configuration = this.getConfiguration();
+    const precomputed = configuration.getPrecomputedConfiguration();
+
+    if (precomputed) {
+      return this.getSubject(
+        precomputed.subjectKey,
+        precomputed.subjectAttributes ?? {},
+        precomputed.banditActions,
+      );
+    }
+
+    // Use the stored precomputed config if available and configuration hasn't been loaded yet
+    if (this.precomputedConfig) {
+      return this.getSubject(
+        this.precomputedConfig.subjectKey,
+        this.precomputedConfig.subjectAttributes,
+        this.precomputedConfig.banditActions,
+      );
+    }
+
+    return undefined;
   }
 
   /**
@@ -194,33 +627,11 @@ export default class EppoClient {
   withOverrides(overrides: Record<FlagKey, Variation> | undefined): EppoClient {
     if (overrides && Object.keys(overrides).length) {
       const copy = shallowClone(this);
-      copy.overrideStore = new MemoryOnlyConfigurationStore<Variation>();
+      copy.overrideStore = new MemoryStore<Variation>();
       copy.overrideStore.setEntries(overrides);
       return copy;
     }
     return this;
-  }
-
-  setConfigurationRequestParameters(
-    configurationRequestParameters: FlagConfigurationRequestParameters,
-  ) {
-    this.configurationRequestParameters = configurationRequestParameters;
-  }
-
-  // noinspection JSUnusedGlobalSymbols
-  setFlagConfigurationStore(flagConfigurationStore: IConfigurationStore<Flag | ObfuscatedFlag>) {
-    this.flagConfigurationStore = flagConfigurationStore;
-
-    this.updateConfigRequestorIfExists();
-  }
-
-  // noinspection JSUnusedGlobalSymbols
-  setBanditVariationConfigurationStore(
-    banditVariationConfigurationStore: IConfigurationStore<BanditVariation[]>,
-  ) {
-    this.banditVariationConfigurationStore = banditVariationConfigurationStore;
-
-    this.updateConfigRequestorIfExists();
   }
 
   /** Sets the EventDispatcher instance to use when tracking events with {@link track}. */
@@ -244,43 +655,7 @@ export default class EppoClient {
     this.eventDispatcher?.attachContext(key, value);
   }
 
-  // noinspection JSUnusedGlobalSymbols
-  setBanditModelConfigurationStore(
-    banditModelConfigurationStore: IConfigurationStore<BanditParameters>,
-  ) {
-    this.banditModelConfigurationStore = banditModelConfigurationStore;
-
-    this.updateConfigRequestorIfExists();
-  }
-
-  private updateConfigRequestorIfExists() {
-    // Update the ConfigurationRequestor if it exists
-    if (this.configurationRequestor) {
-      this.configurationRequestor.setConfigurationStores(
-        this.flagConfigurationStore,
-        this.banditVariationConfigurationStore || null,
-        this.banditModelConfigurationStore || null,
-      );
-    }
-  }
-
-  // noinspection JSUnusedGlobalSymbols
-  /**
-   * Setting this value will have no side effects other than triggering a warning when the actual
-   * configuration's obfuscated does not match the value set here.
-   *
-   * @deprecated The client determines whether the configuration is obfuscated by inspection
-   * @param isObfuscated
-   */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  setIsObfuscated(isObfuscated: boolean) {
-    logger.warn(
-      '[Eppo SDK] setIsObfuscated no longer has an effect and will be removed in the next major release; obfuscation ' +
-        'is now inferred from the configuration, so you can safely remove the call to this method.',
-    );
-  }
-
-  setOverrideStore(store: ISyncStore<Variation>): void {
+  setOverrideStore(store: KVStore<Variation>): void {
     this.overrideStore = store;
   }
 
@@ -298,72 +673,10 @@ export default class EppoClient {
     );
   }
 
-  async fetchFlagConfigurations() {
-    if (!this.configurationRequestParameters) {
-      throw new Error(
-        'Eppo SDK unable to fetch flag configurations without configuration request parameters',
-      );
-    }
-    // if fetchFlagConfigurations() was previously called, stop any polling process from that call
-    this.requestPoller?.stop();
-
-    const {
-      apiKey,
-      sdkName,
-      sdkVersion,
-      baseUrl, // Default is set in ApiEndpoints constructor if undefined
-      requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
-      numInitialRequestRetries = DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES,
-      numPollRequestRetries = DEFAULT_POLL_CONFIG_REQUEST_RETRIES,
-      pollAfterSuccessfulInitialization = false,
-      pollAfterFailedInitialization = false,
-      throwOnFailedInitialization = false,
-      skipInitialPoll = false,
-    } = this.configurationRequestParameters;
-
-    let { pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS } = this.configurationRequestParameters;
-    if (pollingIntervalMs <= 0) {
-      logger.error('pollingIntervalMs must be greater than 0. Using default');
-      pollingIntervalMs = DEFAULT_POLL_INTERVAL_MS;
-    }
-
-    const apiEndpoints = new ApiEndpoints({
-      baseUrl,
-      queryParams: { apiKey, sdkName, sdkVersion },
-      sdkTokenDecoder: new SdkTokenDecoder(apiKey),
-    });
-
-    const httpClient = new FetchHttpClient(apiEndpoints, requestTimeoutMs);
-    const configurationRequestor = new ConfigurationRequestor(
-      httpClient,
-      this.flagConfigurationStore,
-      this.banditVariationConfigurationStore ?? null,
-      this.banditModelConfigurationStore ?? null,
-    );
-    this.configurationRequestor = configurationRequestor;
-
-    const pollingCallback = async () => {
-      if (await configurationRequestor.isFlagConfigExpired()) {
-        return configurationRequestor.fetchAndStoreConfigurations();
-      }
-    };
-
-    this.requestPoller = initPoller(pollingIntervalMs, pollingCallback, {
-      maxStartRetries: numInitialRequestRetries,
-      maxPollRetries: numPollRequestRetries,
-      pollAfterSuccessfulStart: pollAfterSuccessfulInitialization,
-      pollAfterFailedStart: pollAfterFailedInitialization,
-      errorOnFailedStart: throwOnFailedInitialization,
-      skipInitialPoll: skipInitialPoll,
-    });
-
-    await this.requestPoller.start();
-  }
-
   // noinspection JSUnusedGlobalSymbols
   stopPolling() {
-    if (this.requestPoller) {
-      this.requestPoller.stop();
+    if (this.configurationPoller) {
+      this.configurationPoller.stop();
     }
   }
 
@@ -418,18 +731,6 @@ export default class EppoClient {
       action: null,
       evaluationDetails: flagEvaluationDetails,
     };
-  }
-
-  /**
-   * @deprecated use getBooleanAssignment instead.
-   */
-  getBoolAssignment(
-    flagKey: string,
-    subjectKey: string,
-    subjectAttributes: Attributes,
-    defaultValue: boolean,
-  ): boolean {
-    return this.getBooleanAssignment(flagKey, subjectKey, subjectAttributes, defaultValue);
   }
 
   /**
@@ -663,10 +964,10 @@ export default class EppoClient {
     let result: string | null = null;
 
     const flagBanditVariations = config.getFlagBanditVariations(flagKey);
-    const banditKey = flagBanditVariations?.at(0)?.key;
+    const banditKey = flagBanditVariations.at(0)?.key;
 
     if (banditKey) {
-      const banditParameters = config.getBandit(banditKey);
+      const banditParameters = config.getBanditConfiguration()?.response.bandits[banditKey];
       if (banditParameters) {
         const contextualSubjectAttributes = ensureContextualSubjectAttributes(subjectAttributes);
         const actionsWithContextualAttributes = ensureActionsWithContextualAttributes(actions);
@@ -701,9 +1002,35 @@ export default class EppoClient {
       'ASSIGNMENT_ERROR',
       'Unexpected error getting assigned variation for bandit action',
     );
+
     try {
-      // Get the assigned variation for the flag with a possible bandit
-      // Note for getting assignments, we don't care about context
+      // Check if we have precomputed configuration for this subject
+      const precomputed = config.getPrecomputedConfiguration();
+      if (precomputed && precomputed.subjectKey === subjectKey) {
+        // Use precomputed results if available
+        const { flagEvaluation, banditAction, assignmentEvent, banditEvent } =
+          this.evaluatePrecomputedAssignment(precomputed, flagKey, VariationType.STRING);
+
+        if (flagEvaluation.assignmentDetails.variation) {
+          variation = flagEvaluation.assignmentDetails.variation.value.toString();
+          evaluationDetails = flagEvaluation.assignmentDetails.evaluationDetails;
+          action = banditAction;
+
+          this.maybeLogAssignment(assignmentEvent);
+
+          if (banditEvent) {
+            try {
+              this.logBanditAction(banditEvent);
+            } catch (err: any) {
+              logger.error('Error logging precomputed bandit event', err);
+            }
+          }
+
+          return { variation, action, evaluationDetails };
+        }
+      }
+
+      // If no precomputed result, continue with regular evaluation
       const nonContextualSubjectAttributes =
         ensureNonContextualSubjectAttributes(subjectAttributes);
       const { variation: assignedVariation, evaluationDetails: assignmentEvaluationDetails } =
@@ -720,7 +1047,6 @@ export default class EppoClient {
       // Note: the reason for non-bandit assignments include the subject being bucketed into a non-bandit variation or
       // a rollout having been done.
       const bandit = config.getFlagVariationBandit(flagKey, variation);
-
       if (!bandit) {
         return { variation, action: null, evaluationDetails };
       }
@@ -919,19 +1245,19 @@ export default class EppoClient {
   }
 
   private parseVariationWithDetails(
-    { flagEvaluationDetails, variation }: FlagEvaluation,
+    { assignmentDetails: { variation, evaluationDetails } }: FlagEvaluation,
     defaultValue: EppoValue,
     expectedVariationType: VariationType,
   ): { eppoValue: EppoValue; flagEvaluationDetails: IFlagEvaluationDetails } {
     try {
-      if (!variation || flagEvaluationDetails.flagEvaluationCode !== 'MATCH') {
-        return { eppoValue: defaultValue, flagEvaluationDetails };
+      if (!variation || evaluationDetails.flagEvaluationCode !== 'MATCH') {
+        return { eppoValue: defaultValue, flagEvaluationDetails: evaluationDetails };
       }
       const eppoValue = EppoValue.valueOf(variation.value, expectedVariationType);
-      return { eppoValue, flagEvaluationDetails };
+      return { eppoValue, flagEvaluationDetails: evaluationDetails };
     } catch (error: any) {
       const eppoValue = this.rethrowIfNotGraceful(error, defaultValue);
-      return { eppoValue, flagEvaluationDetails };
+      return { eppoValue, flagEvaluationDetails: evaluationDetails };
     }
   }
 
@@ -948,29 +1274,23 @@ export default class EppoClient {
     subjectAttributes: Attributes = {},
   ): Record<FlagKey, PrecomputedFlag> {
     const config = this.getConfiguration();
-    const configDetails = config.getFlagConfigDetails();
-    const flagKeys = this.getFlagKeys();
+    const flagKeys = config.getFlagKeys();
     const flags: Record<FlagKey, PrecomputedFlag> = {};
 
     // Evaluate all the enabled flags for the user
     flagKeys.forEach((flagKey) => {
-      const flag = this.getNormalizedFlag(config, flagKey);
+      const flag = config.getFlag(flagKey);
       if (!flag) {
         logger.debug(`${loggerPrefix} No assigned variation. Flag does not exist.`);
         return;
       }
 
       // Evaluate the flag for this subject.
-      const evaluation = this.evaluator.evaluateFlag(
-        flag,
-        configDetails,
-        subjectKey,
-        subjectAttributes,
-        config.isObfuscated(),
-      );
+      const evaluation = this.evaluator.evaluateFlag(config, flag, subjectKey, subjectAttributes);
+      const { assignmentDetails } = evaluation;
 
       // allocationKey is set along with variation when there is a result. this check appeases typescript below
-      if (!evaluation.variation || !evaluation.allocationKey) {
+      if (!assignmentDetails.variation || !assignmentDetails.allocationKey) {
         logger.debug(`${loggerPrefix} No assigned variation: ${flagKey}`);
         return;
       }
@@ -978,12 +1298,12 @@ export default class EppoClient {
       // Transform into a PrecomputedFlag
       flags[flagKey] = {
         flagKey,
-        allocationKey: evaluation.allocationKey,
-        doLog: evaluation.doLog,
-        extraLogging: evaluation.extraLogging,
-        variationKey: evaluation.variation.key,
+        allocationKey: assignmentDetails.allocationKey,
+        doLog: assignmentDetails.doLog,
+        extraLogging: assignmentDetails.extraLogging,
+        variationKey: assignmentDetails.variation.key,
         variationType: flag.variationType,
-        variationValue: evaluation.variation.value.toString(),
+        variationValue: assignmentDetails.variation.value.toString(),
       };
     });
 
@@ -996,40 +1316,46 @@ export default class EppoClient {
    * @param subjectKey an identifier of the experiment subject, for example a user ID.
    * @param subjectAttributes optional attributes associated with the subject, for example name and email.
    * @param banditActions optional attributes associated with the bandit actions
-   * @param salt a salt to use for obfuscation
    */
-  getPrecomputedConfiguration(
+  public getPrecomputedConfiguration(
     subjectKey: string,
     subjectAttributes: Attributes | ContextAttributes = {},
     banditActions: Record<FlagKey, BanditActions> = {},
-    salt?: string,
-  ): string {
-    const config = this.getConfiguration();
-    const configDetails = config.getFlagConfigDetails();
+  ): Configuration {
+    const configuration = this.getConfiguration();
 
     const subjectContextualAttributes = ensureContextualSubjectAttributes(subjectAttributes);
     const subjectFlatAttributes = ensureNonContextualSubjectAttributes(subjectAttributes);
-    const flags = this.getAllAssignments(subjectKey, subjectFlatAttributes);
 
+    const flags = this.getAllAssignments(subjectKey, subjectFlatAttributes);
     const bandits = this.computeBanditsForFlags(
-      config,
+      configuration,
       subjectKey,
       subjectContextualAttributes,
       banditActions,
       flags,
     );
 
-    const precomputedConfig: IPrecomputedConfiguration = PrecomputedConfiguration.obfuscated(
-      subjectKey,
-      flags,
-      bandits,
-      salt ?? '', // no salt if not provided
-      subjectContextualAttributes,
-      configDetails.configEnvironment,
-    );
+    const salt = generateSalt();
+    const obfuscatedFlags = obfuscatePrecomputedFlags(salt, flags);
+    const obfuscatedBandits = obfuscatePrecomputedBanditMap(salt, bandits);
 
-    const configWire: IConfigurationWire = ConfigurationWireV1.precomputed(precomputedConfig);
-    return JSON.stringify(configWire);
+    const response: IObfuscatedPrecomputedConfigurationResponse = {
+      format: FormatEnum.PRECOMPUTED,
+      createdAt: new Date().toISOString(),
+      obfuscated: true,
+      salt,
+      flags: obfuscatedFlags,
+      bandits: obfuscatedBandits,
+    };
+
+    return Configuration.fromResponses({
+      precomputed: {
+        response,
+        subjectKey,
+        subjectAttributes: subjectContextualAttributes,
+      },
+    });
   }
 
   /**
@@ -1044,17 +1370,40 @@ export default class EppoClient {
    * @param expectedVariationType The expected variation type
    * @returns A detailed return of assignment for a particular subject and flag
    */
-  getAssignmentDetail(
+  public getAssignmentDetail(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Attributes = {},
     expectedVariationType?: VariationType,
+  ): FlagEvaluation {
+    const result = this.evaluateAssignment(
+      flagKey,
+      subjectKey,
+      subjectAttributes,
+      expectedVariationType,
+    );
+    this.maybeLogAssignment(result.assignmentEvent);
+    return result;
+  }
+
+  /**
+   * Internal helper that evaluates a flag assignment without logging
+   * Returns the evaluation result that can be used for logging
+   *
+   * @todo This belongs to Evaluator class.
+   */
+  private evaluateAssignment(
+    flagKey: string,
+    subjectKey: string,
+    subjectAttributes: Attributes,
+    expectedVariationType: VariationType | undefined,
   ): FlagEvaluation {
     validateNotBlank(subjectKey, 'Invalid argument: subjectKey cannot be blank');
     validateNotBlank(flagKey, 'Invalid argument: flagKey cannot be blank');
     const config = this.getConfiguration();
 
     const flagEvaluationDetailsBuilder = this.newFlagEvaluationDetailsBuilder(config, flagKey);
+
     const overrideVariation = this.overrideStore?.get(flagKey);
     if (overrideVariation) {
       return overrideResult(
@@ -1066,8 +1415,19 @@ export default class EppoClient {
       );
     }
 
-    const configDetails = config.getFlagConfigDetails();
-    const flag = this.getNormalizedFlag(config, flagKey);
+    const precomputed = config.getPrecomputedConfiguration();
+    if (precomputed && precomputed.subjectKey === subjectKey) {
+      // Short-circuit evaluation if we have a matching precomputed configuration.
+      const precomputedResult = this.evaluatePrecomputedAssignment(
+        precomputed,
+        flagKey,
+        expectedVariationType,
+      );
+
+      return precomputedResult.flagEvaluation;
+    }
+
+    const flag = config.getFlag(flagKey);
 
     if (flag === null) {
       logger.warn(`${loggerPrefix} No assigned variation. Flag not found: ${flagKey}`);
@@ -1081,7 +1441,7 @@ export default class EppoClient {
         subjectKey,
         subjectAttributes,
         flagEvaluationDetails,
-        configDetails.configFormat,
+        config.getFlagsConfiguration()?.response.format ?? '',
       );
     }
 
@@ -1097,7 +1457,7 @@ export default class EppoClient {
           subjectKey,
           subjectAttributes,
           flagEvaluationDetails,
-          configDetails.configFormat,
+          config.getFlagsConfiguration()?.response.format ?? '',
         );
       }
       throw new TypeError(errorMessage);
@@ -1115,39 +1475,202 @@ export default class EppoClient {
         subjectKey,
         subjectAttributes,
         flagEvaluationDetails,
-        configDetails.configFormat,
+        config.getFlagsConfiguration()?.response.format ?? '',
       );
     }
 
-    const isObfuscated = config.isObfuscated();
     const result = this.evaluator.evaluateFlag(
+      config,
       flag,
-      configDetails,
       subjectKey,
       subjectAttributes,
-      isObfuscated,
       expectedVariationType,
     );
-    if (isObfuscated) {
-      // flag.key is obfuscated, replace with requested flag key
-      result.flagKey = flagKey;
-    }
 
-    try {
-      if (result?.doLog) {
-        this.maybeLogAssignment(result);
-      }
-    } catch (error) {
-      logger.error(`${loggerPrefix} Error logging assignment event: ${error}`);
+    // if flag.key is obfuscated, replace with requested flag key
+    if (result.assignmentDetails) {
+      result.assignmentDetails.flagKey = flagKey;
     }
 
     return result;
   }
 
   /**
+   * @todo This belongs to Evaluator class.
+   */
+  private evaluatePrecomputedAssignment(
+    precomputed: PrecomputedConfig,
+    flagKey: string,
+    expectedVariationType: VariationType | undefined,
+  ): {
+    flagEvaluation: FlagEvaluation;
+    banditAction: string | null;
+    assignmentEvent?: IAssignmentEvent;
+    banditEvent?: IBanditEvent;
+  } {
+    const obfuscatedKey = getMD5Hash(flagKey, precomputed.response.salt);
+    const obfuscatedFlag: PrecomputedFlag | undefined = precomputed.response.flags[obfuscatedKey];
+    const obfuscatedBandit: IObfuscatedPrecomputedBandit | undefined =
+      precomputed.response.bandits[obfuscatedKey];
+
+    if (!obfuscatedFlag) {
+      logger.warn(`${loggerPrefix} No assigned variation. Flag not found: ${flagKey}`);
+      const flagEvaluationDetails: IFlagEvaluationDetails = {
+        environmentName: precomputed.response.environment?.name ?? '',
+        flagEvaluationCode: 'FLAG_UNRECOGNIZED_OR_DISABLED' as const,
+        flagEvaluationDescription: `Unrecognized or disabled flag: ${flagKey}`,
+        variationKey: null,
+        variationValue: null,
+        banditKey: null,
+        banditAction: null,
+        configFetchedAt: precomputed.fetchedAt ?? '',
+        configPublishedAt: precomputed.response.createdAt,
+        matchedRule: null,
+        matchedAllocation: null,
+        unmatchedAllocations: [],
+        unevaluatedAllocations: [],
+      };
+
+      const noneResultValue = noneResult(
+        flagKey,
+        precomputed.subjectKey,
+        ensureNonContextualSubjectAttributes(precomputed.subjectAttributes ?? {}),
+        flagEvaluationDetails,
+        precomputed.response.format,
+      );
+
+      return {
+        flagEvaluation: noneResultValue,
+        banditAction: null,
+      };
+    }
+
+    const flag = decodePrecomputedFlag(obfuscatedFlag);
+    const bandit = obfuscatedBandit && decodePrecomputedBandit(obfuscatedBandit);
+
+    if (!checkTypeMatch(expectedVariationType, flag.variationType)) {
+      const errorMessage = `Variation value does not have the correct type. Found ${flag.variationType}, but expected ${expectedVariationType} for flag ${flagKey}`;
+      if (this.isGracefulFailureMode) {
+        const flagEvaluationDetails: IFlagEvaluationDetails = {
+          environmentName: precomputed.response.environment?.name ?? '',
+          flagEvaluationCode: 'TYPE_MISMATCH' as const,
+          flagEvaluationDescription: errorMessage,
+          variationKey: null,
+          variationValue: null,
+          banditKey: null,
+          banditAction: null,
+          configFetchedAt: precomputed.fetchedAt ?? '',
+          configPublishedAt: precomputed.response.createdAt,
+          matchedRule: null,
+          matchedAllocation: null,
+          unmatchedAllocations: [],
+          unevaluatedAllocations: [],
+        };
+
+        return {
+          flagEvaluation: noneResult(
+            flagKey,
+            precomputed.subjectKey,
+            ensureNonContextualSubjectAttributes(precomputed.subjectAttributes ?? {}),
+            flagEvaluationDetails,
+            precomputed.response.format,
+          ),
+          banditAction: null,
+        };
+      }
+      throw new TypeError(errorMessage);
+    }
+
+    // Prepare flag evaluation details
+    const flagEvaluationDetails: IFlagEvaluationDetails = {
+      environmentName: precomputed.response.environment?.name ?? '',
+      flagEvaluationCode: 'MATCH' as const,
+      flagEvaluationDescription: 'Matched precomputed flag',
+      variationKey: flag.variationKey ?? null,
+      variationValue: flag.variationValue,
+      banditKey: bandit?.banditKey ?? null,
+      banditAction: bandit?.action ?? null,
+      configFetchedAt: precomputed.fetchedAt ?? '',
+      configPublishedAt: precomputed.response.createdAt,
+      matchedRule: null,
+      matchedAllocation: null,
+      unmatchedAllocations: [],
+      unevaluatedAllocations: [],
+    };
+
+    const assignmentDetails: AssignmentResult = {
+      flagKey,
+      format: precomputed.response.format,
+      subjectKey: precomputed.subjectKey,
+      subjectAttributes: precomputed.subjectAttributes
+        ? ensureNonContextualSubjectAttributes(precomputed.subjectAttributes)
+        : {},
+      variation: {
+        key: flag.variationKey ?? '',
+        value: flag.variationValue,
+      },
+      allocationKey: flag.allocationKey ?? '',
+      extraLogging: flag.extraLogging ?? {},
+      doLog: flag.doLog,
+      entityId: null,
+      evaluationDetails: flagEvaluationDetails,
+    };
+
+    const flagEvaluation: FlagEvaluation = {
+      assignmentDetails,
+    };
+
+    // Create assignment event if needed
+    if (flag.doLog) {
+      flagEvaluation.assignmentEvent = {
+        ...flag.extraLogging,
+        allocation: flag.allocationKey ?? null,
+        experiment: flag.allocationKey ? `${flagKey}-${flag.allocationKey}` : null,
+        featureFlag: flagKey,
+        format: precomputed.response.format,
+        variation: flag.variationKey ?? null,
+        subject: precomputed.subjectKey,
+        timestamp: new Date().toISOString(),
+        subjectAttributes: precomputed.subjectAttributes
+          ? ensureNonContextualSubjectAttributes(precomputed.subjectAttributes)
+          : {},
+        metaData: this.buildLoggerMetadata(),
+        evaluationDetails: flagEvaluationDetails,
+        entityId: null,
+      };
+    }
+
+    if (bandit) {
+      flagEvaluation.banditEvent = {
+        timestamp: new Date().toISOString(),
+        featureFlag: flagKey,
+        bandit: bandit.banditKey,
+        subject: precomputed.subjectKey,
+        action: bandit.action,
+        actionProbability: bandit.actionProbability,
+        optimalityGap: bandit.optimalityGap,
+        modelVersion: bandit.modelVersion,
+        subjectNumericAttributes: precomputed.subjectAttributes?.numericAttributes ?? {},
+        subjectCategoricalAttributes: precomputed.subjectAttributes?.categoricalAttributes ?? {},
+        actionNumericAttributes: bandit.actionNumericAttributes,
+        actionCategoricalAttributes: bandit.actionCategoricalAttributes,
+        metaData: this.buildLoggerMetadata(),
+        evaluationDetails: flagEvaluationDetails,
+      };
+    }
+
+    return {
+      flagEvaluation,
+      banditAction: bandit?.action ?? null,
+      assignmentEvent: flagEvaluation.assignmentEvent,
+      banditEvent: flagEvaluation.banditEvent,
+    };
+  }
+
+  /**
    * Enqueues an arbitrary event. Events must have a type and a payload.
    */
-  track(type: string, payload: Record<string, unknown>) {
+  public track(type: string, payload: Record<string, unknown>) {
     this.eventDispatcher.dispatch({
       uuid: randomUUID(),
       type,
@@ -1157,57 +1680,30 @@ export default class EppoClient {
   }
 
   private newFlagEvaluationDetailsBuilder(
-    config: IConfiguration,
+    config: Configuration,
     flagKey: string,
   ): FlagEvaluationDetailsBuilder {
-    const flag = this.getNormalizedFlag(config, flagKey);
-    const configDetails = config.getFlagConfigDetails();
+    const flag = config.getFlag(flagKey);
+    const flagsConfiguration = config.getFlagsConfiguration();
     return new FlagEvaluationDetailsBuilder(
-      configDetails.configEnvironment.name,
+      flagsConfiguration?.response.environment.name ?? '',
       flag?.allocations ?? [],
-      configDetails.configFetchedAt,
-      configDetails.configPublishedAt,
+      flagsConfiguration?.fetchedAt ?? '',
+      flagsConfiguration?.response.createdAt ?? '',
     );
   }
 
-  private getNormalizedFlag(config: IConfiguration, flagKey: string): Flag | null {
-    return config.isObfuscated()
-      ? this.getObfuscatedFlag(config, flagKey)
-      : config.getFlag(flagKey);
+  public isInitialized() {
+    return this.initialized;
   }
 
-  private getObfuscatedFlag(config: IConfiguration, flagKey: string): Flag | null {
-    const flag: ObfuscatedFlag | null = config.getFlag(getMD5Hash(flagKey)) as ObfuscatedFlag;
-    return flag ? decodeFlag(flag) : null;
-  }
-
-  // noinspection JSUnusedGlobalSymbols
-  getFlagKeys() {
-    /**
-     * Returns a list of all flag keys that have been initialized.
-     * This can be useful to debug the initialization process.
-     *
-     * Note that it is generally not a good idea to preload all flag configurations.
-     */
-    return this.getConfiguration().getFlagKeys();
-  }
-
-  isInitialized() {
-    return this.getConfiguration().isInitialized();
-  }
-
-  /** @deprecated Use `setAssignmentLogger` */
-  setLogger(logger: IAssignmentLogger) {
-    this.setAssignmentLogger(logger);
-  }
-
-  setAssignmentLogger(logger: IAssignmentLogger) {
+  public setAssignmentLogger(logger: IAssignmentLogger) {
     this.assignmentLogger = logger;
     // log any assignment events that may have been queued while initializing
     this.flushQueuedEvents(this.assignmentEventsQueue, this.assignmentLogger?.logAssignment);
   }
 
-  setBanditLogger(logger: IBanditLogger) {
+  public setBanditLogger(logger: IBanditLogger) {
     this.banditLogger = logger;
     // log any bandit events that may have been queued while initializing
     this.flushQueuedEvents(this.banditEventsQueue, this.banditLogger?.logBanditAction);
@@ -1216,28 +1712,28 @@ export default class EppoClient {
   /**
    * Assignment cache methods.
    */
-  disableAssignmentCache() {
+  public disableAssignmentCache() {
     this.assignmentCache = undefined;
   }
 
-  useNonExpiringInMemoryAssignmentCache() {
+  public useNonExpiringInMemoryAssignmentCache() {
     this.assignmentCache = new NonExpiringInMemoryAssignmentCache();
   }
 
-  useLRUInMemoryAssignmentCache(maxSize: number) {
+  public useLRUInMemoryAssignmentCache(maxSize: number) {
     this.assignmentCache = new LRUInMemoryAssignmentCache(maxSize);
   }
 
   // noinspection JSUnusedGlobalSymbols
-  useCustomAssignmentCache(cache: AssignmentCache) {
+  public useCustomAssignmentCache(cache: AssignmentCache) {
     this.assignmentCache = cache;
   }
 
-  disableBanditAssignmentCache() {
+  public disableBanditAssignmentCache() {
     this.banditAssignmentCache = undefined;
   }
 
-  useNonExpiringInMemoryBanditAssignmentCache() {
+  public useNonExpiringInMemoryBanditAssignmentCache() {
     this.banditAssignmentCache = new NonExpiringInMemoryAssignmentCache();
   }
 
@@ -1245,21 +1741,17 @@ export default class EppoClient {
    * @param {number} maxSize - Maximum cache size
    * @param {number} timeout - TTL of cache entries
    */
-  useExpiringInMemoryBanditAssignmentCache(maxSize: number, timeout?: number) {
+  public useExpiringInMemoryBanditAssignmentCache(maxSize: number, timeout?: number) {
     this.banditAssignmentCache = new TLRUInMemoryAssignmentCache(maxSize, timeout);
   }
 
   // noinspection JSUnusedGlobalSymbols
-  useCustomBanditAssignmentCache(cache: AssignmentCache) {
+  public useCustomBanditAssignmentCache(cache: AssignmentCache) {
     this.banditAssignmentCache = cache;
   }
 
-  setIsGracefulFailureMode(gracefulFailureMode: boolean) {
+  public setIsGracefulFailureMode(gracefulFailureMode: boolean) {
     this.isGracefulFailureMode = gracefulFailureMode;
-  }
-
-  getFlagConfigurations(): Record<string, Flag> {
-    return this.getConfiguration().getFlags();
   }
 
   private flushQueuedEvents<T>(eventQueue: BoundedEventQueue<T>, logFunction?: (event: T) => void) {
@@ -1277,47 +1769,28 @@ export default class EppoClient {
     });
   }
 
-  private maybeLogAssignment(result: FlagEvaluation) {
-    const {
-      flagKey,
-      format,
-      subjectKey,
-      allocationKey = null,
-      subjectAttributes,
-      variation,
-      flagEvaluationDetails,
-      extraLogging = {},
-      entityId,
-    } = result;
-    const event: IAssignmentEvent = {
-      ...extraLogging,
-      allocation: allocationKey,
-      experiment: allocationKey ? `${flagKey}-${allocationKey}` : null,
-      featureFlag: flagKey,
-      format,
-      variation: variation?.key ?? null,
-      subject: subjectKey,
-      timestamp: new Date().toISOString(),
-      subjectAttributes,
-      metaData: this.buildLoggerMetadata(),
-      evaluationDetails: flagEvaluationDetails,
-      entityId,
-    };
-
-    if (variation && allocationKey) {
-      // If already logged, don't log again
-      const hasLoggedAssignment = this.assignmentCache?.has({
-        flagKey,
-        subjectKey,
-        allocationKey,
-        variationKey: variation.key,
-      });
-      if (hasLoggedAssignment) {
-        return;
-      }
-    }
-
+  private maybeLogAssignment(event: IAssignmentEvent | undefined) {
     try {
+      if (!event) return;
+
+      const flagKey = event.featureFlag;
+      const subjectKey = event.subject;
+      const allocationKey = event.allocation;
+      const variationKey = event.variation;
+
+      if (variationKey && allocationKey) {
+        // If already logged, don't log again
+        const hasLoggedAssignment = this.assignmentCache?.has({
+          flagKey,
+          subjectKey,
+          allocationKey,
+          variationKey,
+        });
+        if (hasLoggedAssignment) {
+          return;
+        }
+      }
+
       if (this.assignmentLogger) {
         this.assignmentLogger.logAssignment(event);
       } else {
@@ -1329,7 +1802,7 @@ export default class EppoClient {
         flagKey,
         subjectKey,
         allocationKey: allocationKey ?? '__eppo_no_allocation',
-        variationKey: variation?.key ?? '__eppo_no_variation',
+        variationKey: variationKey ?? '__eppo_no_variation',
       });
     } catch (error: any) {
       logger.error(`${loggerPrefix} Error logging assignment event: ${error.message}`);
@@ -1338,14 +1811,15 @@ export default class EppoClient {
 
   private buildLoggerMetadata(): Record<string, unknown> {
     return {
-      obfuscated: this.getConfiguration().isObfuscated(),
+      obfuscated:
+        this.getConfiguration()?.getFlagsConfiguration()?.response.format === FormatEnum.CLIENT,
       sdkLanguage: 'javascript',
       sdkLibVersion: LIB_VERSION,
     };
   }
 
   private computeBanditsForFlags(
-    config: IConfiguration,
+    config: Configuration,
     subjectKey: string,
     subjectAttributes: ContextAttributes,
     banditActions: Record<FlagKey, BanditActions>,
@@ -1375,7 +1849,7 @@ export default class EppoClient {
   }
 
   private getPrecomputedBandit(
-    config: IConfiguration,
+    config: Configuration,
     flagKey: string,
     variationValue: string,
     subjectKey: string,
@@ -1409,10 +1883,12 @@ export default class EppoClient {
   }
 }
 
+/** @internal */
 export function checkTypeMatch(expectedType?: VariationType, actualType?: VariationType): boolean {
   return expectedType === undefined || actualType === expectedType;
 }
 
+/** @internal */
 export function checkValueTypeMatch(
   expectedType: VariationType | undefined,
   value: ValueType,
@@ -1436,4 +1912,25 @@ export function checkValueTypeMatch(
     default:
       return false;
   }
+}
+
+class TimeoutError extends Error {
+  constructor(message = 'Operation timed out') {
+    super(message);
+    this.name = 'TimeoutError';
+
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, TimeoutError);
+    }
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout;
+
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new TimeoutError()), ms);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
 }

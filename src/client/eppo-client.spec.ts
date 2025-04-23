@@ -2,44 +2,30 @@ import * as base64 from 'js-base64';
 import { times } from 'lodash';
 import * as td from 'testdouble';
 
-import {
-  ASSIGNMENT_TEST_DATA_DIR,
-  AssignmentVariationValue,
-  getTestAssignments,
-  IAssignmentTestCase,
-  MOCK_UFC_RESPONSE_FILE,
-  OBFUSCATED_MOCK_UFC_RESPONSE_FILE,
-  readMockUFCResponse,
-  SubjectTestCase,
-  testCasesByFileName,
-  validateTestAssignments,
-} from '../../test/testHelpers';
+import { MOCK_UFC_RESPONSE_FILE, readMockUFCResponse } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
-import { IConfigurationStore } from '../configuration-store/configuration-store';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
+import { Configuration } from '../configuration';
 import {
-  IConfigurationWire,
-  IObfuscatedPrecomputedConfigurationResponse,
-  ObfuscatedPrecomputedConfigurationResponse,
-} from '../configuration-wire/configuration-wire-types';
-import { MAX_EVENT_QUEUE_SIZE, DEFAULT_POLL_INTERVAL_MS, POLL_JITTER_PCT } from '../constants';
+  MAX_EVENT_QUEUE_SIZE,
+  DEFAULT_BASE_POLLING_INTERVAL_MS,
+  POLL_JITTER_PCT,
+} from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../interfaces';
+import { KVStore, MemoryStore } from '../kvstore';
 import { getMD5Hash } from '../obfuscation';
-import { AttributeType } from '../types';
 
-import EppoClient, {
-  checkTypeMatch,
-  FlagConfigurationRequestParameters,
-  IAssignmentDetails,
-} from './eppo-client';
-import { initConfiguration } from './test-utils';
+import EppoClient, { checkTypeMatch } from './eppo-client';
 
 // Use a known salt to produce deterministic hashes
 const salt = base64.fromUint8Array(new Uint8Array([7, 53, 17, 78]));
+jest.mock('../salt', () => ({
+  generateSalt: () => salt,
+}));
 
 describe('EppoClient E2E test', () => {
+  // Configure fetch mock for tests that still need it
   global.fetch = jest.fn(() => {
     const ufc = readMockUFCResponse(MOCK_UFC_RESPONSE_FILE);
 
@@ -49,23 +35,35 @@ describe('EppoClient E2E test', () => {
       json: () => Promise.resolve(ufc),
     });
   }) as jest.Mock;
-  const storage = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
 
   /**
-   * Use this helper instead of directly setting entries on the `storage` ConfigurationStore.
-   * This method ensures the format field is set as it is required for parsing.
-   * @param entries
+   * Creates an EppoClient with the specified flags and initializes with 'none' strategy
+   * to avoid network requests.
+   * @param entries The flag entries to use in the configuration
    */
-  function setUnobfuscatedFlagEntries(
-    entries: Record<string, Flag | ObfuscatedFlag>,
-  ): Promise<boolean> {
-    storage.setFormat(FormatEnum.SERVER);
-    return storage.setEntries(entries);
+  function setUnobfuscatedFlagEntries(entries: Record<string, Flag | ObfuscatedFlag>): EppoClient {
+    return new EppoClient({
+      sdkKey: 'test',
+      sdkName: 'test',
+      sdkVersion: 'test',
+      configuration: {
+        initialConfiguration: Configuration.fromResponses({
+          flags: {
+            response: {
+              format: FormatEnum.SERVER,
+              flags: entries,
+              createdAt: new Date().toISOString(),
+              environment: {
+                name: 'test',
+              },
+              banditReferences: {},
+            },
+          },
+        }),
+        initializationStrategy: 'none',
+      },
+    });
   }
-
-  beforeAll(async () => {
-    await initConfiguration(storage);
-  });
 
   const flagKey = 'mock-flag';
 
@@ -107,8 +105,7 @@ describe('EppoClient E2E test', () => {
     let client: EppoClient;
 
     beforeAll(async () => {
-      await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
-      client = new EppoClient({ flagConfigurationStore: storage });
+      client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
 
       td.replace(EppoClient.prototype, 'getAssignmentDetail', function () {
         throw new Error('Mock test error');
@@ -122,8 +119,6 @@ describe('EppoClient E2E test', () => {
     it('returns default value when graceful failure if error encountered', async () => {
       client.setIsGracefulFailureMode(true);
 
-      expect(client.getBoolAssignment(flagKey, 'subject-identifier', {}, true)).toBe(true);
-      expect(client.getBoolAssignment(flagKey, 'subject-identifier', {}, false)).toBe(false);
       expect(client.getBooleanAssignment(flagKey, 'subject-identifier', {}, true)).toBe(true);
       expect(client.getBooleanAssignment(flagKey, 'subject-identifier', {}, false)).toBe(false);
       expect(client.getNumericAssignment(flagKey, 'subject-identifier', {}, 1)).toBe(1);
@@ -143,7 +138,6 @@ describe('EppoClient E2E test', () => {
       client.setIsGracefulFailureMode(false);
 
       expect(() => {
-        client.getBoolAssignment(flagKey, 'subject-identifier', {}, true);
         client.getBooleanAssignment(flagKey, 'subject-identifier', {}, true);
       }).toThrow();
 
@@ -162,14 +156,10 @@ describe('EppoClient E2E test', () => {
   });
 
   describe('setLogger', () => {
-    beforeAll(async () => {
-      await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
-    });
-
     it('Invokes logger for queued events', () => {
       const mockLogger = td.object<IAssignmentLogger>();
 
-      const client = new EppoClient({ flagConfigurationStore: storage });
+      const client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
       client.getStringAssignment(flagKey, 'subject-to-be-logged', {}, 'default-value');
       client.setAssignmentLogger(mockLogger);
 
@@ -182,7 +172,7 @@ describe('EppoClient E2E test', () => {
     it('Does not log same queued event twice', () => {
       const mockLogger = td.object<IAssignmentLogger>();
 
-      const client = new EppoClient({ flagConfigurationStore: storage });
+      const client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
 
       client.getStringAssignment(flagKey, 'subject-to-be-logged', {}, 'default-value');
       client.setAssignmentLogger(mockLogger);
@@ -193,7 +183,7 @@ describe('EppoClient E2E test', () => {
 
     it('Does not invoke logger for events that exceed queue size', () => {
       const mockLogger = td.object<IAssignmentLogger>();
-      const client = new EppoClient({ flagConfigurationStore: storage });
+      const client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
 
       times(MAX_EVENT_QUEUE_SIZE + 100, (i) =>
         client.getStringAssignment(flagKey, `subject-to-be-logged-${i}`, {}, 'default-value'),
@@ -204,7 +194,7 @@ describe('EppoClient E2E test', () => {
 
     it('should log assignment event with entityId', () => {
       const mockLogger = td.object<IAssignmentLogger>();
-      const client = new EppoClient({ flagConfigurationStore: storage });
+      const client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
       client.setAssignmentLogger(mockLogger);
       client.getStringAssignment(flagKey, 'subject-to-be-logged', {}, 'default-value');
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(1);
@@ -220,8 +210,10 @@ describe('EppoClient E2E test', () => {
   });
 
   describe('precomputed flags', () => {
-    beforeAll(async () => {
-      await setUnobfuscatedFlagEntries({
+    let client: EppoClient;
+
+    beforeEach(() => {
+      client = setUnobfuscatedFlagEntries({
         [flagKey]: mockFlag,
         disabledFlag: { ...mockFlag, enabled: false },
         anotherFlag: {
@@ -243,20 +235,13 @@ describe('EppoClient E2E test', () => {
       });
     });
 
-    let client: EppoClient;
-    beforeEach(() => {
-      client = new EppoClient({ flagConfigurationStore: storage });
-    });
-
     it('skips disabled flags', () => {
-      const encodedPrecomputedWire = client.getPrecomputedConfiguration('subject', {}, {}, salt);
-      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
+      const configuration = client.getPrecomputedConfiguration('subject', {}, {});
+      const precomputed = configuration.getPrecomputedConfiguration();
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
       }
-      const precomputedResponse = JSON.parse(
-        precomputed.response,
-      ) as ObfuscatedPrecomputedConfigurationResponse;
+      const precomputedResponse = precomputed.response;
 
       expect(precomputedResponse).toBeTruthy();
       const precomputedFlags = precomputedResponse?.flags ?? {};
@@ -268,14 +253,12 @@ describe('EppoClient E2E test', () => {
     });
 
     it('evaluates and returns assignments', () => {
-      const encodedPrecomputedWire = client.getPrecomputedConfiguration('subject', {}, {}, salt);
-      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
+      const configuration = client.getPrecomputedConfiguration('subject', {}, {});
+      const precomputed = configuration.getPrecomputedConfiguration();
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
       }
-      const precomputedResponse = JSON.parse(
-        precomputed.response,
-      ) as IObfuscatedPrecomputedConfigurationResponse;
+      const precomputedResponse = precomputed.response;
 
       expect(precomputedResponse).toBeTruthy();
       const precomputedFlags = precomputedResponse?.flags ?? {};
@@ -286,12 +269,12 @@ describe('EppoClient E2E test', () => {
     });
 
     it('obfuscates assignments', () => {
-      const encodedPrecomputedWire = client.getPrecomputedConfiguration('subject', {}, {}, salt);
-      const { precomputed } = JSON.parse(encodedPrecomputedWire) as IConfigurationWire;
+      const configuration = client.getPrecomputedConfiguration('subject', {}, {});
+      const precomputed = configuration.getPrecomputedConfiguration();
       if (!precomputed) {
         fail('Precomputed data not in Configuration response');
       }
-      const precomputedResponse = JSON.parse(precomputed.response);
+      const precomputedResponse = precomputed.response;
 
       expect(precomputedResponse).toBeTruthy();
       expect(precomputedResponse.salt).toEqual('BzURTg==');
@@ -322,96 +305,28 @@ describe('EppoClient E2E test', () => {
     });
   });
 
-  describe.each(['Not Obfuscated', 'Obfuscated'])('UFC Shared Test Cases %s', (obfuscationType) => {
-    const testCases = testCasesByFileName<IAssignmentTestCase>(ASSIGNMENT_TEST_DATA_DIR);
-    const isObfuscated = obfuscationType === 'Obfuscated';
-
-    beforeAll(async () => {
-      global.fetch = jest.fn(() => {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () =>
-            Promise.resolve(
-              readMockUFCResponse(
-                isObfuscated ? OBFUSCATED_MOCK_UFC_RESPONSE_FILE : MOCK_UFC_RESPONSE_FILE,
-              ),
-            ),
-        });
-      }) as jest.Mock;
-
-      await initConfiguration(storage);
-    });
-
-    afterAll(() => {
-      jest.restoreAllMocks();
-    });
-
-    describe.each(['Scalar', 'With Details'])('%s', (assignmentType) => {
-      const assignmentWithDetails = assignmentType === 'With Details';
-
-      it.each(Object.keys(testCases))('test variation assignment splits - %s', async (fileName) => {
-        const { flag, variationType, defaultValue, subjects } = testCases[fileName];
-        const client = new EppoClient({ flagConfigurationStore: storage, isObfuscated });
-        client.setIsGracefulFailureMode(false);
-
-        let assignments: {
-          subject: SubjectTestCase;
-          assignment: AssignmentVariationValue;
-        }[] = [];
-
-        const typeAssignmentFunctions = assignmentWithDetails
-          ? {
-              [VariationType.BOOLEAN]: client.getBooleanAssignmentDetails.bind(client),
-              [VariationType.NUMERIC]: client.getNumericAssignmentDetails.bind(client),
-              [VariationType.INTEGER]: client.getIntegerAssignmentDetails.bind(client),
-              [VariationType.STRING]: client.getStringAssignmentDetails.bind(client),
-              [VariationType.JSON]: client.getJSONAssignmentDetails.bind(client),
-            }
-          : {
-              [VariationType.BOOLEAN]: client.getBooleanAssignment.bind(client),
-              [VariationType.NUMERIC]: client.getNumericAssignment.bind(client),
-              [VariationType.INTEGER]: client.getIntegerAssignment.bind(client),
-              [VariationType.STRING]: client.getStringAssignment.bind(client),
-              [VariationType.JSON]: client.getJSONAssignment.bind(client),
-            };
-
-        const assignmentFn = typeAssignmentFunctions[variationType] as (
-          flagKey: string,
-          subjectKey: string,
-          subjectAttributes: Record<string, AttributeType>,
-          defaultValue: AssignmentVariationValue,
-        ) => AssignmentVariationValue | IAssignmentDetails<AssignmentVariationValue>;
-        if (!assignmentFn) {
-          throw new Error(`Unknown variation type: ${variationType}`);
-        }
-
-        assignments = getTestAssignments(
-          { flag, variationType, defaultValue, subjects },
-          assignmentFn,
-        );
-
-        validateTestAssignments(assignments, flag, assignmentWithDetails, isObfuscated);
-      });
-    });
-  });
-
   it('returns null if getStringAssignment was called for the subject before any UFC was loaded', () => {
     const localClient = new EppoClient({
-      flagConfigurationStore: new MemoryOnlyConfigurationStore(),
+      sdkKey: 'test',
+      sdkName: 'test',
+      sdkVersion: 'test',
+      configuration: {
+        initialConfiguration: Configuration.empty(),
+        initializationStrategy: 'none',
+      },
     });
     expect(localClient.getStringAssignment(flagKey, 'subject-1', {}, 'hello world')).toEqual(
       'hello world',
     );
-    expect(localClient.isInitialized()).toBe(false);
+    expect(localClient.isInitialized()).toBe(true);
   });
 
   it('returns default value when key does not exist', async () => {
-    const client = new EppoClient({ flagConfigurationStore: storage });
+    const client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
 
     const nonExistentFlag = 'non-existent-flag';
 
-    expect(client.getBoolAssignment(nonExistentFlag, 'subject-identifier', {}, true)).toBe(true);
+    expect(client.getBooleanAssignment(nonExistentFlag, 'subject-identifier', {}, true)).toBe(true);
     expect(client.getBooleanAssignment(nonExistentFlag, 'subject-identifier', {}, true)).toBe(true);
     expect(client.getNumericAssignment(nonExistentFlag, 'subject-identifier', {}, 1)).toBe(1);
     expect(client.getJSONAssignment(nonExistentFlag, 'subject-identifier', {}, {})).toEqual({});
@@ -422,9 +337,7 @@ describe('EppoClient E2E test', () => {
 
   it('logs variation assignment and experiment key', async () => {
     const mockLogger = td.object<IAssignmentLogger>();
-
-    await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
-    const client = new EppoClient({ flagConfigurationStore: storage });
+    const client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
     client.setAssignmentLogger(mockLogger);
 
     const subjectAttributes = { foo: 3 };
@@ -449,8 +362,7 @@ describe('EppoClient E2E test', () => {
     const mockLogger = td.object<IAssignmentLogger>();
     td.when(mockLogger.logAssignment(td.matchers.anything())).thenThrow(new Error('logging error'));
 
-    await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
-    const client = new EppoClient({ flagConfigurationStore: storage });
+    const client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
     client.setAssignmentLogger(mockLogger);
 
     const subjectAttributes = { foo: 3 };
@@ -465,9 +377,10 @@ describe('EppoClient E2E test', () => {
   });
 
   it('exports flag configuration', async () => {
-    await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
-    const client = new EppoClient({ flagConfigurationStore: storage });
-    expect(client.getFlagConfigurations()).toEqual({ [flagKey]: mockFlag });
+    const client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
+    expect(client.getConfiguration().getFlagsConfiguration()?.response.flags).toEqual({
+      [flagKey]: mockFlag,
+    });
   });
 
   describe('assignment logging deduplication', () => {
@@ -476,9 +389,7 @@ describe('EppoClient E2E test', () => {
 
     beforeEach(async () => {
       mockLogger = td.object<IAssignmentLogger>();
-
-      await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
-      client = new EppoClient({ flagConfigurationStore: storage });
+      client = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
       client.setAssignmentLogger(mockLogger);
     });
 
@@ -532,7 +443,7 @@ describe('EppoClient E2E test', () => {
     });
 
     it('logs for each unique flag', async () => {
-      await setUnobfuscatedFlagEntries({
+      client = setUnobfuscatedFlagEntries({
         [flagKey]: mockFlag,
         'flag-2': {
           ...mockFlag,
@@ -543,6 +454,7 @@ describe('EppoClient E2E test', () => {
           key: 'flag-3',
         },
       });
+      client.setAssignmentLogger(mockLogger);
 
       client.useNonExpiringInMemoryAssignmentCache();
 
@@ -562,10 +474,13 @@ describe('EppoClient E2E test', () => {
     it('logs twice for the same flag when allocations change', async () => {
       client.useNonExpiringInMemoryAssignmentCache();
 
-      await setUnobfuscatedFlagEntries({
+      // Initially call with the default allocation
+      client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+
+      // Create a new client with a different allocation
+      const clientWithNewAllocation = setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
-
           allocations: [
             {
               key: 'allocation-a-2',
@@ -581,9 +496,12 @@ describe('EppoClient E2E test', () => {
           ],
         },
       });
-      client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+      clientWithNewAllocation.setAssignmentLogger(mockLogger);
+      clientWithNewAllocation.useNonExpiringInMemoryAssignmentCache();
+      clientWithNewAllocation.getStringAssignment(flagKey, 'subject-10', {}, 'default');
 
-      await setUnobfuscatedFlagEntries({
+      // Create a third client with yet another allocation
+      const clientWithThirdAllocation = setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
           allocations: [
@@ -601,21 +519,22 @@ describe('EppoClient E2E test', () => {
           ],
         },
       });
-      client.getStringAssignment(flagKey, 'subject-10', {}, 'default');
-      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(2);
+      clientWithThirdAllocation.setAssignmentLogger(mockLogger);
+      clientWithThirdAllocation.useNonExpiringInMemoryAssignmentCache();
+      clientWithThirdAllocation.getStringAssignment(flagKey, 'subject-10', {}, 'default');
+
+      expect(td.explain(mockLogger.logAssignment).callCount).toEqual(3);
     });
 
     it('logs the same subject/flag/variation after two changes', async () => {
       client.useNonExpiringInMemoryAssignmentCache();
 
       // original configuration version
-      await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
-
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // log this assignment
       client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
 
       // change the variation
-      await setUnobfuscatedFlagEntries({
+      const clientWithVariationB = setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
           allocations: [
@@ -633,18 +552,22 @@ describe('EppoClient E2E test', () => {
           ],
         },
       });
+      clientWithVariationB.setAssignmentLogger(mockLogger);
+      clientWithVariationB.useNonExpiringInMemoryAssignmentCache();
 
-      client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // log this assignment
-      client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
+      clientWithVariationB.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // log this assignment
+      clientWithVariationB.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
 
       // change the flag again, back to the original
-      await setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
+      const clientWithOriginalFlag = setUnobfuscatedFlagEntries({ [flagKey]: mockFlag });
+      clientWithOriginalFlag.setAssignmentLogger(mockLogger);
+      clientWithOriginalFlag.useNonExpiringInMemoryAssignmentCache();
 
-      client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // important: log this assignment
-      client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
+      clientWithOriginalFlag.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // important: log this assignment
+      clientWithOriginalFlag.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
 
       // change the allocation
-      await setUnobfuscatedFlagEntries({
+      const clientWithDifferentAllocation = setUnobfuscatedFlagEntries({
         [flagKey]: {
           ...mockFlag,
           allocations: [
@@ -662,9 +585,11 @@ describe('EppoClient E2E test', () => {
           ],
         },
       });
+      clientWithDifferentAllocation.setAssignmentLogger(mockLogger);
+      clientWithDifferentAllocation.useNonExpiringInMemoryAssignmentCache();
 
-      client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // log this assignment
-      client.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
+      clientWithDifferentAllocation.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // log this assignment
+      clientWithDifferentAllocation.getStringAssignment(flagKey, 'subject-10', {}, 'default'); // cache hit, don't log
 
       expect(td.explain(mockLogger.logAssignment).callCount).toEqual(4);
     });
@@ -672,14 +597,22 @@ describe('EppoClient E2E test', () => {
 
   describe('Eppo Client constructed with configuration request parameters', () => {
     let client: EppoClient;
-    let thisFlagStorage: IConfigurationStore<Flag | ObfuscatedFlag>;
-    let requestConfiguration: FlagConfigurationRequestParameters;
+    let requestConfiguration: {
+      apiKey: string;
+      sdkName: string;
+      sdkVersion: string;
+      baseUrl?: string;
+      requestTimeoutMs?: number;
+      basePollingIntervalMs?: number;
+      pollAfterSuccessfulInitialization?: boolean;
+      pollAfterFailedInitialization?: boolean;
+    };
 
     const flagKey = 'numeric_flag';
     const subject = 'alice';
     const pi = 3.1415926;
 
-    const maxRetryDelay = DEFAULT_POLL_INTERVAL_MS * POLL_JITTER_PCT;
+    const maxRetryDelay = DEFAULT_BASE_POLLING_INTERVAL_MS * POLL_JITTER_PCT;
 
     beforeAll(async () => {
       global.fetch = jest.fn(() => {
@@ -698,13 +631,10 @@ describe('EppoClient E2E test', () => {
         sdkVersion: '1.0.0',
       };
 
-      thisFlagStorage = new MemoryOnlyConfigurationStore();
-
       // We only want to fake setTimeout() and clearTimeout()
       jest.useFakeTimers({
         advanceTimers: true,
         doNotFake: [
-          'Date',
           'hrtime',
           'nextTick',
           'performance',
@@ -732,47 +662,49 @@ describe('EppoClient E2E test', () => {
 
     it('Fetches initial configuration with parameters in constructor', async () => {
       client = new EppoClient({
-        flagConfigurationStore: thisFlagStorage,
-        configurationRequestParameters: requestConfiguration,
+        sdkKey: requestConfiguration.apiKey,
+        sdkName: requestConfiguration.sdkName,
+        sdkVersion: requestConfiguration.sdkVersion,
+        configuration: {},
       });
       client.setIsGracefulFailureMode(false);
       // no configuration loaded
       let variation = client.getNumericAssignment(flagKey, subject, {}, 123.4);
       expect(variation).toBe(123.4);
+
       // have client fetch configurations
-      await client.fetchFlagConfigurations();
+      await client.waitForInitialization();
+
       variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
       expect(variation).toBe(pi);
     });
 
-    it('Fetches initial configuration with parameters provided later', async () => {
-      client = new EppoClient({ flagConfigurationStore: thisFlagStorage });
-      client.setIsGracefulFailureMode(false);
-      client.setConfigurationRequestParameters(requestConfiguration);
-      // no configuration loaded
-      let variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
-      expect(variation).toBe(0.0);
-      // have client fetch configurations
-      await client.fetchFlagConfigurations();
-      variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
-      expect(variation).toBe(pi);
-    });
-
-    describe('Poll after successful start', () => {
-      it('Continues to poll when cache has not expired', async () => {
-        class MockStore<T> extends MemoryOnlyConfigurationStore<T> {
-          public static expired = false;
-
-          async isExpired(): Promise<boolean> {
-            return MockStore.expired;
-          }
-        }
-
+    describe('Configuration polling', () => {
+      it('Respects activationStrategy: stale', async () => {
         client = new EppoClient({
-          flagConfigurationStore: new MockStore(),
-          configurationRequestParameters: {
-            ...requestConfiguration,
-            pollAfterSuccessfulInitialization: true,
+          sdkKey: requestConfiguration.apiKey,
+          sdkName: requestConfiguration.sdkName,
+          sdkVersion: requestConfiguration.sdkVersion,
+          configuration: {
+            initialConfiguration: Configuration.fromResponses({
+              flags: {
+                fetchedAt: new Date().toISOString(),
+                response: {
+                  format: FormatEnum.SERVER,
+                  flags: {},
+                  createdAt: new Date().toISOString(),
+                  environment: {
+                    name: 'test',
+                  },
+                  banditReferences: {},
+                },
+              },
+            }),
+            initializationStrategy: 'stale-while-revalidate',
+            maxAgeSeconds: 30,
+            enablePolling: true,
+            activationStrategy: 'stale',
+            maxStaleSeconds: DEFAULT_BASE_POLLING_INTERVAL_MS / 1000,
           },
         });
         client.setIsGracefulFailureMode(false);
@@ -781,165 +713,150 @@ describe('EppoClient E2E test', () => {
         expect(variation).toBe(0.0);
 
         // have client fetch configurations; cache is not expired so assignment stays
-        await client.fetchFlagConfigurations();
+        await client.waitForInitialization();
         variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
         expect(variation).toBe(0.0);
 
-        // Expire the cache and advance time until a reload should happen
-        MockStore.expired = true;
-        await jest.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS * 1.5);
+        // Advance time until a reload should happen
+        await jest.advanceTimersByTimeAsync(DEFAULT_BASE_POLLING_INTERVAL_MS * 1.5);
 
         variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
         expect(variation).toBe(pi);
       });
     });
-    it('Does not fetch configurations if the configuration store is unexpired', async () => {
-      class MockStore<T> extends MemoryOnlyConfigurationStore<T> {
-        async isExpired(): Promise<boolean> {
-          return false;
-        }
-      }
 
+    it('Does not fetch configurations if the configuration store is unexpired', async () => {
+      // Test needs network fetching approach
       client = new EppoClient({
-        flagConfigurationStore: new MockStore(),
-        configurationRequestParameters: requestConfiguration,
+        sdkKey: requestConfiguration.apiKey,
+        sdkName: requestConfiguration.sdkName,
+        sdkVersion: requestConfiguration.sdkVersion,
       });
       client.setIsGracefulFailureMode(false);
       // no configuration loaded
       let variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
       expect(variation).toBe(0.0);
       // have client fetch configurations
-      await client.fetchFlagConfigurations();
+      await client.getConfiguration();
       variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
       expect(variation).toBe(0.0);
     });
 
-    it.each([
-      { pollAfterSuccessfulInitialization: false },
-      { pollAfterSuccessfulInitialization: true },
-    ])('retries initial configuration request with config %p', async (configModification) => {
-      let callCount = 0;
+    it.each([{ enablePolling: false }, { enablePolling: true }])(
+      'retries initial configuration request with config %p',
+      async (configModification) => {
+        let callCount = 0;
 
-      global.fetch = jest.fn(() => {
-        if (++callCount === 1) {
-          // Simulate an error for the first call
-          return Promise.resolve({
-            ok: false,
-            status: 500,
-            json: () => Promise.reject(new Error('Server error')),
-          });
-        } else {
-          // Return a successful response for subsequent calls
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: () => {
-              return readMockUFCResponse(MOCK_UFC_RESPONSE_FILE);
-            },
-          });
-        }
-      }) as jest.Mock;
+        global.fetch = jest.fn(() => {
+          if (callCount++ === 0) {
+            // Simulate an error for the first call
+            return Promise.resolve({
+              ok: false,
+              status: 500,
+              json: () => Promise.reject(new Error('Server error')),
+            });
+          } else {
+            // Return a successful response for subsequent calls
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: () => {
+                return readMockUFCResponse(MOCK_UFC_RESPONSE_FILE);
+              },
+            });
+          }
+        }) as jest.Mock;
 
-      const { pollAfterSuccessfulInitialization } = configModification;
-      requestConfiguration = {
-        ...requestConfiguration,
-        pollAfterSuccessfulInitialization,
-      };
-      client = new EppoClient({
-        flagConfigurationStore: thisFlagStorage,
-        configurationRequestParameters: requestConfiguration,
-      });
-      client.setIsGracefulFailureMode(false);
-      // no configuration loaded
-      let variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
-      expect(variation).toBe(0.0);
+        const { enablePolling } = configModification;
 
-      // By not awaiting (yet) only the first attempt should be fired off before test execution below resumes
-      const fetchPromise = client.fetchFlagConfigurations();
+        client = new EppoClient({
+          sdkKey: requestConfiguration.apiKey,
+          sdkName: requestConfiguration.sdkName,
+          sdkVersion: requestConfiguration.sdkVersion,
+          configuration: {
+            initializationTimeoutMs: 60_000,
+            enablePolling,
+          },
+        });
+        client.setIsGracefulFailureMode(false);
+        // no configuration loaded
+        let variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
+        expect(variation).toBe(0.0);
 
-      // Advance timers mid-init to allow retrying
-      await jest.advanceTimersByTimeAsync(maxRetryDelay);
+        // By not awaiting (yet) only the first attempt should be fired off before test execution below resumes
+        const fetchPromise = client.waitForInitialization();
 
-      // Await so it can finish its initialization before this test proceeds
-      await fetchPromise;
+        // Advance timers mid-init to allow retrying
+        await jest.advanceTimersByTimeAsync(maxRetryDelay);
 
-      variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
-      expect(variation).toBe(pi);
-      expect(callCount).toBe(2);
+        // Await so it can finish its initialization before this test proceeds
+        await fetchPromise;
 
-      await jest.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS);
-      // By default, no more polling
-      expect(callCount).toBe(pollAfterSuccessfulInitialization ? 3 : 2);
-    });
+        variation = client.getNumericAssignment(flagKey, subject, {}, 0.0);
+        expect(variation).toBe(pi);
+        expect(callCount).toBe(2);
 
-    it.each([
-      {
-        pollAfterFailedInitialization: false,
-        throwOnFailedInitialization: false,
+        await jest.advanceTimersByTimeAsync(1.5 * DEFAULT_BASE_POLLING_INTERVAL_MS);
+        // By default, no more polling
+        expect(callCount).toBe(enablePolling ? 3 : 2);
       },
-      { pollAfterFailedInitialization: false, throwOnFailedInitialization: true },
-      { pollAfterFailedInitialization: true, throwOnFailedInitialization: false },
-      { pollAfterFailedInitialization: true, throwOnFailedInitialization: true },
-    ])('initial configuration request fails with config %p', async (configModification) => {
-      let callCount = 0;
+    );
 
-      global.fetch = jest.fn(() => {
-        if (++callCount === 1) {
-          // Simulate an error for the first call
-          return Promise.resolve({
-            ok: false,
-            status: 500,
-            json: () => Promise.reject(new Error('Server error')),
-          } as Response);
-        } else {
-          // Return a successful response for subsequent calls
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve(readMockUFCResponse(MOCK_UFC_RESPONSE_FILE)),
-          } as Response);
-        }
-      });
+    it.each([{ enablePolling: false }, { enablePolling: true }])(
+      'initial configuration request fails with config %p',
+      async (configModification) => {
+        let callCount = 0;
 
-      const { pollAfterFailedInitialization, throwOnFailedInitialization } = configModification;
+        global.fetch = jest.fn(() => {
+          if (++callCount === 1) {
+            // Simulate an error for the first call
+            return Promise.resolve({
+              ok: false,
+              status: 500,
+              json: () => Promise.reject(new Error('Server error')),
+            } as Response);
+          } else {
+            // Return a successful response for subsequent calls
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: () => Promise.resolve(readMockUFCResponse(MOCK_UFC_RESPONSE_FILE)),
+            } as Response);
+          }
+        });
 
-      // Note: fake time does not play well with errors bubbled up after setTimeout (event loop,
-      // timeout queue, message queue stuff) so we don't allow retries when rethrowing.
-      const numInitialRequestRetries = 0;
+        const { enablePolling } = configModification;
 
-      requestConfiguration = {
-        ...requestConfiguration,
-        numInitialRequestRetries,
-        throwOnFailedInitialization,
-        pollAfterFailedInitialization,
-      };
-      client = new EppoClient({
-        flagConfigurationStore: thisFlagStorage,
-        configurationRequestParameters: requestConfiguration,
-      });
-      client.setIsGracefulFailureMode(false);
-      // no configuration loaded
-      expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(0.0);
+        // This test specifically tests network fetching behavior
+        client = new EppoClient({
+          sdkKey: requestConfiguration.apiKey,
+          sdkName: requestConfiguration.sdkName,
+          sdkVersion: requestConfiguration.sdkVersion,
+          configuration: {
+            enablePolling,
+            // Very short initialization timeout to force an initialization failure
+            initializationTimeoutMs: 100,
+            activationStrategy: 'always',
+          },
+        });
+        client.setIsGracefulFailureMode(false);
+        // no configuration loaded
+        expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(0.0);
 
-      // By not awaiting (yet) only the first attempt should be fired off before test execution below resumes
-      if (throwOnFailedInitialization) {
-        await expect(client.fetchFlagConfigurations()).rejects.toThrow();
-      } else {
-        await expect(client.fetchFlagConfigurations()).resolves.toBeUndefined();
-      }
-      expect(callCount).toBe(1);
-      // still no configuration loaded
-      expect(client.getNumericAssignment(flagKey, subject, {}, 10.0)).toBe(10.0);
+        expect(callCount).toBe(1);
+        // still no configuration loaded
+        expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(0.0);
 
-      // Advance timers so a post-init poll can take place
-      await jest.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS * 1.5);
+        // Advance timers so a post-init poll can take place
+        await jest.advanceTimersByTimeAsync(DEFAULT_BASE_POLLING_INTERVAL_MS);
 
-      // if pollAfterFailedInitialization = true, we will poll later and get a config, otherwise not
-      expect(callCount).toBe(pollAfterFailedInitialization ? 2 : 1);
-      expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(
-        pollAfterFailedInitialization ? pi : 0.0,
-      );
-    });
+        // if enablePolling = true, we will poll later and get a config, otherwise not
+        expect(callCount).toBe(enablePolling ? 2 : 1);
+        expect(client.getNumericAssignment(flagKey, subject, {}, 0.0)).toBe(
+          enablePolling ? pi : 0.0,
+        );
+      },
+    );
   });
 
   describe('Contstructed with enhanced SDK Token', () => {
@@ -963,18 +880,12 @@ describe('EppoClient E2E test', () => {
 
     it('uses the default base URL when the API Key is not an enhanced token', async () => {
       const client = new EppoClient({
-        configurationRequestParameters: {
-          apiKey: 'basic-token',
-          pollAfterSuccessfulInitialization: false,
-          pollAfterFailedInitialization: false,
-          sdkVersion: '',
-          sdkName: '',
-        },
-
-        flagConfigurationStore: storage,
+        sdkKey: 'basic-token',
+        sdkName: '',
+        sdkVersion: '',
       });
 
-      await client.fetchFlagConfigurations();
+      await client.waitForInitialization();
 
       expect(urlRequests).toEqual([
         'https://fscdn.eppo.cloud/api/flag-config/v1/config?apiKey=basic-token&sdkName=&sdkVersion=',
@@ -983,18 +894,12 @@ describe('EppoClient E2E test', () => {
 
     it('uses the customer-specific subdomain when provided', async () => {
       const client = new EppoClient({
-        configurationRequestParameters: {
-          apiKey: 'zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA==',
-          pollAfterSuccessfulInitialization: false,
-          pollAfterFailedInitialization: false,
-          sdkVersion: '',
-          sdkName: '',
-        },
-
-        flagConfigurationStore: storage,
+        sdkKey: 'zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA==',
+        sdkName: '',
+        sdkVersion: '',
       });
 
-      await client.fetchFlagConfigurations();
+      await client.waitForInitialization();
 
       expect(urlRequests).toHaveLength(1);
       expect(urlRequests[0]).toContain(
@@ -1004,19 +909,13 @@ describe('EppoClient E2E test', () => {
 
     it('prefers a provided baseUrl over encoded subdomain', async () => {
       const client = new EppoClient({
-        configurationRequestParameters: {
-          baseUrl: 'http://override.base.url',
-          apiKey: 'zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA==',
-          pollAfterSuccessfulInitialization: false,
-          pollAfterFailedInitialization: false,
-          sdkVersion: '',
-          sdkName: '',
-        },
-
-        flagConfigurationStore: storage,
+        sdkKey: 'zCsQuoHJxVPp895.Y3M9ZXhwZXJpbWVudA==',
+        sdkName: '',
+        sdkVersion: '',
+        baseUrl: 'http://override.base.url',
       });
 
-      await client.fetchFlagConfigurations();
+      await client.waitForInitialization();
 
       expect(urlRequests).toHaveLength(1);
       expect(urlRequests[0]).toContain('http://override.base.url/flag-config/v1/config');
@@ -1026,15 +925,32 @@ describe('EppoClient E2E test', () => {
   describe('flag overrides', () => {
     let client: EppoClient;
     let mockLogger: IAssignmentLogger;
-    let overrideStore: IConfigurationStore<Variation>;
+    let overrideStore: KVStore<Variation>;
 
     beforeEach(() => {
-      storage.setEntries({ [flagKey]: mockFlag });
       mockLogger = td.object<IAssignmentLogger>();
-      overrideStore = new MemoryOnlyConfigurationStore<Variation>();
+      overrideStore = new MemoryStore<Variation>();
       client = new EppoClient({
-        flagConfigurationStore: storage,
-        overrideStore: overrideStore,
+        sdkKey: 'test',
+        sdkName: 'test',
+        sdkVersion: 'test',
+        configuration: {
+          initialConfiguration: Configuration.fromResponses({
+            flags: {
+              response: {
+                format: FormatEnum.SERVER,
+                flags: { [flagKey]: mockFlag },
+                createdAt: new Date().toISOString(),
+                environment: {
+                  name: 'test',
+                },
+                banditReferences: {},
+              },
+            },
+          }),
+          initializationStrategy: 'none',
+        },
+        overrideStore,
       });
       client.setAssignmentLogger(mockLogger);
       client.useNonExpiringInMemoryAssignmentCache();
@@ -1153,7 +1069,25 @@ describe('EppoClient E2E test', () => {
     it('uses normal assignment when no overrides store is configured', () => {
       // Create client without overrides store
       const clientWithoutOverrides = new EppoClient({
-        flagConfigurationStore: storage,
+        sdkKey: 'test',
+        sdkName: 'test',
+        sdkVersion: 'test',
+        configuration: {
+          initialConfiguration: Configuration.fromResponses({
+            flags: {
+              response: {
+                format: FormatEnum.SERVER,
+                flags: { [flagKey]: mockFlag },
+                createdAt: new Date().toISOString(),
+                environment: {
+                  name: 'test',
+                },
+                banditReferences: {},
+              },
+            },
+          }),
+          initializationStrategy: 'none',
+        },
       });
       clientWithoutOverrides.setAssignmentLogger(mockLogger);
 

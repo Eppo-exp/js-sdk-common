@@ -2,16 +2,11 @@ import * as fs from 'fs';
 
 import { isEqual } from 'lodash';
 
-import {
-  AttributeType,
-  ContextAttributes,
-  IAssignmentDetails,
-  Variation,
-  VariationType,
-} from '../src';
+import { AttributeType, ContextAttributes, IAssignmentDetails, VariationType } from '../src';
+import { Configuration } from '../src/configuration';
 import { IFlagEvaluationDetails } from '../src/flag-evaluation-details-builder';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from '../src/http-client';
-
+import { Variation } from '../src/interfaces';
 export const TEST_DATA_DIR = './test/data/ufc/';
 export const ASSIGNMENT_TEST_DATA_DIR = TEST_DATA_DIR + 'tests/';
 export const BANDIT_TEST_DATA_DIR = TEST_DATA_DIR + 'bandit-tests/';
@@ -63,6 +58,41 @@ export function readMockUFCResponse(
   filename: string,
 ): IUniversalFlagConfigResponse | IBanditParametersResponse {
   return JSON.parse(fs.readFileSync(TEST_DATA_DIR + filename, 'utf-8'));
+}
+
+export function readMockUfcConfiguration(): Configuration {
+  const config = fs.readFileSync(TEST_DATA_DIR + 'flags-v1.json', 'utf-8');
+  return Configuration.fromResponses({
+    flags: {
+      response: JSON.parse(config),
+      fetchedAt: new Date().toISOString(),
+    },
+  });
+}
+
+export function readMockUfcObfuscatedConfiguration(): Configuration {
+  const config = fs.readFileSync(TEST_DATA_DIR + 'flags-v1-obfuscated.json', 'utf-8');
+  return Configuration.fromResponses({
+    flags: {
+      response: JSON.parse(config),
+      fetchedAt: new Date().toISOString(),
+    },
+  });
+}
+
+export function readMockBanditsConfiguration(): Configuration {
+  const flags = fs.readFileSync(TEST_DATA_DIR + 'bandit-flags-v1.json', 'utf-8');
+  const bandits = fs.readFileSync(TEST_DATA_DIR + 'bandit-models-v1.json', 'utf-8');
+  return Configuration.fromResponses({
+    flags: {
+      response: JSON.parse(flags),
+      fetchedAt: new Date().toISOString(),
+    },
+    bandits: {
+      response: JSON.parse(bandits),
+      fetchedAt: new Date().toISOString(),
+    },
+  });
 }
 
 export function readMockConfigurationWireResponse(filename: string): string {

@@ -1,5 +1,5 @@
 import ApiEndpoints from './api-endpoints';
-import { IObfuscatedPrecomputedConfigurationResponse } from './configuration-wire/configuration-wire-types';
+import { BanditsConfig, FlagsConfig, PrecomputedConfig } from './configuration';
 import {
   BanditParameters,
   BanditReference,
@@ -8,6 +8,7 @@ import {
   FormatEnum,
   PrecomputedFlagsPayload,
 } from './interfaces';
+import { IObfuscatedPrecomputedConfigurationResponse } from './precomputed-configuration';
 import { Attributes } from './types';
 
 export interface IQueryParams {
@@ -21,10 +22,11 @@ export interface IQueryParamsWithSubject extends IQueryParams {
   subjectAttributes: Attributes;
 }
 
+/** @internal */
 export class HttpRequestError extends Error {
   constructor(
     public message: string,
-    public status: number,
+    public status?: number,
     public cause?: Error,
   ) {
     super(message);
@@ -47,40 +49,62 @@ export interface IBanditParametersResponse {
   bandits: Record<string, BanditParameters>;
 }
 
+/** @internal */
 export interface IHttpClient {
-  getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined>;
-  getBanditParameters(): Promise<IBanditParametersResponse | undefined>;
-  getPrecomputedFlags(
-    payload: PrecomputedFlagsPayload,
-  ): Promise<IObfuscatedPrecomputedConfigurationResponse | undefined>;
+  getUniversalFlagConfiguration(): Promise<FlagsConfig | undefined>;
+  getBanditParameters(): Promise<BanditsConfig | undefined>;
+  getPrecomputedFlags(payload: PrecomputedFlagsPayload): Promise<PrecomputedConfig | undefined>;
   rawGet<T>(url: string): Promise<T | undefined>;
   rawPost<T, P>(url: string, payload: P): Promise<T | undefined>;
 }
 
+/** @internal */
 export default class FetchHttpClient implements IHttpClient {
   constructor(
     private readonly apiEndpoints: ApiEndpoints,
     private readonly timeout: number,
   ) {}
 
-  async getUniversalFlagConfiguration(): Promise<IUniversalFlagConfigResponse | undefined> {
+  async getUniversalFlagConfiguration(): Promise<FlagsConfig> {
     const url = this.apiEndpoints.ufcEndpoint();
-    return await this.rawGet<IUniversalFlagConfigResponse>(url);
+    const response = await this.rawGet<IUniversalFlagConfigResponse>(url);
+    if (!response) {
+      throw new HttpRequestError('Empty response');
+    }
+    return {
+      response,
+      fetchedAt: new Date().toISOString(),
+    };
   }
 
-  async getBanditParameters(): Promise<IBanditParametersResponse | undefined> {
+  async getBanditParameters(): Promise<BanditsConfig> {
     const url = this.apiEndpoints.banditParametersEndpoint();
-    return await this.rawGet<IBanditParametersResponse>(url);
+    const response = await this.rawGet<IBanditParametersResponse>(url);
+    if (!response) {
+      throw new HttpRequestError('Empty response');
+    }
+    return {
+      response,
+      fetchedAt: new Date().toISOString(),
+    };
   }
 
-  async getPrecomputedFlags(
-    payload: PrecomputedFlagsPayload,
-  ): Promise<IObfuscatedPrecomputedConfigurationResponse | undefined> {
+  async getPrecomputedFlags(payload: PrecomputedFlagsPayload): Promise<PrecomputedConfig> {
     const url = this.apiEndpoints.precomputedFlagsEndpoint();
-    return await this.rawPost<IObfuscatedPrecomputedConfigurationResponse, PrecomputedFlagsPayload>(
-      url,
-      payload,
-    );
+    const response = await this.rawPost<
+      IObfuscatedPrecomputedConfigurationResponse,
+      PrecomputedFlagsPayload
+    >(url, payload);
+    if (!response) {
+      throw new HttpRequestError('Empty response');
+    }
+    return {
+      response,
+      fetchedAt: new Date().toISOString(),
+      subjectKey: payload.subjectKey,
+      subjectAttributes: payload.subjectAttributes,
+      banditActions: payload.banditActions,
+    };
   }
 
   async rawGet<T>(url: string): Promise<T | undefined> {

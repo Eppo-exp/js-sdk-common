@@ -44,14 +44,6 @@ export interface Environment {
 }
 export const UNKNOWN_ENVIRONMENT_NAME = 'UNKNOWN';
 
-export interface ConfigDetails {
-  configFetchedAt: string;
-  configPublishedAt: string;
-  configEnvironment: Environment;
-  configFormat: string;
-  salt?: string;
-}
-
 export interface Flag {
   key: string;
   enabled: boolean;
@@ -197,7 +189,7 @@ export interface PrecomputedFlagsDetails {
 }
 
 export interface PrecomputedFlagsPayload {
-  subject_key: string;
-  subject_attributes: ContextAttributes;
-  bandit_actions?: Record<FlagKey, Record<string, ContextAttributes>>;
+  subjectKey: string;
+  subjectAttributes: ContextAttributes;
+  banditActions?: Record<FlagKey, Record<string, ContextAttributes>>;
 }

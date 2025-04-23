@@ -1,11 +1,16 @@
 import { FormatEnum } from './interfaces';
 
-export const DEFAULT_REQUEST_TIMEOUT_MS = 5000;
-export const REQUEST_TIMEOUT_MILLIS = DEFAULT_REQUEST_TIMEOUT_MS; // for backwards compatibility
-export const DEFAULT_POLL_INTERVAL_MS = 30000;
+export const DEFAULT_REQUEST_TIMEOUT_MS = 5_000;
+export const DEFAULT_BASE_POLLING_INTERVAL_MS = 30_000;
+export const DEFAULT_MAX_POLLING_INTERVAL_MS = 300_000;
 export const POLL_JITTER_PCT = 0.1;
-export const DEFAULT_INITIAL_CONFIG_REQUEST_RETRIES = 1;
-export const DEFAULT_POLL_CONFIG_REQUEST_RETRIES = 7;
+export const DEFAULT_INITIALIZATION_TIMEOUT_MS = 5_000;
+export const DEFAULT_MAX_AGE_SECONDS = 30;
+export const DEFAULT_MAX_STALE_SECONDS = Infinity;
+export const DEFAULT_INITIALIZATION_STRATEGY = 'stale-while-revalidate';
+export const DEFAULT_ACTIVATION_STRATEGY = 'next-load';
+export const DEFAULT_ENABLE_POLLING = false;
+export const DEFAULT_ENABLE_BANDITS = true;
 export const BASE_URL = 'https://fscdn.eppo.cloud/api';
 export const UFC_ENDPOINT = '/flag-config/v1/config';
 export const BANDIT_ENDPOINT = '/flag-config/v1/bandits';

@@ -2,7 +2,11 @@ import * as fs from 'fs';
 
 import type { CommandModule } from 'yargs';
 
-import { ConfigurationWireHelper } from '../../configuration-wire/configuration-wire-helper';
+import ApiEndpoints from '../../api-endpoints';
+import { BroadcastChannel } from '../../broadcast';
+import ConfigurationRequestor from '../../configuration-requestor';
+import FetchHttpClient from '../../http-client';
+import { LIB_VERSION } from '../../version';
 
 export const bootstrapConfigCommand: CommandModule = {
   command: 'bootstrap-config',
@@ -41,12 +45,22 @@ export const bootstrapConfigCommand: CommandModule = {
     }
 
     try {
-      const helper = ConfigurationWireHelper.build(argv.key as string, {
-        sdkName: argv.sdk as string,
+      const apiEndpoints = new ApiEndpoints({
         baseUrl: argv['base-url'] as string,
-        fetchBandits: true,
+        queryParams: {
+          apiKey: argv.key as string,
+          sdkName: argv.sdk as string,
+          sdkVersion: LIB_VERSION,
+        },
       });
-      const config = await helper.fetchConfiguration();
+
+      const httpClient = new FetchHttpClient(apiEndpoints, 10000);
+
+      const requestor = new ConfigurationRequestor(httpClient, new BroadcastChannel(), {
+        wantsBandits: true,
+      });
+
+      const config = await requestor.fetchConfiguration();
 
       if (!config) {
         console.error('Error: Failed to fetch configuration');

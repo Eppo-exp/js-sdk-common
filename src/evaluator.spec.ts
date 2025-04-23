@@ -1,5 +1,6 @@
+import { Configuration } from './configuration';
 import { Evaluator, hashKey, isInShardRange, matchesRules } from './evaluator';
-import { Flag, Variation, Shard, VariationType, ConfigDetails, FormatEnum } from './interfaces';
+import { Flag, Variation, Shard, VariationType, FormatEnum } from './interfaces';
 import { getMD5Hash } from './obfuscation';
 import { ObfuscatedOperatorType, OperatorType, Rule } from './rules';
 import { DeterministicSharder } from './sharders';
@@ -11,17 +12,19 @@ describe('Evaluator', () => {
 
   const evaluator = new Evaluator();
 
-  let configDetails: ConfigDetails;
-
-  beforeEach(() => {
-    configDetails = {
-      configEnvironment: {
-        name: 'Test',
+  const configuration: Configuration = Configuration.fromResponses({
+    flags: {
+      fetchedAt: new Date().toISOString(),
+      response: {
+        environment: {
+          name: 'Test',
+        },
+        createdAt: new Date().toISOString(),
+        flags: {},
+        format: FormatEnum.SERVER,
+        banditReferences: {},
       },
-      configFetchedAt: new Date().toISOString(),
-      configPublishedAt: new Date().toISOString(),
-      configFormat: FormatEnum.CLIENT,
-    };
+    },
   });
 
   it('should return none result for disabled flag', () => {
@@ -47,11 +50,11 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(flag, configDetails, 'subject_key', {}, false);
-    expect(result.flagKey).toEqual('disabled_flag');
-    expect(result.allocationKey).toBeNull();
-    expect(result.variation).toBeNull();
-    expect(result.doLog).toBeFalsy();
+    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', {});
+    expect(result.assignmentDetails.flagKey).toEqual('disabled_flag');
+    expect(result.assignmentDetails.allocationKey).toBeNull();
+    expect(result.assignmentDetails.variation).toBeNull();
+    expect(result.assignmentDetails.doLog).toBeFalsy();
   });
 
   it('should match shard with full range', () => {
@@ -74,7 +77,9 @@ describe('Evaluator', () => {
 
     expect(evaluator.matchesShard(shard, 'subject_key', 100)).toBeTruthy();
 
-    const deterministicEvaluator = new Evaluator(new DeterministicSharder({ subject_key: 50 }));
+    const deterministicEvaluator = new Evaluator({
+      sharder: new DeterministicSharder({ subject_key: 50 }),
+    });
     expect(deterministicEvaluator.matchesShard(shard, 'subject_key', 100)).toBeTruthy();
   });
 
@@ -84,7 +89,7 @@ describe('Evaluator', () => {
       ranges: [{ start: 0, end: 50 }],
     };
 
-    const evaluator = new Evaluator(new DeterministicSharder({ 'a-subject_key': 99 }));
+    const evaluator = new Evaluator({ sharder: new DeterministicSharder({ 'a-subject_key': 99 }) });
     expect(evaluator.matchesShard(shard, 'subject_key', 100)).toBeFalsy();
   });
 
@@ -98,11 +103,11 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(emptyFlag, configDetails, 'subject_key', {}, false);
-    expect(result.flagKey).toEqual('empty');
-    expect(result.allocationKey).toBeNull();
-    expect(result.variation).toBeNull();
-    expect(result.doLog).toBeFalsy();
+    const result = evaluator.evaluateFlag(configuration, emptyFlag, 'subject_key', {});
+    expect(result.assignmentDetails.flagKey).toEqual('empty');
+    expect(result.assignmentDetails.allocationKey).toBeNull();
+    expect(result.assignmentDetails.variation).toBeNull();
+    expect(result.assignmentDetails.doLog).toBeFalsy();
   });
 
   it('should evaluate simple flag and return control variation', () => {
@@ -128,8 +133,8 @@ describe('Evaluator', () => {
       totalShards: 10000,
     };
 
-    const result = evaluator.evaluateFlag(flag, configDetails, 'user-1', {}, false);
-    expect(result.variation).toEqual({ key: 'control', value: 'control-value' });
+    const result = evaluator.evaluateFlag(configuration, flag, 'user-1', {});
+    expect(result.assignmentDetails.variation).toEqual({ key: 'control', value: 'control-value' });
   });
 
   it('should evaluate flag based on a targeting condition based on id', () => {
@@ -161,14 +166,14 @@ describe('Evaluator', () => {
       totalShards: 10000,
     };
 
-    let result = evaluator.evaluateFlag(flag, configDetails, 'alice', {}, false);
-    expect(result.variation).toEqual({ key: 'control', value: 'control' });
+    let result = evaluator.evaluateFlag(configuration, flag, 'alice', {});
+    expect(result.assignmentDetails.variation).toEqual({ key: 'control', value: 'control' });
 
-    result = evaluator.evaluateFlag(flag, configDetails, 'bob', {}, false);
-    expect(result.variation).toEqual({ key: 'control', value: 'control' });
+    result = evaluator.evaluateFlag(configuration, flag, 'bob', {});
+    expect(result.assignmentDetails.variation).toEqual({ key: 'control', value: 'control' });
 
-    result = evaluator.evaluateFlag(flag, configDetails, 'charlie', {}, false);
-    expect(result.variation).toBeNull();
+    result = evaluator.evaluateFlag(configuration, flag, 'charlie', {});
+    expect(result.assignmentDetails.variation).toBeNull();
   });
 
   it('should evaluate flag based on a targeting condition with overwritten id', () => {
@@ -200,8 +205,8 @@ describe('Evaluator', () => {
       totalShards: 10000,
     };
 
-    const result = evaluator.evaluateFlag(flag, configDetails, 'alice', { id: 'charlie' }, false);
-    expect(result.variation).toBeNull();
+    const result = evaluator.evaluateFlag(configuration, flag, 'alice', { id: 'charlie' });
+    expect(result.assignmentDetails.variation).toBeNull();
   });
 
   it('should catch all allocation and return variation A', () => {
@@ -227,11 +232,11 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(flag, configDetails, 'subject_key', {}, false);
-    expect(result.flagKey).toEqual('flag');
-    expect(result.allocationKey).toEqual('default');
-    expect(result.variation).toEqual(VARIATION_A);
-    expect(result.doLog).toBeTruthy();
+    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', {});
+    expect(result.assignmentDetails.flagKey).toEqual('flag');
+    expect(result.assignmentDetails.allocationKey).toEqual('default');
+    expect(result.assignmentDetails.variation).toEqual(VARIATION_A);
+    expect(result.assignmentDetails.doLog).toBeTruthy();
   });
 
   it('should match first allocation rule and return variation B', () => {
@@ -275,16 +280,12 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(
-      flag,
-      configDetails,
-      'subject_key',
-      { email: 'eppo@example.com' },
-      false,
-    );
-    expect(result.flagKey).toEqual('flag');
-    expect(result.allocationKey).toEqual('first');
-    expect(result.variation).toEqual(VARIATION_B);
+    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', {
+      email: 'eppo@example.com',
+    });
+    expect(result.assignmentDetails.flagKey).toEqual('flag');
+    expect(result.assignmentDetails.allocationKey).toEqual('first');
+    expect(result.assignmentDetails.variation).toEqual(VARIATION_B);
   });
 
   it('should not match first allocation rule and return variation A', () => {
@@ -328,16 +329,12 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(
-      flag,
-      configDetails,
-      'subject_key',
-      { email: 'eppo@test.com' },
-      false,
-    );
-    expect(result.flagKey).toEqual('flag');
-    expect(result.allocationKey).toEqual('default');
-    expect(result.variation).toEqual(VARIATION_A);
+    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', {
+      email: 'eppo@test.com',
+    });
+    expect(result.assignmentDetails.flagKey).toEqual('flag');
+    expect(result.assignmentDetails.allocationKey).toEqual('default');
+    expect(result.assignmentDetails.variation).toEqual(VARIATION_A);
   });
 
   it('should not match first allocation rule and return variation A (obfuscated)', () => {
@@ -385,16 +382,12 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(
-      flag,
-      configDetails,
-      'subject_key',
-      { email: 'eppo@test.com' },
-      false,
-    );
-    expect(result.flagKey).toEqual('obfuscated_flag_key');
-    expect(result.allocationKey).toEqual('default');
-    expect(result.variation).toEqual(VARIATION_A);
+    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', {
+      email: 'eppo@test.com',
+    });
+    expect(result.assignmentDetails.flagKey).toEqual('obfuscated_flag_key');
+    expect(result.assignmentDetails.allocationKey).toEqual('default');
+    expect(result.assignmentDetails.variation).toEqual(VARIATION_A);
   });
 
   it('should evaluate sharding and return correct variations', () => {
@@ -441,8 +434,8 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const deterministicEvaluator = new Evaluator(
-      new DeterministicSharder({
+    const deterministicEvaluator = new Evaluator({
+      sharder: new DeterministicSharder({
         'traffic-alice': 2,
         'traffic-bob': 3,
         'traffic-charlie': 4,
@@ -452,19 +445,23 @@ describe('Evaluator', () => {
         'split-charlie': 8,
         'split-dave': 1,
       }),
-    );
+    });
 
     expect(
-      deterministicEvaluator.evaluateFlag(flag, configDetails, 'alice', {}, false).variation,
+      deterministicEvaluator.evaluateFlag(configuration, flag, 'alice', {}).assignmentDetails
+        .variation,
     ).toEqual(VARIATION_A);
     expect(
-      deterministicEvaluator.evaluateFlag(flag, configDetails, 'bob', {}, false).variation,
+      deterministicEvaluator.evaluateFlag(configuration, flag, 'bob', {}).assignmentDetails
+        .variation,
     ).toEqual(VARIATION_B);
     expect(
-      deterministicEvaluator.evaluateFlag(flag, configDetails, 'charlie', {}, false).variation,
+      deterministicEvaluator.evaluateFlag(configuration, flag, 'charlie', {}).assignmentDetails
+        .variation,
     ).toEqual(VARIATION_C);
     expect(
-      deterministicEvaluator.evaluateFlag(flag, configDetails, 'dave', {}, false).variation,
+      deterministicEvaluator.evaluateFlag(configuration, flag, 'dave', {}).assignmentDetails
+        .variation,
     ).toEqual(VARIATION_C);
   });
 
@@ -494,10 +491,10 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(flag, configDetails, 'subject_key', {}, false);
-    expect(result.flagKey).toEqual('flag');
-    expect(result.allocationKey).toBeNull();
-    expect(result.variation).toBeNull();
+    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', {});
+    expect(result.assignmentDetails.flagKey).toEqual('flag');
+    expect(result.assignmentDetails.allocationKey).toBeNull();
+    expect(result.assignmentDetails.variation).toBeNull();
   });
 
   it('should return correct variation for evaluation during allocation', () => {
@@ -526,10 +523,10 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(flag, configDetails, 'subject_key', {}, false);
-    expect(result.flagKey).toEqual('flag');
-    expect(result.allocationKey).toEqual('default');
-    expect(result.variation).toEqual(VARIATION_A);
+    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', {});
+    expect(result.assignmentDetails.flagKey).toEqual('flag');
+    expect(result.assignmentDetails.allocationKey).toEqual('default');
+    expect(result.assignmentDetails.variation).toEqual(VARIATION_A);
   });
 
   it('should not match on allocation after endAt has passed', () => {
@@ -558,10 +555,10 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(flag, configDetails, 'subject_key', {}, false);
-    expect(result.flagKey).toEqual('flag');
-    expect(result.allocationKey).toBeNull();
-    expect(result.variation).toBeNull();
+    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', {});
+    expect(result.assignmentDetails.flagKey).toEqual('flag');
+    expect(result.assignmentDetails.allocationKey).toBeNull();
+    expect(result.assignmentDetails.variation).toBeNull();
   });
 
   it('should create a hash key that appends subject to salt', () => {

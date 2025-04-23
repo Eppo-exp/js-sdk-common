@@ -3,39 +3,32 @@ import * as fs from 'fs';
 import {
   AssignmentVariationValue,
   IAssignmentTestCase,
-  MOCK_UFC_RESPONSE_FILE,
-  readMockUFCResponse,
+  readMockUfcConfiguration,
 } from '../../test/testHelpers';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
 import { AllocationEvaluationCode } from '../flag-evaluation-details-builder';
-import { Flag, ObfuscatedFlag, Variation, VariationType } from '../interfaces';
+import { Variation, VariationType } from '../interfaces';
 import { OperatorType } from '../rules';
 import { AttributeType } from '../types';
 
 import EppoClient, { IAssignmentDetails } from './eppo-client';
-import { initConfiguration } from './test-utils';
 
 describe('EppoClient get*AssignmentDetails', () => {
   const testStart = Date.now();
 
-  global.fetch = jest.fn(() => {
-    const ufc = readMockUFCResponse(MOCK_UFC_RESPONSE_FILE);
+  let client: EppoClient;
 
-    return Promise.resolve({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve(ufc),
+  beforeEach(() => {
+    client = new EppoClient({
+      sdkKey: 'dummy',
+      sdkName: 'js-client-sdk-common',
+      sdkVersion: '1.0.0',
+      baseUrl: 'http://127.0.0.1:4000',
+      configuration: { initialConfiguration: readMockUfcConfiguration() },
     });
-  }) as jest.Mock;
-  const storage = new MemoryOnlyConfigurationStore<Flag | ObfuscatedFlag>();
-
-  beforeAll(async () => {
-    await initConfiguration(storage);
+    client.setIsGracefulFailureMode(false);
   });
 
   it('should set the details for a matched rule', () => {
-    const client = new EppoClient({ flagConfigurationStore: storage });
-    client.setIsGracefulFailureMode(false);
     const subjectAttributes = { email: 'alice@mycompany.com', country: 'US' };
     const result = client.getIntegerAssignmentDetails(
       'integer-flag',
@@ -86,8 +79,6 @@ describe('EppoClient get*AssignmentDetails', () => {
   });
 
   it('should set the details for a matched split', () => {
-    const client = new EppoClient({ flagConfigurationStore: storage });
-    client.setIsGracefulFailureMode(false);
     const subjectAttributes = { email: 'alice@mycompany.com', country: 'Brazil' };
     const result = client.getIntegerAssignmentDetails(
       'integer-flag',
@@ -129,8 +120,6 @@ describe('EppoClient get*AssignmentDetails', () => {
   });
 
   it('should handle matching a split allocation with a matched rule', () => {
-    const client = new EppoClient({ flagConfigurationStore: storage });
-    client.setIsGracefulFailureMode(false);
     const subjectAttributes = { id: 'alice', email: 'alice@external.com', country: 'Brazil' };
     const result = client.getStringAssignmentDetails(
       'new-user-onboarding',
@@ -191,8 +180,6 @@ describe('EppoClient get*AssignmentDetails', () => {
   });
 
   it('should handle unrecognized flags', () => {
-    const client = new EppoClient({ flagConfigurationStore: storage });
-    client.setIsGracefulFailureMode(false);
     const result = client.getIntegerAssignmentDetails('asdf', 'alice', {}, 0);
     expect(result).toEqual({
       variation: 0,
@@ -216,7 +203,6 @@ describe('EppoClient get*AssignmentDetails', () => {
   });
 
   it('should handle type mismatches with graceful failure mode enabled', () => {
-    const client = new EppoClient({ flagConfigurationStore: storage });
     client.setIsGracefulFailureMode(true);
     const result = client.getBooleanAssignmentDetails('integer-flag', 'alice', {}, true);
     expect(result).toEqual({
@@ -253,7 +239,6 @@ describe('EppoClient get*AssignmentDetails', () => {
   });
 
   it('should throw an error for type mismatches with graceful failure mode disabled', () => {
-    const client = new EppoClient({ flagConfigurationStore: storage });
     client.setIsGracefulFailureMode(false);
     expect(() => client.getBooleanAssignmentDetails('integer-flag', 'alice', {}, true)).toThrow();
   });
@@ -278,22 +263,6 @@ describe('EppoClient get*AssignmentDetails', () => {
       }
     };
 
-    beforeAll(async () => {
-      global.fetch = jest.fn(() => {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve(readMockUFCResponse(MOCK_UFC_RESPONSE_FILE)),
-        });
-      }) as jest.Mock;
-
-      await initConfiguration(storage);
-    });
-
-    afterAll(() => {
-      jest.restoreAllMocks();
-    });
-
     describe.each(getTestFilePaths())('for file: %s', (testFilePath: string) => {
       const testCase = parseJSON(testFilePath);
       describe.each(testCase.subjects.map(({ subjectKey }) => subjectKey))(
@@ -302,9 +271,6 @@ describe('EppoClient get*AssignmentDetails', () => {
           const { flag, variationType, defaultValue, subjects } = testCase;
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           const subject = subjects.find((subject) => subject.subjectKey === subjectKey)!;
-
-          const client = new EppoClient({ flagConfigurationStore: storage });
-          client.setIsGracefulFailureMode(false);
 
           const focusOn = {
             testFilePath: '', // focus on test file paths (don't forget to set back to empty string!)

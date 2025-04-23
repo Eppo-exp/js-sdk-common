@@ -7,34 +7,27 @@ import {
   testCasesByFileName,
   BanditTestCase,
   BANDIT_TEST_DATA_DIR,
+  readMockBanditsConfiguration,
 } from '../../test/testHelpers';
-import ApiEndpoints from '../api-endpoints';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
-import ConfigurationRequestor from '../configuration-requestor';
-import { MemoryOnlyConfigurationStore } from '../configuration-store/memory.store';
-import {
-  IConfigurationWire,
-  IPrecomputedConfiguration,
-  IObfuscatedPrecomputedConfigurationResponse,
-} from '../configuration-wire/configuration-wire-types';
-import { Evaluator, FlagEvaluation } from '../evaluator';
+import { Evaluator } from '../evaluator';
 import {
   AllocationEvaluationCode,
   IFlagEvaluationDetails,
 } from '../flag-evaluation-details-builder';
-import FetchHttpClient from '../http-client';
-import { BanditVariation, BanditParameters, Flag } from '../interfaces';
 import { attributeEncodeBase64 } from '../obfuscation';
 import { Attributes, BanditActions, ContextAttributes } from '../types';
 
 import EppoClient, { IAssignmentDetails } from './eppo-client';
 
+const salt = base64.fromUint8Array(new Uint8Array([101, 112, 112, 111]));
+jest.mock('../salt', () => ({
+  generateSalt: () => salt,
+}));
+
 describe('EppoClient Bandits E2E test', () => {
-  const flagStore = new MemoryOnlyConfigurationStore<Flag>();
-  const banditVariationStore = new MemoryOnlyConfigurationStore<BanditVariation[]>();
-  const banditModelStore = new MemoryOnlyConfigurationStore<BanditParameters>();
   let client: EppoClient;
   const mockLogAssignment = jest.fn();
   const mockLogBanditAction = jest.fn();
@@ -53,32 +46,18 @@ describe('EppoClient Bandits E2E test', () => {
         json: () => Promise.resolve(response),
       });
     }) as jest.Mock;
-
-    // Initialize a configuration requestor
-    const apiEndpoints = new ApiEndpoints({
-      baseUrl: 'http://127.0.0.1:4000',
-      queryParams: {
-        apiKey: 'dummy',
-        sdkName: 'js-client-sdk-common',
-        sdkVersion: '1.0.0',
-      },
-    });
-    const httpClient = new FetchHttpClient(apiEndpoints, 1000);
-    const configurationRequestor = new ConfigurationRequestor(
-      httpClient,
-      flagStore,
-      banditVariationStore,
-      banditModelStore,
-    );
-    await configurationRequestor.fetchAndStoreConfigurations();
   });
 
   beforeEach(() => {
     client = new EppoClient({
-      flagConfigurationStore: flagStore,
-      banditVariationConfigurationStore: banditVariationStore,
-      banditModelConfigurationStore: banditModelStore,
-      isObfuscated: false,
+      sdkKey: 'dummy',
+      sdkName: 'js-client-sdk-common',
+      sdkVersion: '1.0.0',
+      baseUrl: 'http://127.0.0.1:4000',
+      configuration: {
+        initializationStrategy: 'none',
+        initialConfiguration: readMockBanditsConfiguration(),
+      },
     });
     client.setIsGracefulFailureMode(false);
     client.setAssignmentLogger({ logAssignment: mockLogAssignment });
@@ -517,19 +496,59 @@ describe('EppoClient Bandits E2E test', () => {
         mockEvaluateFlag = jest
           .spyOn(Evaluator.prototype, 'evaluateFlag')
           .mockImplementation(() => {
-            return {
-              flagKey,
-              subjectKey,
-              subjectAttributes,
-              allocationKey: 'mock-allocation',
-              variation: { key: variationToReturn, value: variationToReturn },
-              extraLogging: {},
-              doLog: true,
-              flagEvaluationDetails: {
-                flagEvaluationCode: 'MATCH',
-                flagEvaluationDescription: 'Mocked evaluation',
+            const evaluationDetails = {
+              flagEvaluationCode: 'MATCH' as const,
+              flagEvaluationDescription: 'Mocked evaluation',
+              configFetchedAt: new Date().toISOString(),
+              configPublishedAt: new Date().toISOString(),
+              environmentName: 'test',
+              variationKey: variationToReturn,
+              variationValue: variationToReturn,
+              banditKey: null,
+              banditAction: null,
+              matchedRule: null,
+              matchedAllocation: {
+                key: 'mock-allocation',
+                allocationEvaluationCode: AllocationEvaluationCode.MATCH,
+                orderPosition: 1,
               },
-            } as FlagEvaluation;
+              unmatchedAllocations: [],
+              unevaluatedAllocations: [],
+            };
+
+            return {
+              assignmentDetails: {
+                flagKey,
+                format: 'SERVER',
+                subjectKey,
+                subjectAttributes,
+                allocationKey: 'mock-allocation',
+                variation: { key: variationToReturn, value: variationToReturn },
+                extraLogging: {},
+                doLog: true,
+                entityId: null,
+                evaluationDetails,
+              },
+              assignmentEvent: {
+                allocation: 'mock-allocation',
+                experiment: `${flagKey}-mock-allocation`,
+                featureFlag: flagKey,
+                format: 'SERVER',
+                variation: variationToReturn,
+                subject: subjectKey,
+                timestamp: new Date().toISOString(),
+                subjectAttributes,
+                metaData: {
+                  obfuscated: false,
+                  sdkLanguage: 'javascript',
+                  sdkLibVersion: '1.0.0',
+                  sdkName: 'js-client-sdk-common',
+                  sdkVersion: '1.0.0',
+                },
+                evaluationDetails,
+                entityId: null,
+              },
+            };
           });
 
         mockEvaluateBandit = jest
@@ -654,27 +673,6 @@ describe('EppoClient Bandits E2E test', () => {
       },
     };
 
-    function getPrecomputedResults(
-      client: EppoClient,
-      subjectKey: string,
-      subjectAttributes: ContextAttributes,
-      banditActions: Record<string, BanditActions>,
-    ): IPrecomputedConfiguration {
-      const salt = base64.fromUint8Array(new Uint8Array([101, 112, 112, 111]));
-      const precomputedResults = client.getPrecomputedConfiguration(
-        subjectKey,
-        subjectAttributes,
-        banditActions,
-        salt,
-      );
-
-      const { precomputed } = JSON.parse(precomputedResults) as IConfigurationWire;
-      if (!precomputed) {
-        fail('precomputed result was not parsed');
-      }
-      return precomputed;
-    }
-
     describe('obfuscated results', () => {
       it('obfuscates precomputed bandits', () => {
         const bannerBanditFlagMd5 = '3ac89e06235484aa6f2aec8c33109a02';
@@ -684,11 +682,11 @@ describe('EppoClient Bandits E2E test', () => {
         const adidasB64 = 'YWRpZGFz';
         const modelB64 = 'MTIz'; // 123
 
-        const precomputed = getPrecomputedResults(client, bob, bobInfo, bobActions);
-
-        const response = JSON.parse(
-          precomputed.response,
-        ) as IObfuscatedPrecomputedConfigurationResponse;
+        const configuration = client.getPrecomputedConfiguration(bob, bobInfo, bobActions);
+        const response = configuration.getPrecomputedConfiguration()?.response;
+        if (!response) {
+          fail('precomputed result was not parsed');
+        }
 
         const numericAttrs = response.bandits[bannerBanditFlagMd5]['actionNumericAttributes'];
         const categoricalAttrs =

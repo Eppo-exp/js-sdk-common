@@ -1,8 +1,6 @@
 import { IAssignmentEvent } from './assignment-logger';
 import EppoClient from './client/eppo-client';
-import { IConfigurationStore } from './configuration-store/configuration-store';
 import { EppoAssignmentLogger } from './eppo-assignment-logger';
-import { Flag } from './interfaces';
 
 jest.mock('./client/eppo-client');
 
@@ -13,7 +11,12 @@ describe('EppoAssignmentLogger', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockEppoClient = new EppoClient({
-      flagConfigurationStore: {} as IConfigurationStore<Flag>,
+      sdkKey: 'test-sdk-key',
+      sdkName: 'test-sdk-name',
+      sdkVersion: 'test-sdk-version',
+      configuration: {
+        initializationStrategy: 'none',
+      },
     }) as jest.Mocked<EppoClient>;
     mockEppoClient.track = jest.fn();
     logger = new EppoAssignmentLogger(mockEppoClient);
