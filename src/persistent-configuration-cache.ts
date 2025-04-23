@@ -46,13 +46,18 @@ export class PersistentConfigurationCache {
     });
   }
 
-  public async loadConfiguration({ maxStaleSeconds = Infinity }: { maxStaleSeconds?: number } = {}): Promise<Configuration | null> {
+  public async loadConfiguration({
+    maxStaleSeconds = Infinity,
+  }: { maxStaleSeconds?: number } = {}): Promise<Configuration | null> {
     try {
       const configuration = await this.storage.loadConfiguration();
       if (configuration) {
         const age = configuration.getAgeMs();
         if (age !== undefined && age > maxStaleSeconds * 1000) {
-          logger.debug({ age, maxStaleSeconds }, '[Eppo SDK] Cached configuration is too old to be used');
+          logger.debug(
+            { age, maxStaleSeconds },
+            '[Eppo SDK] Cached configuration is too old to be used',
+          );
           return null;
         }
 

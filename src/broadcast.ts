@@ -2,7 +2,7 @@ export type Listener<T extends unknown[]> = (...args: T) => void;
 
 /**
  * A broadcast channel for dispatching events to multiple listeners.
- * 
+ *
  * @internal
  */
 export class BroadcastChannel<T extends unknown[]> {

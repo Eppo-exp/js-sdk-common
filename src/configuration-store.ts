@@ -3,28 +3,32 @@ import { Configuration } from './configuration';
 import { ConfigurationFeed } from './configuration-feed';
 import { BroadcastChannel } from './broadcast';
 
-export type ActivationStrategy = {
-  /**
-   * Always activate new configuration.
-   */
-  type: 'always';
-} | {
-  /**
-   * Activate new configuration if the current configuration is stale (older than maxAgeSeconds).
-   */
-  type: 'stale';
-  maxAgeSeconds: number;
-} | {
-  /**
-   * Activate new configuration if the current configuration is empty.
-   */
-  type: 'empty';
-} | {
-  /**
-   * Never activate new configuration.
-   */
-  type: 'never';
-};
+export type ActivationStrategy =
+  | {
+      /**
+       * Always activate new configuration.
+       */
+      type: 'always';
+    }
+  | {
+      /**
+       * Activate new configuration if the current configuration is stale (older than maxAgeSeconds).
+       */
+      type: 'stale';
+      maxAgeSeconds: number;
+    }
+  | {
+      /**
+       * Activate new configuration if the current configuration is empty.
+       */
+      type: 'empty';
+    }
+  | {
+      /**
+       * Never activate new configuration.
+       */
+      type: 'never';
+    };
 
 /**
  * `ConfigurationStore` answers a simple question: what configuration is currently active?
@@ -43,7 +47,10 @@ export class ConfigurationStore {
    * Register configuration store to receive updates from a configuration feed using the specified
    * activation strategy.
    */
-  public register(configurationFeed: ConfigurationFeed, activationStrategy: ActivationStrategy): void {
+  public register(
+    configurationFeed: ConfigurationFeed,
+    activationStrategy: ActivationStrategy,
+  ): void {
     if (activationStrategy.type === 'never') {
       // No need to subscribe to configuration feed if we don't want to activate any configuration.
       return;
@@ -51,9 +58,11 @@ export class ConfigurationStore {
 
     configurationFeed.addListener((configuration) => {
       const currentConfiguration = this.getConfiguration();
-      const shouldActivate = activationStrategy.type === 'always'
-        || (activationStrategy.type === 'stale' && currentConfiguration.isStale(activationStrategy.maxAgeSeconds))
-        || (activationStrategy.type === 'empty' && currentConfiguration.isEmpty());
+      const shouldActivate =
+        activationStrategy.type === 'always' ||
+        (activationStrategy.type === 'stale' &&
+          currentConfiguration.isStale(activationStrategy.maxAgeSeconds)) ||
+        (activationStrategy.type === 'empty' && currentConfiguration.isEmpty());
 
       if (shouldActivate) {
         this.setConfiguration(configuration);

@@ -1,8 +1,9 @@
 import pino from 'pino';
 
+/** @internal */
 export const loggerPrefix = '[Eppo SDK]';
 
-// Create a Pino logger instance
+/** @internal */
 export const logger = pino({
   // eslint-disable-next-line no-restricted-globals
   level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'warn' : 'info'),

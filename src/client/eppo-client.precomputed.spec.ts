@@ -11,7 +11,9 @@ import EppoClient from './eppo-client';
 
 describe('EppoClient Precomputed Mode', () => {
   // Read both configurations for test reference
-  const precomputedConfigurationWire = readMockConfigurationWireResponse(MOCK_PRECOMPUTED_WIRE_FILE);
+  const precomputedConfigurationWire = readMockConfigurationWireResponse(
+    MOCK_PRECOMPUTED_WIRE_FILE,
+  );
   const initialConfiguration = Configuration.fromString(precomputedConfigurationWire);
 
   let client: EppoClient;
@@ -21,7 +23,7 @@ describe('EppoClient Precomputed Mode', () => {
   beforeEach(() => {
     mockAssignmentLogger = { logAssignment: jest.fn() } as jest.Mocked<IAssignmentLogger>;
     mockBanditLogger = { logBanditAction: jest.fn() } as jest.Mocked<IBanditLogger>;
-    
+
     // Create EppoClient with precomputed configuration
     client = new EppoClient({
       sdkKey: 'test-key',
@@ -33,7 +35,7 @@ describe('EppoClient Precomputed Mode', () => {
         enablePolling: false,
       },
     });
-    
+
     client.setAssignmentLogger(mockAssignmentLogger);
     client.setBanditLogger(mockBanditLogger);
   });
@@ -67,29 +69,40 @@ describe('EppoClient Precomputed Mode', () => {
     expect(result).toEqual({ key: 'value', number: 123 });
     expect(mockAssignmentLogger.logAssignment).toHaveBeenCalledTimes(1);
   });
-  
+
   it('correctly evaluates flag with extra logging', () => {
-    const result = client.getStringAssignment('string-flag-with-extra-logging', 'test-subject-key', {}, 'default');
+    const result = client.getStringAssignment(
+      'string-flag-with-extra-logging',
+      'test-subject-key',
+      {},
+      'default',
+    );
     expect(result).toBe('red');
     expect(mockAssignmentLogger.logAssignment).toHaveBeenCalledTimes(1);
   });
 
   it('logs bandit evaluation for flag with bandit data', () => {
     const banditActions = {
-      'show_red_button': {
+      show_red_button: {
         expectedConversion: 0.23,
         expectedRevenue: 15.75,
         category: 'promotion',
-        placement: 'home_screen'
-      }
+        placement: 'home_screen',
+      },
     };
-    
-    const result = client.getBanditAction('string-flag', 'test-subject-key', {}, banditActions, 'default');
-    
+
+    const result = client.getBanditAction(
+      'string-flag',
+      'test-subject-key',
+      {},
+      banditActions,
+      'default',
+    );
+
     expect(result.variation).toBe('red');
     expect(result.action).toBe('show_red_button');
     expect(mockBanditLogger.logBanditAction).toHaveBeenCalledTimes(1);
-    
+
     const call = mockBanditLogger.logBanditAction.mock.calls[0][0];
     expect(call.bandit).toBe('recommendation-model-v1');
     expect(call.action).toBe('show_red_button');
@@ -99,22 +112,37 @@ describe('EppoClient Precomputed Mode', () => {
   });
 
   it('returns default values for nonexistent flags', () => {
-    const stringResult = client.getStringAssignment('nonexistent-flag', 'test-subject-key', {}, 'default-string');
+    const stringResult = client.getStringAssignment(
+      'nonexistent-flag',
+      'test-subject-key',
+      {},
+      'default-string',
+    );
     expect(stringResult).toBe('default-string');
-    
-    const boolResult = client.getBooleanAssignment('nonexistent-flag', 'test-subject-key', {}, true);
+
+    const boolResult = client.getBooleanAssignment(
+      'nonexistent-flag',
+      'test-subject-key',
+      {},
+      true,
+    );
     expect(boolResult).toBe(true);
-    
+
     const intResult = client.getIntegerAssignment('nonexistent-flag', 'test-subject-key', {}, 100);
     expect(intResult).toBe(100);
   });
 
   it('correctly handles assignment details', () => {
-    const details = client.getStringAssignmentDetails('string-flag', 'test-subject-key', {}, 'default');
-    
+    const details = client.getStringAssignmentDetails(
+      'string-flag',
+      'test-subject-key',
+      {},
+      'default',
+    );
+
     expect(details.variation).toBe('red');
     expect(details.evaluationDetails.variationKey).toBe('variation-123');
-    
+
     // Assignment should be logged
     expect(mockAssignmentLogger.logAssignment).toHaveBeenCalledTimes(1);
     const call = mockAssignmentLogger.logAssignment.mock.calls[0][0];
@@ -122,4 +150,4 @@ describe('EppoClient Precomputed Mode', () => {
     expect(call.featureFlag).toBe('string-flag');
     expect(call.subject).toBe('test-subject-key');
   });
-}); 
+});

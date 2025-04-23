@@ -2,10 +2,7 @@ import * as base64 from 'js-base64';
 import { times } from 'lodash';
 import * as td from 'testdouble';
 
-import {
-  MOCK_UFC_RESPONSE_FILE,
-  readMockUFCResponse,
-} from '../../test/testHelpers';
+import { MOCK_UFC_RESPONSE_FILE, readMockUFCResponse } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import {
@@ -28,7 +25,6 @@ jest.mock('../salt', () => ({
 }));
 
 describe('EppoClient E2E test', () => {
-
   // Configure fetch mock for tests that still need it
   global.fetch = jest.fn(() => {
     const ufc = readMockUFCResponse(MOCK_UFC_RESPONSE_FILE);

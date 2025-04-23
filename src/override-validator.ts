@@ -53,12 +53,16 @@ export class OverrideValidator {
     }
     if (typeof parsed['browserExtensionKey'] !== 'string') {
       throw new Error(
-        `Invalid type for 'browserExtensionKey'. Expected string, but received ${typeof parsed['browserExtensionKey']}`,
+        `Invalid type for 'browserExtensionKey'. Expected string, but received ${typeof parsed[
+          'browserExtensionKey'
+        ]}`,
       );
     }
     if (typeof parsed['overrides'] !== 'object') {
       throw new Error(
-        `Invalid type for 'overrides'. Expected object, but received ${typeof parsed['overrides']}.`,
+        `Invalid type for 'overrides'. Expected object, but received ${typeof parsed[
+          'overrides'
+        ]}.`,
       );
     }
   }

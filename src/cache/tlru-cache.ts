@@ -8,10 +8,7 @@ import { LRUCache } from './lru-cache';
  **/
 export class TLRUCache extends LRUCache {
   private readonly cacheEntriesTTLRegistry = new Map<string, Date>();
-  constructor(
-    readonly maxSize: number,
-    readonly ttl: number,
-  ) {
+  constructor(readonly maxSize: number, readonly ttl: number) {
     super(maxSize);
   }
 

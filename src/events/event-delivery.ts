@@ -9,10 +9,7 @@ export type EventDeliveryResult = {
 };
 
 export default class EventDelivery implements IEventDelivery {
-  constructor(
-    private readonly sdkKey: string,
-    private readonly ingestionUrl: string,
-  ) {}
+  constructor(private readonly sdkKey: string, private readonly ingestionUrl: string) {}
 
   /**
    * Delivers a batch of events to the ingestion URL endpoint. Returns the UUIDs of any events from

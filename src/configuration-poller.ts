@@ -6,9 +6,9 @@ import { ConfigurationFeed, ConfigurationSource } from './configuration-feed';
 /**
  * Polls for new configurations from the Eppo server. When a new configuration is fetched,
  * it is published to the configuration feed.
- * 
+ *
  * The poller is created in the stopped state. Call `start` to begin polling.
- * 
+ *
  * @internal
  */
 export class ConfigurationPoller {
@@ -26,7 +26,7 @@ export class ConfigurationPoller {
   public constructor(
     private readonly configurationRequestor: ConfigurationRequestor,
     options: {
-      configurationFeed?: ConfigurationFeed,
+      configurationFeed?: ConfigurationFeed;
       basePollingIntervalMs: number;
       maxPollingIntervalMs: number;
       maxAgeMs: number;
@@ -56,7 +56,7 @@ export class ConfigurationPoller {
 
   /**
    * Starts the configuration poller.
-   * 
+   *
    * This method will start polling for new configurations from the Eppo server.
    * It will continue to poll until the `stop` method is called.
    */
@@ -74,7 +74,7 @@ export class ConfigurationPoller {
 
   /**
    * Stops the configuration poller.
-   * 
+   *
    * This method will stop polling for new configurations from the Eppo server. Note that it will
    * not interrupt the current poll cycle / active fetch, but it will make sure that configuration
    * listeners are not notified of any new configurations after this method is called.
@@ -112,7 +112,10 @@ export class ConfigurationPoller {
         await timeout(this.basePollingIntervalMs + randomJitterMs(this.basePollingIntervalMs));
       } else {
         // Exponential backoff capped at maxPollingIntervalMs.
-        const baseDelayMs = Math.min((Math.pow(2, consecutiveFailures) * this.basePollingIntervalMs), this.maxPollingIntervalMs);
+        const baseDelayMs = Math.min(
+          Math.pow(2, consecutiveFailures) * this.basePollingIntervalMs,
+          this.maxPollingIntervalMs,
+        );
         const delayMs = baseDelayMs + randomJitterMs(baseDelayMs);
 
         logger.warn({ delayMs, consecutiveFailures }, '[Eppo SDK] will try polling again');
@@ -124,7 +127,7 @@ export class ConfigurationPoller {
 }
 
 function timeout(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**

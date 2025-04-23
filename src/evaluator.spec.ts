@@ -77,7 +77,9 @@ describe('Evaluator', () => {
 
     expect(evaluator.matchesShard(shard, 'subject_key', 100)).toBeTruthy();
 
-    const deterministicEvaluator = new Evaluator({ sharder: new DeterministicSharder({ subject_key: 50 }) });
+    const deterministicEvaluator = new Evaluator({
+      sharder: new DeterministicSharder({ subject_key: 50 }),
+    });
     expect(deterministicEvaluator.matchesShard(shard, 'subject_key', 100)).toBeTruthy();
   });
 
@@ -278,7 +280,9 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', { email: 'eppo@example.com' });
+    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', {
+      email: 'eppo@example.com',
+    });
     expect(result.assignmentDetails.flagKey).toEqual('flag');
     expect(result.assignmentDetails.allocationKey).toEqual('first');
     expect(result.assignmentDetails.variation).toEqual(VARIATION_B);
@@ -325,7 +329,9 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', { email: 'eppo@test.com' });
+    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', {
+      email: 'eppo@test.com',
+    });
     expect(result.assignmentDetails.flagKey).toEqual('flag');
     expect(result.assignmentDetails.allocationKey).toEqual('default');
     expect(result.assignmentDetails.variation).toEqual(VARIATION_A);
@@ -376,7 +382,9 @@ describe('Evaluator', () => {
       totalShards: 10,
     };
 
-    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', { email: 'eppo@test.com' });
+    const result = evaluator.evaluateFlag(configuration, flag, 'subject_key', {
+      email: 'eppo@test.com',
+    });
     expect(result.assignmentDetails.flagKey).toEqual('obfuscated_flag_key');
     expect(result.assignmentDetails.allocationKey).toEqual('default');
     expect(result.assignmentDetails.variation).toEqual(VARIATION_A);
@@ -440,16 +448,20 @@ describe('Evaluator', () => {
     });
 
     expect(
-      deterministicEvaluator.evaluateFlag(configuration, flag, 'alice', {}).assignmentDetails.variation,
+      deterministicEvaluator.evaluateFlag(configuration, flag, 'alice', {}).assignmentDetails
+        .variation,
     ).toEqual(VARIATION_A);
     expect(
-      deterministicEvaluator.evaluateFlag(configuration, flag, 'bob', {}).assignmentDetails.variation,
+      deterministicEvaluator.evaluateFlag(configuration, flag, 'bob', {}).assignmentDetails
+        .variation,
     ).toEqual(VARIATION_B);
     expect(
-      deterministicEvaluator.evaluateFlag(configuration, flag, 'charlie', {}).assignmentDetails.variation,
+      deterministicEvaluator.evaluateFlag(configuration, flag, 'charlie', {}).assignmentDetails
+        .variation,
     ).toEqual(VARIATION_C);
     expect(
-      deterministicEvaluator.evaluateFlag(configuration, flag, 'dave', {}).assignmentDetails.variation,
+      deterministicEvaluator.evaluateFlag(configuration, flag, 'dave', {}).assignmentDetails
+        .variation,
     ).toEqual(VARIATION_C);
   });
 

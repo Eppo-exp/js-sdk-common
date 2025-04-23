@@ -517,7 +517,7 @@ describe('EppoClient Bandits E2E test', () => {
               unmatchedAllocations: [],
               unevaluatedAllocations: [],
             };
-            
+
             return {
               assignmentDetails: {
                 flagKey,
@@ -549,7 +549,7 @@ describe('EppoClient Bandits E2E test', () => {
                 },
                 evaluationDetails,
                 entityId: null,
-              }
+              },
             };
           });
 
@@ -681,11 +681,7 @@ describe('EppoClient Bandits E2E test', () => {
       subjectAttributes: ContextAttributes,
       banditActions: Record<string, BanditActions>,
     ): Configuration {
-      return client.getPrecomputedConfiguration(
-        subjectKey,
-        subjectAttributes,
-        banditActions,
-      );
+      return client.getPrecomputedConfiguration(subjectKey, subjectAttributes, banditActions);
     }
 
     describe('obfuscated results', () => {

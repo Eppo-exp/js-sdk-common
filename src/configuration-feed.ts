@@ -12,7 +12,7 @@ export enum ConfigurationSource {
   /**
    * Configuration was loaded from the network.
    */
-  Network = 'network'
+  Network = 'network',
 }
 
 /**

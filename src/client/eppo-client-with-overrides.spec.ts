@@ -5,9 +5,7 @@ import * as overrideValidatorModule from '../override-validator';
 import EppoClient from './eppo-client';
 
 describe('EppoClient', () => {
-  function setUnobfuscatedFlagEntries(
-    entries: Record<string, Flag>,
-  ): EppoClient {
+  function setUnobfuscatedFlagEntries(entries: Record<string, Flag>): EppoClient {
     return new EppoClient({
       sdkKey: 'dummy',
       sdkName: 'js-client-sdk-common',
@@ -26,8 +24,8 @@ describe('EppoClient', () => {
               },
               banditReferences: {},
             },
-          }
-        })
+          },
+        }),
       },
     });
   }

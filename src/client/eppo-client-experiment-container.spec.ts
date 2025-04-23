@@ -17,7 +17,7 @@ describe('getExperimentContainerEntry', () => {
   let loggerWarnSpy: jest.SpyInstance;
 
   beforeEach(async () => {
-    client = new EppoClient({ 
+    client = new EppoClient({
       configuration: {
         initializationStrategy: 'none',
         initialConfiguration: readMockUfcConfiguration(),

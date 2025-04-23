@@ -18,7 +18,7 @@ export class Subject {
 
   /**
    * @internal Creates a new Subject instance.
-   * 
+   *
    * @param client The EppoClient instance to wrap
    * @param subjectKey The subject key to use for all assignments
    * @param subjectAttributes The subject attributes to use for all assignments
@@ -28,7 +28,7 @@ export class Subject {
     client: EppoClient,
     subjectKey: string,
     subjectAttributes: Attributes | ContextAttributes,
-    banditActions: Record<FlagKey, BanditActions>
+    banditActions: Record<FlagKey, BanditActions>,
   ) {
     this.client = client;
     this.subjectKey = subjectKey;
@@ -52,10 +52,10 @@ export class Subject {
    */
   public getStringAssignment(flagKey: string, defaultValue: string): string {
     return this.client.getStringAssignment(
-      flagKey, 
-      this.subjectKey, 
-      ensureNonContextualSubjectAttributes(this.subjectAttributes), 
-      defaultValue
+      flagKey,
+      this.subjectKey,
+      ensureNonContextualSubjectAttributes(this.subjectAttributes),
+      defaultValue,
     );
   }
 
@@ -67,12 +67,15 @@ export class Subject {
    * @param defaultValue default value to return if the subject is not part of the experiment sample
    * @returns an object that includes the variation value along with additional metadata about the assignment
    */
-  public getStringAssignmentDetails(flagKey: string, defaultValue: string): IAssignmentDetails<string> {
+  public getStringAssignmentDetails(
+    flagKey: string,
+    defaultValue: string,
+  ): IAssignmentDetails<string> {
     return this.client.getStringAssignmentDetails(
-      flagKey, 
-      this.subjectKey, 
-      ensureNonContextualSubjectAttributes(this.subjectAttributes), 
-      defaultValue
+      flagKey,
+      this.subjectKey,
+      ensureNonContextualSubjectAttributes(this.subjectAttributes),
+      defaultValue,
     );
   }
 
@@ -85,10 +88,10 @@ export class Subject {
    */
   public getBooleanAssignment(flagKey: string, defaultValue: boolean): boolean {
     return this.client.getBooleanAssignment(
-      flagKey, 
-      this.subjectKey, 
-      ensureNonContextualSubjectAttributes(this.subjectAttributes), 
-      defaultValue
+      flagKey,
+      this.subjectKey,
+      ensureNonContextualSubjectAttributes(this.subjectAttributes),
+      defaultValue,
     );
   }
 
@@ -100,12 +103,15 @@ export class Subject {
    * @param defaultValue default value to return if the subject is not part of the experiment sample
    * @returns an object that includes the variation value along with additional metadata about the assignment
    */
-  public getBooleanAssignmentDetails(flagKey: string, defaultValue: boolean): IAssignmentDetails<boolean> {
+  public getBooleanAssignmentDetails(
+    flagKey: string,
+    defaultValue: boolean,
+  ): IAssignmentDetails<boolean> {
     return this.client.getBooleanAssignmentDetails(
-      flagKey, 
-      this.subjectKey, 
-      ensureNonContextualSubjectAttributes(this.subjectAttributes), 
-      defaultValue
+      flagKey,
+      this.subjectKey,
+      ensureNonContextualSubjectAttributes(this.subjectAttributes),
+      defaultValue,
     );
   }
 
@@ -118,10 +124,10 @@ export class Subject {
    */
   public getIntegerAssignment(flagKey: string, defaultValue: number): number {
     return this.client.getIntegerAssignment(
-      flagKey, 
-      this.subjectKey, 
-      ensureNonContextualSubjectAttributes(this.subjectAttributes), 
-      defaultValue
+      flagKey,
+      this.subjectKey,
+      ensureNonContextualSubjectAttributes(this.subjectAttributes),
+      defaultValue,
     );
   }
 
@@ -133,12 +139,15 @@ export class Subject {
    * @param defaultValue default value to return if the subject is not part of the experiment sample
    * @returns an object that includes the variation value along with additional metadata about the assignment
    */
-  public getIntegerAssignmentDetails(flagKey: string, defaultValue: number): IAssignmentDetails<number> {
+  public getIntegerAssignmentDetails(
+    flagKey: string,
+    defaultValue: number,
+  ): IAssignmentDetails<number> {
     return this.client.getIntegerAssignmentDetails(
-      flagKey, 
-      this.subjectKey, 
-      ensureNonContextualSubjectAttributes(this.subjectAttributes), 
-      defaultValue
+      flagKey,
+      this.subjectKey,
+      ensureNonContextualSubjectAttributes(this.subjectAttributes),
+      defaultValue,
     );
   }
 
@@ -151,10 +160,10 @@ export class Subject {
    */
   public getNumericAssignment(flagKey: string, defaultValue: number): number {
     return this.client.getNumericAssignment(
-      flagKey, 
-      this.subjectKey, 
-      ensureNonContextualSubjectAttributes(this.subjectAttributes), 
-      defaultValue
+      flagKey,
+      this.subjectKey,
+      ensureNonContextualSubjectAttributes(this.subjectAttributes),
+      defaultValue,
     );
   }
 
@@ -166,12 +175,15 @@ export class Subject {
    * @param defaultValue default value to return if the subject is not part of the experiment sample
    * @returns an object that includes the variation value along with additional metadata about the assignment
    */
-  public getNumericAssignmentDetails(flagKey: string, defaultValue: number): IAssignmentDetails<number> {
+  public getNumericAssignmentDetails(
+    flagKey: string,
+    defaultValue: number,
+  ): IAssignmentDetails<number> {
     return this.client.getNumericAssignmentDetails(
-      flagKey, 
-      this.subjectKey, 
-      ensureNonContextualSubjectAttributes(this.subjectAttributes), 
-      defaultValue
+      flagKey,
+      this.subjectKey,
+      ensureNonContextualSubjectAttributes(this.subjectAttributes),
+      defaultValue,
     );
   }
 
@@ -184,10 +196,10 @@ export class Subject {
    */
   public getJSONAssignment(flagKey: string, defaultValue: object): object {
     return this.client.getJSONAssignment(
-      flagKey, 
-      this.subjectKey, 
-      ensureNonContextualSubjectAttributes(this.subjectAttributes), 
-      defaultValue
+      flagKey,
+      this.subjectKey,
+      ensureNonContextualSubjectAttributes(this.subjectAttributes),
+      defaultValue,
     );
   }
 
@@ -199,28 +211,39 @@ export class Subject {
    * @param defaultValue default value to return if the subject is not part of the experiment sample
    * @returns an object that includes the variation value along with additional metadata about the assignment
    */
-  public getJSONAssignmentDetails(flagKey: string, defaultValue: object): IAssignmentDetails<object> {
+  public getJSONAssignmentDetails(
+    flagKey: string,
+    defaultValue: object,
+  ): IAssignmentDetails<object> {
     return this.client.getJSONAssignmentDetails(
-      flagKey, 
-      this.subjectKey, 
-      ensureNonContextualSubjectAttributes(this.subjectAttributes), 
-      defaultValue
+      flagKey,
+      this.subjectKey,
+      ensureNonContextualSubjectAttributes(this.subjectAttributes),
+      defaultValue,
     );
   }
 
   public getBanditAction(
-    flagKey: string, 
+    flagKey: string,
     defaultValue: string,
   ): Omit<IAssignmentDetails<string>, 'evaluationDetails'> {
-    return this.client.getBanditAction(flagKey, this.subjectKey, this.subjectAttributes, this.banditActions?.[flagKey] ?? {}, defaultValue);
+    return this.client.getBanditAction(
+      flagKey,
+      this.subjectKey,
+      this.subjectAttributes,
+      this.banditActions?.[flagKey] ?? {},
+      defaultValue,
+    );
   }
 
-
-  public getBanditActionDetails(
-    flagKey: string, 
-    defaultValue: string,
-  ): IAssignmentDetails<string> {
-    return this.client.getBanditActionDetails(flagKey, this.subjectKey, this.subjectAttributes, this.banditActions?.[flagKey] ?? {}, defaultValue);
+  public getBanditActionDetails(flagKey: string, defaultValue: string): IAssignmentDetails<string> {
+    return this.client.getBanditActionDetails(
+      flagKey,
+      this.subjectKey,
+      this.subjectAttributes,
+      this.banditActions?.[flagKey] ?? {},
+      defaultValue,
+    );
   }
 
   /**
@@ -234,11 +257,13 @@ export class Subject {
    * Only use this method under certain circumstances (i.e. where the impact of the choice of bandit cannot be measured,
    * but you want to put the "best foot forward", for example, when being web-crawled).
    */
-  public getBestAction(
-    flagKey: string, 
-    defaultAction: string,
-  ): string {
-    return this.client.getBestAction(flagKey, this.subjectAttributes, this.banditActions?.[flagKey] ?? {}, defaultAction);
+  public getBestAction(flagKey: string, defaultAction: string): string {
+    return this.client.getBestAction(
+      flagKey,
+      this.subjectAttributes,
+      this.banditActions?.[flagKey] ?? {},
+      defaultAction,
+    );
   }
 
   /**
@@ -255,9 +280,9 @@ export class Subject {
    */
   public getExperimentContainerEntry<T>(flagExperiment: IContainerExperiment<T>): T {
     return this.client.getExperimentContainerEntry(
-      flagExperiment, 
-      this.subjectKey, 
-      ensureNonContextualSubjectAttributes(this.subjectAttributes)
+      flagExperiment,
+      this.subjectKey,
+      ensureNonContextualSubjectAttributes(this.subjectAttributes),
     );
   }
 
@@ -268,8 +293,8 @@ export class Subject {
    */
   public getPrecomputedConfiguration(): Configuration {
     return this.client.getPrecomputedConfiguration(
-      this.subjectKey, 
-      this.subjectAttributes, 
+      this.subjectKey,
+      this.subjectAttributes,
       this.banditActions || {},
     );
   }
@@ -282,4 +307,4 @@ export class Subject {
   public waitForInitialization(): Promise<void> {
     return this.client.waitForInitialization();
   }
-} 
+}

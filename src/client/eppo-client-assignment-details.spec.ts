@@ -1,9 +1,6 @@
 import * as fs from 'fs';
 
-import {
-  IAssignmentTestCase,
-  readMockUfcConfiguration,
-} from '../../test/testHelpers';
+import { IAssignmentTestCase, readMockUfcConfiguration } from '../../test/testHelpers';
 import { AllocationEvaluationCode } from '../flag-evaluation-details-builder';
 import { Variation, VariationType } from '../interfaces';
 import { OperatorType } from '../rules';
