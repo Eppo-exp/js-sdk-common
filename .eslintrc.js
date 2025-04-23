@@ -3,6 +3,7 @@ module.exports = {
   env: {
     es6: true,
     jest: true,
+    node: true,
   },
   extends: [
     'eslint:recommended',
@@ -84,6 +85,12 @@ module.exports = {
   overrides: [
     {
       files: ['*.spec.ts'],
+      rules: {
+        'no-restricted-globals': 'off',
+      },
+    },
+    {
+      files: ['src/tools/**/*.ts'],
       rules: {
         'no-restricted-globals': 'off',
       },

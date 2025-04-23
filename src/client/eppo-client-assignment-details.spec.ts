@@ -1,6 +1,10 @@
 import * as fs from 'fs';
 
-import { IAssignmentTestCase, readMockUfcConfiguration } from '../../test/testHelpers';
+import {
+  AssignmentVariationValue,
+  IAssignmentTestCase,
+  readMockUfcConfiguration,
+} from '../../test/testHelpers';
 import { AllocationEvaluationCode } from '../flag-evaluation-details-builder';
 import { Variation, VariationType } from '../interfaces';
 import { OperatorType } from '../rules';
@@ -291,8 +295,8 @@ describe('EppoClient get*AssignmentDetails', () => {
                 flagKey: string,
                 subjectKey: string,
                 subjectAttributes: Record<string, AttributeType>,
-                defaultValue: boolean | string | number | object,
-              ) => IAssignmentDetails<boolean | string | number | object>;
+                defaultValue: AssignmentVariationValue,
+              ) => IAssignmentDetails<AssignmentVariationValue>;
               if (!assignmentFn) {
                 throw new Error(`Unknown variation type: ${variationType}`);
               }

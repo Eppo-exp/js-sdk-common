@@ -6,6 +6,7 @@ import { AttributeType, ContextAttributes, IAssignmentDetails, VariationType } f
 import { IFlagEvaluationDetails } from '../src/flag-evaluation-details-builder';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from '../src/http-client';
 import { Configuration } from '../src/configuration';
+import { Variation } from '../src/interfaces';
 export const TEST_DATA_DIR = './test/data/ufc/';
 export const ASSIGNMENT_TEST_DATA_DIR = TEST_DATA_DIR + 'tests/';
 export const BANDIT_TEST_DATA_DIR = TEST_DATA_DIR + 'bandit-tests/';
@@ -20,17 +21,19 @@ const MOCK_PRECOMPUTED_FILENAME = 'precomputed-v1';
 export const MOCK_PRECOMPUTED_WIRE_FILE = `${MOCK_PRECOMPUTED_FILENAME}.json`;
 export const MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE = `${MOCK_PRECOMPUTED_FILENAME}-deobfuscated.json`;
 
+export type AssignmentVariationValue = Variation['value'] | object;
+
 export interface SubjectTestCase {
   subjectKey: string;
   subjectAttributes: Record<string, AttributeType>;
-  assignment: string | number | boolean | object;
+  assignment: AssignmentVariationValue;
   evaluationDetails: IFlagEvaluationDetails;
 }
 
 export interface IAssignmentTestCase {
   flag: string;
   variationType: VariationType;
-  defaultValue: string | number | boolean | object;
+  defaultValue: AssignmentVariationValue;
   subjects: SubjectTestCase[];
 }
 
@@ -120,12 +123,15 @@ export function getTestAssignments(
     flagKey: string,
     subjectKey: string,
     subjectAttributes: Record<string, AttributeType>,
-    defaultValue: string | number | boolean | object,
-  ) => string | number | boolean | object,
-): { subject: SubjectTestCase; assignment: string | boolean | number | null | object }[] {
+    defaultValue: AssignmentVariationValue,
+  ) => AssignmentVariationValue | IAssignmentDetails<AssignmentVariationValue>,
+): {
+  subject: SubjectTestCase;
+  assignment: AssignmentVariationValue | IAssignmentDetails<AssignmentVariationValue>;
+}[] {
   const assignments: {
     subject: SubjectTestCase;
-    assignment: string | boolean | number | null | object;
+    assignment: AssignmentVariationValue;
   }[] = [];
   for (const subject of testCase.subjects) {
     const assignment = assignmentFn(
@@ -139,48 +145,88 @@ export function getTestAssignments(
   return assignments;
 }
 
-export function getTestAssignmentDetails(
-  testCase: IAssignmentTestCase,
-  assignmentDetailsFn: (
-    flagKey: string,
-    subjectKey: string,
-    subjectAttributes: Record<string, AttributeType>,
-    defaultValue: string | number | boolean | object,
-  ) => IAssignmentDetails<string | boolean | number | object>,
-): {
-  subject: SubjectTestCase;
-  assignmentDetails: IAssignmentDetails<string | boolean | number | object>;
-}[] {
-  return testCase.subjects.map((subject) => ({
-    subject,
-    assignmentDetails: assignmentDetailsFn(
-      testCase.flag,
-      subject.subjectKey,
-      subject.subjectAttributes,
-      testCase.defaultValue,
-    ),
-  }));
-}
+const configCreatedAt = (
+  readMockUFCResponse(MOCK_UFC_RESPONSE_FILE) as IUniversalFlagConfigResponse
+).createdAt;
+const testHelperInstantiationDate = new Date();
 
 export function validateTestAssignments(
   assignments: {
     subject: SubjectTestCase;
-    assignment: string | boolean | number | object | null;
+    assignment: AssignmentVariationValue | IAssignmentDetails<AssignmentVariationValue>;
   }[],
   flag: string,
+  withDetails: boolean,
+  isObfuscated: boolean,
 ) {
   for (const { subject, assignment } of assignments) {
-    if (!isEqual(assignment, subject.assignment)) {
+    let assignedVariation = assignment;
+    let assignmentDetails: IFlagEvaluationDetails | null = null;
+    if (
+      withDetails === true &&
+      typeof assignment === 'object' &&
+      assignment !== null &&
+      'variation' in assignment
+    ) {
+      assignedVariation = assignment.variation;
+      assignmentDetails = assignment.evaluationDetails;
+    }
+
+    if (!isEqual(assignedVariation, subject.assignment)) {
       // More friendly error message
       console.error(
         `subject ${subject.subjectKey} was assigned ${JSON.stringify(
-          assignment,
+          assignedVariation,
           undefined,
           2,
         )} when expected ${JSON.stringify(subject.assignment, undefined, 2)} for flag ${flag}`,
       );
     }
 
-    expect(assignment).toEqual(subject.assignment);
+    expect(assignedVariation).toEqual(subject.assignment);
+
+    if (withDetails) {
+      if (!assignmentDetails) {
+        throw new Error('Expected assignmentDetails to be populated');
+      }
+      expect(assignmentDetails.environmentName).toBe(subject.evaluationDetails.environmentName);
+      expect(assignmentDetails.flagEvaluationCode).toBe(
+        subject.evaluationDetails.flagEvaluationCode,
+      );
+      expect(assignmentDetails.flagEvaluationDescription).toBe(
+        subject.evaluationDetails.flagEvaluationDescription,
+      );
+      expect(assignmentDetails.variationKey).toBe(subject.evaluationDetails.variationKey);
+      // Use toString() to handle comparing JSON
+      expect(assignmentDetails.variationValue?.toString()).toBe(
+        subject.evaluationDetails.variationValue?.toString(),
+      );
+      expect(assignmentDetails.configPublishedAt).toBe(configCreatedAt);
+      // cannot do an exact match for configFetchedAt because it will change based on fetch
+      expect(new Date(assignmentDetails.configFetchedAt).getTime()).toBeGreaterThan(
+        testHelperInstantiationDate.getTime(),
+      );
+
+      if (!isObfuscated) {
+        expect(assignmentDetails.matchedRule).toEqual(subject.evaluationDetails.matchedRule);
+      } else {
+        // When obfuscated, rules may be one-way hashed (e.g., for ONE_OF checks) so cannot be unobfuscated
+        // Thus we'll just check that the number of conditions is equal and relay on the unobfuscated
+        // tests for correctness
+        expect(assignmentDetails.matchedRule?.conditions || []).toHaveLength(
+          subject.evaluationDetails.matchedRule?.conditions.length || 0,
+        );
+      }
+
+      expect(assignmentDetails.matchedAllocation).toEqual(
+        subject.evaluationDetails.matchedAllocation,
+      );
+      expect(assignmentDetails.unmatchedAllocations).toEqual(
+        subject.evaluationDetails.unmatchedAllocations,
+      );
+      expect(assignmentDetails.unevaluatedAllocations).toEqual(
+        subject.evaluationDetails.unevaluatedAllocations,
+      );
+    }
   }
 }
