@@ -21,10 +21,9 @@ export {
 } from './cache/abstract-assignment-cache';
 export { NonExpiringInMemoryAssignmentCache } from './cache/non-expiring-in-memory-cache-assignment';
 export {
-  IConfigurationWire,
   IObfuscatedPrecomputedConfigurationResponse,
   IPrecomputedConfigurationResponse,
-} from './configuration-wire/configuration-wire-types';
+} from './precomputed-configuration';
 export { decodePrecomputedFlag } from './decoding';
 export { default as BatchEventProcessor } from './events/batch-event-processor';
 export { BoundedEventQueue } from './events/bounded-event-queue';

@@ -17,7 +17,7 @@ import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-
 import { Configuration, PrecomputedConfig } from '../configuration';
 import ConfigurationRequestor from '../configuration-requestor';
 import { ConfigurationStore } from '../configuration-store';
-import { IObfuscatedPrecomputedConfigurationResponse } from '../configuration-wire/configuration-wire-types';
+import { IObfuscatedPrecomputedConfigurationResponse } from '../precomputed-configuration';
 import {
   DEFAULT_BASE_POLLING_INTERVAL_MS,
   DEFAULT_MAX_POLLING_INTERVAL_MS,
@@ -1401,6 +1401,8 @@ export default class EppoClient {
   /**
    * Internal helper that evaluates a flag assignment without logging
    * Returns the evaluation result that can be used for logging
+   *
+   * @todo This belongs to Evaluator class.
    */
   private evaluateAssignment(
     flagKey: string,
@@ -1505,6 +1507,9 @@ export default class EppoClient {
     return result;
   }
 
+  /**
+   * @todo This belongs to Evaluator class.
+   */
   private evaluatePrecomputedAssignment(
     precomputed: PrecomputedConfig,
     flagKey: string,

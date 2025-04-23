@@ -14,7 +14,6 @@ export {
 export { Subject } from './client/subject';
 export * as constants from './constants';
 export { EppoAssignmentLogger } from './eppo-assignment-logger';
-
 export {
   AttributeType,
   Attributes,
@@ -23,3 +22,4 @@ export {
   ContextAttributes,
   FlagKey,
 } from './types';
+export { VariationType } from './interfaces';

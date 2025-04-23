@@ -1,4 +1,4 @@
-import { IObfuscatedPrecomputedConfigurationResponse } from './configuration-wire/configuration-wire-types';
+import { IObfuscatedPrecomputedConfigurationResponse } from './precomputed-configuration';
 import { decodeFlag } from './decoding';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from './http-client';
 import { BanditParameters, BanditVariation, Flag, FormatEnum, ObfuscatedFlag } from './interfaces';

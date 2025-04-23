@@ -1,6 +1,6 @@
 import ApiEndpoints from './api-endpoints';
 import { BanditsConfig, FlagsConfig, PrecomputedConfig } from './configuration';
-import { IObfuscatedPrecomputedConfigurationResponse } from './configuration-wire/configuration-wire-types';
+import { IObfuscatedPrecomputedConfigurationResponse } from './precomputed-configuration';
 import {
   BanditParameters,
   BanditReference,
