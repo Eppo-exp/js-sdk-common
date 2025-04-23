@@ -4,6 +4,7 @@ import * as td from 'testdouble';
 
 import {
   ASSIGNMENT_TEST_DATA_DIR,
+  AssignmentVariationValue,
   getTestAssignments,
   IAssignmentTestCase,
   MOCK_UFC_RESPONSE_FILE,
@@ -28,7 +29,11 @@ import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../i
 import { getMD5Hash } from '../obfuscation';
 import { AttributeType } from '../types';
 
-import EppoClient, { checkTypeMatch, FlagConfigurationRequestParameters } from './eppo-client';
+import EppoClient, {
+  checkTypeMatch,
+  FlagConfigurationRequestParameters,
+  IAssignmentDetails,
+} from './eppo-client';
 import { initConfiguration } from './test-utils';
 
 // Use a known salt to produce deterministic hashes
@@ -317,50 +322,66 @@ describe('EppoClient E2E test', () => {
     });
   });
 
-  describe('UFC Shared Test Cases', () => {
+  describe.each(['Not Obfuscated', 'Obfuscated'])('UFC Shared Test Cases %s', (obfuscationType) => {
     const testCases = testCasesByFileName<IAssignmentTestCase>(ASSIGNMENT_TEST_DATA_DIR);
+    const isObfuscated = obfuscationType === 'Obfuscated';
 
-    describe('Not obfuscated', () => {
-      beforeAll(async () => {
-        global.fetch = jest.fn(() => {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve(readMockUFCResponse(MOCK_UFC_RESPONSE_FILE)),
-          });
-        }) as jest.Mock;
+    beforeAll(async () => {
+      global.fetch = jest.fn(() => {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve(
+              readMockUFCResponse(
+                isObfuscated ? OBFUSCATED_MOCK_UFC_RESPONSE_FILE : MOCK_UFC_RESPONSE_FILE,
+              ),
+            ),
+        });
+      }) as jest.Mock;
 
-        await initConfiguration(storage);
-      });
+      await initConfiguration(storage);
+    });
 
-      afterAll(() => {
-        jest.restoreAllMocks();
-      });
+    afterAll(() => {
+      jest.restoreAllMocks();
+    });
+
+    describe.each(['Scalar', 'With Details'])('%s', (assignmentType) => {
+      const assignmentWithDetails = assignmentType === 'With Details';
 
       it.each(Object.keys(testCases))('test variation assignment splits - %s', async (fileName) => {
         const { flag, variationType, defaultValue, subjects } = testCases[fileName];
-        const client = new EppoClient({ flagConfigurationStore: storage });
+        const client = new EppoClient({ flagConfigurationStore: storage, isObfuscated });
         client.setIsGracefulFailureMode(false);
 
         let assignments: {
           subject: SubjectTestCase;
-          assignment: string | boolean | number | null | object;
+          assignment: AssignmentVariationValue;
         }[] = [];
 
-        const typeAssignmentFunctions = {
-          [VariationType.BOOLEAN]: client.getBooleanAssignment.bind(client),
-          [VariationType.NUMERIC]: client.getNumericAssignment.bind(client),
-          [VariationType.INTEGER]: client.getIntegerAssignment.bind(client),
-          [VariationType.STRING]: client.getStringAssignment.bind(client),
-          [VariationType.JSON]: client.getJSONAssignment.bind(client),
-        };
+        const typeAssignmentFunctions = assignmentWithDetails
+          ? {
+              [VariationType.BOOLEAN]: client.getBooleanAssignmentDetails.bind(client),
+              [VariationType.NUMERIC]: client.getNumericAssignmentDetails.bind(client),
+              [VariationType.INTEGER]: client.getIntegerAssignmentDetails.bind(client),
+              [VariationType.STRING]: client.getStringAssignmentDetails.bind(client),
+              [VariationType.JSON]: client.getJSONAssignmentDetails.bind(client),
+            }
+          : {
+              [VariationType.BOOLEAN]: client.getBooleanAssignment.bind(client),
+              [VariationType.NUMERIC]: client.getNumericAssignment.bind(client),
+              [VariationType.INTEGER]: client.getIntegerAssignment.bind(client),
+              [VariationType.STRING]: client.getStringAssignment.bind(client),
+              [VariationType.JSON]: client.getJSONAssignment.bind(client),
+            };
 
         const assignmentFn = typeAssignmentFunctions[variationType] as (
           flagKey: string,
           subjectKey: string,
           subjectAttributes: Record<string, AttributeType>,
-          defaultValue: boolean | string | number | object,
-        ) => never;
+          defaultValue: AssignmentVariationValue,
+        ) => AssignmentVariationValue | IAssignmentDetails<AssignmentVariationValue>;
         if (!assignmentFn) {
           throw new Error(`Unknown variation type: ${variationType}`);
         }
@@ -370,56 +391,7 @@ describe('EppoClient E2E test', () => {
           assignmentFn,
         );
 
-        validateTestAssignments(assignments, flag);
-      });
-    });
-
-    describe('Obfuscated', () => {
-      beforeAll(async () => {
-        global.fetch = jest.fn(() => {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve(readMockUFCResponse(OBFUSCATED_MOCK_UFC_RESPONSE_FILE)),
-          });
-        }) as jest.Mock;
-
-        await initConfiguration(storage);
-      });
-
-      afterAll(() => {
-        jest.restoreAllMocks();
-      });
-
-      it.each(Object.keys(testCases))('test variation assignment splits - %s', async (fileName) => {
-        const { flag, variationType, defaultValue, subjects } = testCases[fileName];
-        const client = new EppoClient({ flagConfigurationStore: storage, isObfuscated: true });
-        client.setIsGracefulFailureMode(false);
-
-        const typeAssignmentFunctions = {
-          [VariationType.BOOLEAN]: client.getBooleanAssignment.bind(client),
-          [VariationType.NUMERIC]: client.getNumericAssignment.bind(client),
-          [VariationType.INTEGER]: client.getIntegerAssignment.bind(client),
-          [VariationType.STRING]: client.getStringAssignment.bind(client),
-          [VariationType.JSON]: client.getJSONAssignment.bind(client),
-        };
-
-        const assignmentFn = typeAssignmentFunctions[variationType] as (
-          flagKey: string,
-          subjectKey: string,
-          subjectAttributes: Record<string, AttributeType>,
-          defaultValue: boolean | string | number | object,
-        ) => never;
-        if (!assignmentFn) {
-          throw new Error(`Unknown variation type: ${variationType}`);
-        }
-
-        const assignments = getTestAssignments(
-          { flag, variationType, defaultValue, subjects },
-          assignmentFn,
-        );
-
-        validateTestAssignments(assignments, flag);
+        validateTestAssignments(assignments, flag, assignmentWithDetails, isObfuscated);
       });
     });
   });

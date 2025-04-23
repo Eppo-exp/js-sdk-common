@@ -144,7 +144,6 @@ export class Evaluator {
         configDetails.configFormat,
       );
     } catch (err: any) {
-      console.error('>>>>', err);
       const flagEvaluationDetails = flagEvaluationDetailsBuilder.gracefulBuild(
         'ASSIGNMENT_ERROR',
         `Assignment Error: ${err.message}`,
