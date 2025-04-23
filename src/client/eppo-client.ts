@@ -335,6 +335,11 @@ export default class EppoClient {
   private readonly configurationPoller: ConfigurationPoller;
   private initialized = false;
   private readonly initializationPromise: Promise<void>;
+  private readonly precomputedConfig?: {
+    subjectKey: string;
+    subjectAttributes: ContextAttributes;
+    banditActions?: Record<FlagKey, BanditActions>;
+  };
 
   constructor(options: EppoClientParameters) {
     const { eventDispatcher = new NoOpEventDispatcher(), overrideStore, configuration } = options;
@@ -359,6 +364,17 @@ export default class EppoClient {
         activationStrategy = DEFAULT_ACTIVATION_STRATEGY,
       } = {},
     } = options;
+
+    // Store precomputed config options for later use in getPrecomputedSubject().
+    if (options.configuration?.precompute) {
+      this.precomputedConfig = {
+        subjectKey: options.configuration.precompute.subjectKey,
+        subjectAttributes: ensureContextualSubjectAttributes(
+          options.configuration.precompute.subjectAttributes,
+        ),
+        banditActions: options.configuration.precompute.banditActions,
+      };
+    }
 
     this.configurationFeed = new BroadcastChannel<[Configuration, ConfigurationSource]>();
 
@@ -556,6 +572,48 @@ export default class EppoClient {
    */
   public onConfigurationActivated(listener: (configuration: Configuration) => void): () => void {
     return this.configurationStore.onConfigurationChange(listener);
+  }
+
+  /**
+   * Creates a Subject-scoped instance.
+   *
+   * This is useful if you need to evaluate multiple assignments for the same subject. Returned
+   * Subject is connected to the EppoClient instance and will use the same configuration.
+   */
+  public getSubject(
+    subjectKey: string,
+    subjectAttributes: Attributes | ContextAttributes = {},
+    banditActions: Record<FlagKey, BanditActions> = {},
+  ): Subject {
+    return new Subject(this, subjectKey, subjectAttributes, banditActions);
+  }
+
+  /**
+   * If the client is configured to precompute, returns a Subject-scoped instance for the
+   * precomputed configuration.
+   */
+  public getPrecomputedSubject(): Subject | undefined {
+    const configuration = this.getConfiguration();
+    const precomputed = configuration.getPrecomputedConfiguration();
+
+    if (precomputed) {
+      return this.getSubject(
+        precomputed.subjectKey,
+        precomputed.subjectAttributes ?? {},
+        precomputed.banditActions,
+      );
+    }
+
+    // Use the stored precomputed config if available and configuration hasn't been loaded yet
+    if (this.precomputedConfig) {
+      return this.getSubject(
+        this.precomputedConfig.subjectKey,
+        this.precomputedConfig.subjectAttributes,
+        this.precomputedConfig.banditActions,
+      );
+    }
+
+    return undefined;
   }
 
   /**
