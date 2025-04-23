@@ -1,6 +1,5 @@
 import {
   MOCK_PRECOMPUTED_WIRE_FILE,
-  MOCK_DEOBFUSCATED_PRECOMPUTED_RESPONSE_FILE,
   readMockConfigurationWireResponse,
 } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';

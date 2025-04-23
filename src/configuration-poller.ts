@@ -1,7 +1,7 @@
-import ConfigurationRequestor from './configuration-requestor';
 import { logger } from './application-logger';
-import { POLL_JITTER_PCT } from './constants';
 import { ConfigurationFeed, ConfigurationSource } from './configuration-feed';
+import ConfigurationRequestor from './configuration-requestor';
+import { POLL_JITTER_PCT } from './constants';
 
 /**
  * Polls for new configurations from the Eppo server. When a new configuration is fetched,
@@ -64,11 +64,15 @@ export class ConfigurationPoller {
     if (!this.isRunning) {
       logger.debug('[Eppo SDK] starting configuration poller');
       this.isRunning = true;
-      this.poll().finally(() => {
-        // Just to be safe, reset isRunning if the poll() method throws an error or exits
-        // unexpectedly (it shouldn't).
-        this.isRunning = false;
-      });
+      this.poll()
+        .finally(() => {
+          // Just to be safe, reset isRunning if the poll() method throws an error or exits
+          // unexpectedly (it shouldn't).
+          this.isRunning = false;
+        })
+        .catch((err) => {
+          logger.warn({ err }, '[Eppo SDK] unexpected error in poller');
+        });
     }
   }
 

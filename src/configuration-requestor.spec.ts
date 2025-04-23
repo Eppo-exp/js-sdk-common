@@ -525,18 +525,18 @@ describe('ConfigurationRequestor', () => {
 
     describe('fetchConfiguration', () => {
       it('should not fetch bandit parameters if model versions are already loaded', async () => {
-        const ufcResponse = {
-          flags: { test_flag: { key: 'test_flag', value: true } },
-          banditReferences: {
-            bandit: {
-              modelVersion: 'v1',
-              flagVariations: [{ flagKey: 'test_flag', variationId: '1' }],
-            },
-          },
-          environment: 'test',
-          createdAt: '2024-01-01',
-          format: 'SERVER',
-        };
+        // const ufcResponse = {
+        //   flags: { test_flag: { key: 'test_flag', value: true } },
+        //   banditReferences: {
+        //     bandit: {
+        //       modelVersion: 'v1',
+        //       flagVariations: [{ flagKey: 'test_flag', variationId: '1' }],
+        //     },
+        //   },
+        //   environment: 'test',
+        //   createdAt: '2024-01-01',
+        //   format: 'SERVER',
+        // };
 
         await configurationRequestor.fetchConfiguration();
         // const initialFetchCount = fetchSpy.mock.calls.length;

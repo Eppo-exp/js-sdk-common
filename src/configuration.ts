@@ -1,8 +1,8 @@
-import { IObfuscatedPrecomputedConfigurationResponse } from './precomputed-configuration';
 import { decodeFlag } from './decoding';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from './http-client';
 import { BanditParameters, BanditVariation, Flag, FormatEnum, ObfuscatedFlag } from './interfaces';
 import { getMD5Hash } from './obfuscation';
+import { IObfuscatedPrecomputedConfigurationResponse } from './precomputed-configuration';
 import { ContextAttributes, FlagKey, HashedFlagKey } from './types';
 
 /** @internal for SDK use only */

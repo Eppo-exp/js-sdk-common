@@ -1,6 +1,5 @@
 import ApiEndpoints from './api-endpoints';
 import { BanditsConfig, FlagsConfig, PrecomputedConfig } from './configuration';
-import { IObfuscatedPrecomputedConfigurationResponse } from './precomputed-configuration';
 import {
   BanditParameters,
   BanditReference,
@@ -9,6 +8,7 @@ import {
   FormatEnum,
   PrecomputedFlagsPayload,
 } from './interfaces';
+import { IObfuscatedPrecomputedConfigurationResponse } from './precomputed-configuration';
 import { Attributes } from './types';
 
 export interface IQueryParams {

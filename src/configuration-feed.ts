@@ -1,5 +1,5 @@
-import { Configuration } from './configuration';
 import { BroadcastChannel } from './broadcast';
+import { Configuration } from './configuration';
 
 /**
  * Enumeration of possible configuration sources.

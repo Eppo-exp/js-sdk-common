@@ -2,10 +2,10 @@ import * as fs from 'fs';
 
 import type { CommandModule } from 'yargs';
 
-import ConfigurationRequestor from '../../configuration-requestor';
-import { BroadcastChannel } from '../../broadcast';
-import FetchHttpClient from '../../http-client';
 import ApiEndpoints from '../../api-endpoints';
+import { BroadcastChannel } from '../../broadcast';
+import ConfigurationRequestor from '../../configuration-requestor';
+import FetchHttpClient from '../../http-client';
 import { LIB_VERSION } from '../../version';
 
 export const bootstrapConfigCommand: CommandModule = {

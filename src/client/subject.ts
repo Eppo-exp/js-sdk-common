@@ -1,7 +1,8 @@
-import EppoClient, { IAssignmentDetails, IContainerExperiment } from './eppo-client';
-import { Attributes, BanditActions, ContextAttributes, FlagKey } from '../types';
 import { ensureNonContextualSubjectAttributes } from '../attributes';
 import { Configuration } from '../configuration';
+import { Attributes, BanditActions, ContextAttributes, FlagKey } from '../types';
+
+import EppoClient, { IAssignmentDetails, IContainerExperiment } from './eppo-client';
 
 /**
  * A wrapper around EppoClient that automatically supplies subject key, attributes, and bandit

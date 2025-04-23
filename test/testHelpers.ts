@@ -3,9 +3,9 @@ import * as fs from 'fs';
 import { isEqual } from 'lodash';
 
 import { AttributeType, ContextAttributes, IAssignmentDetails, VariationType } from '../src';
+import { Configuration } from '../src/configuration';
 import { IFlagEvaluationDetails } from '../src/flag-evaluation-details-builder';
 import { IBanditParametersResponse, IUniversalFlagConfigResponse } from '../src/http-client';
-import { Configuration } from '../src/configuration';
 import { Variation } from '../src/interfaces';
 export const TEST_DATA_DIR = './test/data/ufc/';
 export const ASSIGNMENT_TEST_DATA_DIR = TEST_DATA_DIR + 'tests/';

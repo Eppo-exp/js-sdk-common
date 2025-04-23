@@ -10,14 +10,16 @@ import {
 } from '../attributes';
 import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
+import { BroadcastChannel } from '../broadcast';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
 import { LRUInMemoryAssignmentCache } from '../cache/lru-in-memory-assignment-cache';
 import { NonExpiringInMemoryAssignmentCache } from '../cache/non-expiring-in-memory-cache-assignment';
 import { TLRUInMemoryAssignmentCache } from '../cache/tlru-in-memory-assignment-cache';
 import { Configuration, PrecomputedConfig } from '../configuration';
+import { ConfigurationSource } from '../configuration-feed';
+import { randomJitterMs, ConfigurationPoller } from '../configuration-poller';
 import ConfigurationRequestor from '../configuration-requestor';
 import { ConfigurationStore } from '../configuration-store';
-import { IObfuscatedPrecomputedConfigurationResponse } from '../precomputed-configuration';
 import {
   DEFAULT_BASE_POLLING_INTERVAL_MS,
   DEFAULT_MAX_POLLING_INTERVAL_MS,
@@ -30,6 +32,7 @@ import {
   DEFAULT_ENABLE_POLLING,
   DEFAULT_ENABLE_BANDITS,
 } from '../constants';
+import { decodePrecomputedBandit, decodePrecomputedFlag } from '../decoding';
 import { EppoValue } from '../eppo_value';
 import {
   AssignmentResult,
@@ -56,8 +59,19 @@ import {
   Variation,
   VariationType,
 } from '../interfaces';
+import { KVStore, MemoryStore } from '../kvstore';
+import {
+  getMD5Hash,
+  obfuscatePrecomputedBanditMap,
+  obfuscatePrecomputedFlags,
+} from '../obfuscation';
 import { OverridePayload, OverrideValidator } from '../override-validator';
-import { randomJitterMs } from '../configuration-poller';
+import {
+  PersistentConfigurationCache,
+  PersistentConfigurationStorage,
+} from '../persistent-configuration-cache';
+import { IObfuscatedPrecomputedConfigurationResponse } from '../precomputed-configuration';
+import { generateSalt } from '../salt';
 import SdkTokenDecoder from '../sdk-token-decoder';
 import {
   Attributes,
@@ -71,22 +85,8 @@ import {
 import { shallowClone } from '../util';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
-import {
-  PersistentConfigurationCache,
-  PersistentConfigurationStorage,
-} from '../persistent-configuration-cache';
-import { ConfigurationPoller } from '../configuration-poller';
-import { ConfigurationSource } from '../configuration-feed';
-import { BroadcastChannel } from '../broadcast';
-import {
-  getMD5Hash,
-  obfuscatePrecomputedBanditMap,
-  obfuscatePrecomputedFlags,
-} from '../obfuscation';
-import { decodePrecomputedBandit, decodePrecomputedFlag } from '../decoding';
+
 import { Subject } from './subject';
-import { generateSalt } from '../salt';
-import { KVStore, MemoryStore } from '../kvstore';
 
 export interface IAssignmentDetails<T extends Variation['value'] | object> {
   variation: T;
@@ -263,16 +263,6 @@ export type EppoClientParameters = {
     requestTimeoutMs?: number;
   };
 };
-
-type VariationTypeMap = {
-  [VariationType.STRING]: string;
-  [VariationType.INTEGER]: number;
-  [VariationType.NUMERIC]: number;
-  [VariationType.BOOLEAN]: boolean;
-  [VariationType.JSON]: object;
-};
-
-type TypeFromVariationType<T extends VariationType> = VariationTypeMap[T];
 
 /**
  * ## Initialization
@@ -1018,8 +1008,6 @@ export default class EppoClient {
       const precomputed = config.getPrecomputedConfiguration();
       if (precomputed && precomputed.subjectKey === subjectKey) {
         // Use precomputed results if available
-        const nonContextualSubjectAttributes =
-          ensureNonContextualSubjectAttributes(subjectAttributes);
         const { flagEvaluation, banditAction, assignmentEvent, banditEvent } =
           this.evaluatePrecomputedAssignment(precomputed, flagKey, VariationType.STRING);
 
@@ -1940,9 +1928,9 @@ class TimeoutError extends Error {
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: NodeJS.Timeout;
 
-  const timeoutPromise = new Promise<never>((_, reject) => {
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => reject(new TimeoutError()), ms);
   });
 
-  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer!));
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
 }

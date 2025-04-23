@@ -1,3 +1,5 @@
+import { IAssignmentEvent } from './assignment-logger';
+import { IBanditEvent } from './bandit-logger';
 import { checkValueTypeMatch } from './client/eppo-client';
 import { Configuration } from './configuration';
 import {
@@ -20,8 +22,6 @@ import {
 import { Rule, matchesRule } from './rules';
 import { MD5Sharder, Sharder } from './sharders';
 import { Attributes } from './types';
-import { IAssignmentEvent } from './assignment-logger';
-import { IBanditEvent } from './bandit-logger';
 import { LIB_VERSION } from './version';
 
 export interface AssignmentResult {

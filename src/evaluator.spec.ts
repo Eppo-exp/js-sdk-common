@@ -1,6 +1,6 @@
 import { Configuration } from './configuration';
 import { Evaluator, hashKey, isInShardRange, matchesRules } from './evaluator';
-import { Flag, Variation, Shard, VariationType, ConfigDetails, FormatEnum } from './interfaces';
+import { Flag, Variation, Shard, VariationType, FormatEnum } from './interfaces';
 import { getMD5Hash } from './obfuscation';
 import { ObfuscatedOperatorType, OperatorType, Rule } from './rules';
 import { DeterministicSharder } from './sharders';
@@ -12,7 +12,7 @@ describe('Evaluator', () => {
 
   const evaluator = new Evaluator();
 
-  let configuration: Configuration = Configuration.fromResponses({
+  const configuration: Configuration = Configuration.fromResponses({
     flags: {
       fetchedAt: new Date().toISOString(),
       response: {

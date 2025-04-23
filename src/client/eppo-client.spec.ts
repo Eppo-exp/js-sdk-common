@@ -5,6 +5,7 @@ import * as td from 'testdouble';
 import { MOCK_UFC_RESPONSE_FILE, readMockUFCResponse } from '../../test/testHelpers';
 import { IAssignmentLogger } from '../assignment-logger';
 import { AssignmentCache } from '../cache/abstract-assignment-cache';
+import { Configuration } from '../configuration';
 import {
   MAX_EVENT_QUEUE_SIZE,
   DEFAULT_BASE_POLLING_INTERVAL_MS,
@@ -12,11 +13,10 @@ import {
 } from '../constants';
 import { decodePrecomputedFlag } from '../decoding';
 import { Flag, ObfuscatedFlag, VariationType, FormatEnum, Variation } from '../interfaces';
+import { KVStore, MemoryStore } from '../kvstore';
 import { getMD5Hash } from '../obfuscation';
 
 import EppoClient, { checkTypeMatch } from './eppo-client';
-import { Configuration } from '../configuration';
-import { KVStore, MemoryStore } from '../kvstore';
 
 // Use a known salt to produce deterministic hashes
 const salt = base64.fromUint8Array(new Uint8Array([7, 53, 17, 78]));

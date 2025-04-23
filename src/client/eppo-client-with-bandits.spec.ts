@@ -9,11 +9,10 @@ import {
   BANDIT_TEST_DATA_DIR,
   readMockBanditsConfiguration,
 } from '../../test/testHelpers';
-import ApiEndpoints from '../api-endpoints';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
 import { BanditEvaluation, BanditEvaluator } from '../bandit-evaluator';
 import { IBanditEvent, IBanditLogger } from '../bandit-logger';
-import { Evaluator, FlagEvaluation } from '../evaluator';
+import { Evaluator } from '../evaluator';
 import {
   AllocationEvaluationCode,
   IFlagEvaluationDetails,
@@ -22,7 +21,6 @@ import { attributeEncodeBase64 } from '../obfuscation';
 import { Attributes, BanditActions, ContextAttributes } from '../types';
 
 import EppoClient, { IAssignmentDetails } from './eppo-client';
-import { Configuration } from '../configuration';
 
 const salt = base64.fromUint8Array(new Uint8Array([101, 112, 112, 111]));
 jest.mock('../salt', () => ({
@@ -674,15 +672,6 @@ describe('EppoClient Bandits E2E test', () => {
         },
       },
     };
-
-    function getPrecomputedResults(
-      client: EppoClient,
-      subjectKey: string,
-      subjectAttributes: ContextAttributes,
-      banditActions: Record<string, BanditActions>,
-    ): Configuration {
-      return client.getPrecomputedConfiguration(subjectKey, subjectAttributes, banditActions);
-    }
 
     describe('obfuscated results', () => {
       it('obfuscates precomputed bandits', () => {
