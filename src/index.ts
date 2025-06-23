@@ -67,6 +67,7 @@ import {
   Environment,
 } from './interfaces';
 import { buildStorageKeySuffix } from './obfuscation';
+import { PollInterceptor } from './poller';
 import {
   AttributeType,
   Attributes,
@@ -96,6 +97,7 @@ export {
   FlagConfigRequestor,
   HttpClient,
   validation,
+  PollInterceptor as PollWrapper,
 
   // Precomputed Client
   EppoPrecomputedClient,

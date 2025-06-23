@@ -55,7 +55,7 @@ import {
 } from '../interfaces';
 import { getMD5Hash } from '../obfuscation';
 import { OverridePayload, OverrideValidator } from '../override-validator';
-import initPoller, { IPoller } from '../poller';
+import initPoller, { IPoller, PollInterceptor } from '../poller';
 import SdkTokenDecoder from '../sdk-token-decoder';
 import {
   Attributes,
@@ -89,6 +89,7 @@ export type FlagConfigurationRequestParameters = {
   pollAfterFailedInitialization?: boolean;
   throwOnFailedInitialization?: boolean;
   skipInitialPoll?: boolean;
+  pollWrapper?: PollInterceptor;
 };
 
 export interface IContainerExperiment<T> {
@@ -355,6 +356,7 @@ export default class EppoClient {
       pollAfterFailedStart: pollAfterFailedInitialization,
       errorOnFailedStart: throwOnFailedInitialization,
       skipInitialPoll: skipInitialPoll,
+      pollIntercept: this.configurationRequestParameters?.pollWrapper,
     });
 
     await this.requestPoller.start();
