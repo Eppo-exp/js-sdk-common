@@ -137,7 +137,7 @@ export default function initPoller(
       }
     }
 
-    setTimeout(poll, nextPollMs);
+    nextTimer = setTimeout(poll, nextPollMs);
   }
 
   return {
