@@ -97,6 +97,7 @@ export default function initPoller(
       stopped = true;
       if (nextTimer) {
         clearTimeout(nextTimer);
+        nextTimer = undefined;
       }
       logger.info('Eppo SDK polling stopped');
     }
@@ -104,6 +105,10 @@ export default function initPoller(
 
   async function poll() {
     if (stopped) {
+      if (nextTimer) {
+        clearTimeout(nextTimer);
+        nextTimer = undefined;
+      }
       return;
     }
 
@@ -134,10 +139,14 @@ export default function initPoller(
           `Eppo SDK reached maximum of ${failedAttempts} failed polling attempts. Stopping polling`,
         );
         stop();
+        return;
       }
     }
 
-    setTimeout(poll, nextPollMs);
+    // Check stopped state again before setting up next timer to handle race condition
+    if (!stopped) {
+      nextTimer = setTimeout(poll, nextPollMs);
+    }
   }
 
   return {
