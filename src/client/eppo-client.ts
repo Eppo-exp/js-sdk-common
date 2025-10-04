@@ -756,14 +756,14 @@ export default class EppoClient {
 
         try {
           this.logBanditAction(banditEvent);
-        } catch (err: any) {
-          logger.error(err, 'Error logging bandit event');
+        } catch (err) {
+          logger.error({ err }, 'Error logging bandit event');
         }
 
         evaluationDetails.banditAction = action;
       }
     } catch (err: any) {
-      logger.error(err, 'Error determining bandit action');
+      logger.error({ err }, 'Error determining bandit action');
       if (!this.isGracefulFailureMode) {
         throw err;
       }
@@ -772,7 +772,7 @@ export default class EppoClient {
         // Update the flag evaluation code to indicate that
         evaluationDetails.flagEvaluationCode = 'BANDIT_ERROR';
       }
-      evaluationDetails.flagEvaluationDescription = `Error evaluating bandit action: ${err.message}`;
+      evaluationDetails.flagEvaluationDescription = `Error evaluating bandit action: ${err?.message}`;
     }
     return { variation, action, evaluationDetails };
   }
@@ -877,7 +877,7 @@ export default class EppoClient {
       // Record in the assignment cache, if active, to deduplicate subsequent repeat assignments
       this.banditAssignmentCache?.set(banditAssignmentCacheProperties);
     } catch (err) {
-      logger.warn(err, 'Error encountered logging bandit action');
+      logger.warn({ err }, 'Error encountered logging bandit action');
     }
   }
 
