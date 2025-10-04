@@ -519,7 +519,7 @@ export default class EppoPrecomputedClient {
       // Record in the assignment cache, if active, to deduplicate subsequent repeat assignments
       this.banditAssignmentCache?.set(banditAssignmentCacheProperties);
     } catch (err) {
-      logger.warn('Error encountered logging bandit action', err);
+      logger.warn(err, 'Error encountered logging bandit action');
     }
   }
 

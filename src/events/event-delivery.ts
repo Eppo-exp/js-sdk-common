@@ -34,7 +34,7 @@ export default class EventDelivery implements IEventDelivery {
         return { failedEvents: batch };
       }
     } catch (e: any) {
-      logger.warn(`Failed to upload event batch`, e);
+      logger.warn(e, `Failed to upload event batch`);
       return { failedEvents: batch };
     }
   }
