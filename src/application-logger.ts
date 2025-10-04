@@ -4,8 +4,15 @@ export const loggerPrefix = '[Eppo SDK]';
 
 // Create a Pino logger instance
 export const logger = pino({
-  // eslint-disable-next-line no-restricted-globals
-  level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'warn' : 'info'),
-  // https://getpino.io/#/docs/browser
-  browser: { disabled: true },
+  // Use any specified log level, or warn in production, info otherwise
+  level:
+    /* eslint-disable no-restricted-globals */
+    typeof process !== 'undefined' && process.env.LOG_LEVEL
+      ? process.env.LOG_LEVEL
+      : typeof process !== 'undefined' && process.env.NODE_ENV === 'production'
+        ? 'warn'
+        : 'info',
+  /* eslint-enable no-restricted-globals */
+
+  browser: { disabled: true }, // See https://getpino.io/#/docs/browser
 });
