@@ -32,7 +32,7 @@ describe('ConfigurationWireHelper', () => {
       expect(configResponse.format).toBe(FormatEnum.CLIENT);
       expect(configResponse.flags).toBeDefined();
       expect(Object.keys(configResponse.flags).length).toBeGreaterThan(1);
-      expect(Object.keys(configResponse.flags)).toHaveLength(19);
+      expect(Object.keys(configResponse.flags)).toHaveLength(23); // Hardcoded number of flags in the shared test file.
 
       const testFlagKey = getMD5Hash('numeric_flag');
       expect(Object.keys(configResponse.flags)).toContain(testFlagKey);
