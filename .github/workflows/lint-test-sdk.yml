@@ -7,13 +7,15 @@ on:
 jobs:
   lint-test-sdk:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
       matrix:
         node-version: [ '18', '20', '22', '23' ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
@@ -27,7 +29,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: 'Set up GCP SDK for downloading test data'
-        uses: 'google-github-actions/setup-gcloud@v0'
+        uses: 'google-github-actions/setup-gcloud@v3'
       - name: Install SDK dependencies
         run: yarn --frozen-lockfile
         working-directory: ./
@@ -39,13 +41,15 @@ jobs:
         working-directory: ./
   typecheck:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
       matrix:
         node-version: [ '18', '20', '22', '23' ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
