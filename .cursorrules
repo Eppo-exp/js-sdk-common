@@ -1,0 +1,16 @@
+# Claude Settings for js-sdk-common
+
+## Git Commit Behavior
+- NEVER commit changes unless the user explicitly asks you to
+- Do not automatically sign commits or use GPG signing
+- Do not skip git hooks (--no-verify, --no-gpg-sign)
+
+## Pull Request Descriptions
+- PR descriptions should always be based on the GitHub PR template if one exists
+- Do not automatically generate or modify PR descriptions unless explicitly requested
+- If creating a PR description, always check for `.github/pull_request_template.md` or `.github/PULL_REQUEST_TEMPLATE.md` first
+
+## General Guidelines
+- Only commit when explicitly asked by the user
+- Respect all existing git workflows and configurations
+
