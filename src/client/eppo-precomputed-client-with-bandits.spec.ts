@@ -119,6 +119,49 @@ describe('EppoPrecomputedClient Bandits E2E test', () => {
         });
         expect(mockLogBanditAction).toHaveBeenCalled();
       });
+
+      it('should log bandit event with correct subject and action attributes', () => {
+        // Recreate client with realistic subject attributes that would
+        // drive action selection in a recommendation model.
+        client = new EppoPrecomputedClient({
+          precomputedFlagStore,
+          precomputedBanditStore,
+          subject: {
+            subjectKey: 'test-subject',
+            subjectAttributes: {
+              numericAttributes: { lastLoginDays: 3, lifetimeValue: 543.21 },
+              categoricalAttributes: { platform: 'ios', language: 'en-US' },
+            },
+          },
+        });
+        client.setAssignmentLogger({ logAssignment: mockLogAssignment });
+        client.setBanditLogger({ logBanditAction: mockLogBanditAction });
+
+        client.getBanditAction('string-flag', 'default');
+
+        expect(mockLogBanditAction).toHaveBeenCalled();
+        const banditEvent = mockLogBanditAction.mock.calls[0][0];
+
+        // Subject attributes should reflect the subject, not the action
+        expect(banditEvent.subjectNumericAttributes).toEqual({
+          lastLoginDays: 3,
+          lifetimeValue: 543.21,
+        });
+        expect(banditEvent.subjectCategoricalAttributes).toEqual({
+          platform: 'ios',
+          language: 'en-US',
+        });
+
+        // Action attributes should come from the precomputed bandit response
+        expect(banditEvent.actionNumericAttributes).toEqual({
+          expectedConversion: 0.23,
+          expectedRevenue: 15.75,
+        });
+        expect(banditEvent.actionCategoricalAttributes).toEqual({
+          category: 'promotion',
+          placement: 'home_screen',
+        });
+      });
     });
   });
 });
