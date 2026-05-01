@@ -125,7 +125,7 @@ export class FlagEvaluationDetailsBuilder {
   ): IFlagEvaluationDetails | null => {
     try {
       return this.build(flagEvaluationCode, flagEvaluationDescription);
-    } catch (err) {
+    } catch {
       return null;
     }
   };

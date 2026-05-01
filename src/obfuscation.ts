@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 import base64 = require('js-base64');
 import * as SparkMD5 from 'spark-md5';
 

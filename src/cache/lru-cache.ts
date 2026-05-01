@@ -19,7 +19,7 @@ export class LRUCache implements Map<string, string> {
 
   constructor(protected readonly capacity: number) {}
 
-  [Symbol.iterator](): IterableIterator<[string, string]> {
+  [Symbol.iterator]() {
     return this.cache[Symbol.iterator]();
   }
 
@@ -33,7 +33,7 @@ export class LRUCache implements Map<string, string> {
 
   readonly size: number = this.cache.size;
 
-  entries(): IterableIterator<[string, string]> {
+  entries() {
     return this.cache.entries();
   }
 
@@ -45,11 +45,11 @@ export class LRUCache implements Map<string, string> {
     return this.cache.delete(key);
   }
 
-  keys(): IterableIterator<string> {
+  keys() {
     return this.cache.keys();
   }
 
-  values(): IterableIterator<string> {
+  values() {
     return this.cache.values();
   }
 
