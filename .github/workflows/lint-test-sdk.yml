@@ -11,9 +11,7 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
       matrix:
-        # Node 18 dropped — `engines.node` is now `>=20.19.0` (uuid 14 is
-        # ESM-only and needs require(esm), default-on from Node 20.19+).
-        node-version: [ '20', '22', '23' ]
+        node-version: [ '18', '20', '22', '23' ]
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js
@@ -47,9 +45,7 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
       matrix:
-        # Node 18 dropped — `engines.node` is now `>=20.19.0` (uuid 14 is
-        # ESM-only and needs require(esm), default-on from Node 20.19+).
-        node-version: [ '20', '22', '23' ]
+        node-version: [ '18', '20', '22', '23' ]
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js

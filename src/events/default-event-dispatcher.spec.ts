@@ -1,5 +1,3 @@
-import { v4 as randomUUID } from 'uuid';
-
 import ArrayBackedNamedEventQueue from './array-backed-named-event-queue';
 import BatchEventProcessor from './batch-event-processor';
 import DefaultEventDispatcher, {
@@ -352,7 +350,7 @@ describe('DefaultEventDispatcher', () => {
       dispatcher.attachContext('foo', 'bar');
       dispatcher.attachContext('baz', 'qux');
       const event = {
-        uuid: randomUUID(),
+        uuid: 'e1',
         payload: { foo: 'event1' },
         timestamp: new Date().getTime(),
         type: 'foo',
