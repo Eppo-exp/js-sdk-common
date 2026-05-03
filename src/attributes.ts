@@ -5,9 +5,9 @@ export function isInstanceOfContextualAttributes(
 ): attributes is ContextAttributes {
   return Boolean(
     typeof attributes === 'object' &&
-      attributes && // exclude null
-      'numericAttributes' in attributes &&
-      'categoricalAttributes' in attributes,
+    attributes && // exclude null
+    'numericAttributes' in attributes &&
+    'categoricalAttributes' in attributes,
   );
 }
 

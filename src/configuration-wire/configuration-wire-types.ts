@@ -23,8 +23,7 @@ export interface IPrecomputedConfigurationResponse extends IBasePrecomputedConfi
   readonly bandits: Record<FlagKey, IPrecomputedBandit>;
 }
 
-export interface IObfuscatedPrecomputedConfigurationResponse
-  extends IBasePrecomputedConfigurationResponse {
+export interface IObfuscatedPrecomputedConfigurationResponse extends IBasePrecomputedConfigurationResponse {
   readonly obfuscated: true; // Always true
   readonly salt: string; // Salt used for hashing md5-encoded strings
 
