@@ -1442,10 +1442,11 @@ export function checkValueTypeMatch(
  * compared, parsed, or stored beyond a single batch lifetime — it just needs
  * to be a string distinct from peers in the same JS context.
  *
- * Prefers `crypto.randomUUID()` when available (modern browsers in secure
- * contexts, Node 14.17+, modern React Native runtimes). Falls back to a
- * base36 random suffix on `Math.random()` for legacy contexts (e.g. http://
- * pages where `crypto.randomUUID()` is undefined). The fallback is not a
+ * Prefers `crypto.randomUUID()` when available via `globalThis.crypto`
+ * (for example, modern browsers in secure contexts, Node 20+, and other
+ * WebCrypto-enabled runtimes). Falls back to a base36 random suffix on
+ * `Math.random()` for legacy contexts where `crypto.randomUUID()` is
+ * undefined (for example, `http://` pages). The fallback is not a
  * cryptographic UUID and is *not* suitable for any security-relevant ID —
  * if `track()` ever grows new constraints, revisit this.
  */
