@@ -1,5 +1,3 @@
-import { v4 as randomUUID } from 'uuid';
-
 import ApiEndpoints from '../api-endpoints';
 import { logger, loggerPrefix } from '../application-logger';
 import { IAssignmentEvent, IAssignmentLogger } from '../assignment-logger';
@@ -1149,7 +1147,7 @@ export default class EppoClient {
    */
   track(type: string, payload: Record<string, unknown>) {
     this.eventDispatcher.dispatch({
-      uuid: randomUUID(),
+      uuid: randomEventId(),
       type,
       timestamp: new Date().getTime(),
       payload,
@@ -1436,4 +1434,22 @@ export function checkValueTypeMatch(
     default:
       return false;
   }
+}
+
+/**
+ * Generates an opaque, unique-enough identifier for an event so the dispatcher
+ * can tell two events apart for batching/retry/dedup. The value is never
+ * compared, parsed, or stored beyond a single batch lifetime — it just needs
+ * to be a string distinct from peers in the same JS context.
+ *
+ * Prefers `crypto.randomUUID()` when available via `globalThis.crypto`
+ * (for example, modern browsers in secure contexts, Node 20+, and other
+ * WebCrypto-enabled runtimes). Falls back to a base36 random suffix on
+ * `Math.random()` for legacy contexts where `crypto.randomUUID()` is
+ * undefined (for example, `http://` pages). The fallback is not a
+ * cryptographic UUID and is *not* suitable for any security-relevant ID —
+ * if `track()` ever grows new constraints, revisit this.
+ */
+function randomEventId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
 }

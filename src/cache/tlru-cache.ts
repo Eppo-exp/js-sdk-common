@@ -56,17 +56,17 @@ export class TLRUCache extends LRUCache {
     }
   }
 
-  entries(): IterableIterator<[string, string]> {
+  entries() {
     this.evictExpiredCacheEntries();
     return super.entries();
   }
 
-  keys(): IterableIterator<string> {
+  keys() {
     this.evictExpiredCacheEntries();
     return super.keys();
   }
 
-  values(): IterableIterator<string> {
+  values() {
     this.evictExpiredCacheEntries();
     return super.values();
   }

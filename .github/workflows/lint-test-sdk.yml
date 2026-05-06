@@ -11,7 +11,11 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
       matrix:
-        node-version: [ '18', '20', '22', '23' ]
+        # Active LTS lines only. Node 18 is EOL (2025-04-30) and the package
+        # `engines.node` is `>=20.0.0`. Node 23 was tested previously but it's
+        # a non-LTS interim release and `expect@30` (jest 30 transitive) only
+        # supports `^18.14 || ^20 || ^22 || >=24`, skipping 23.
+        node-version: [ '20', '22', '24' ]
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js
@@ -45,7 +49,11 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
       matrix:
-        node-version: [ '18', '20', '22', '23' ]
+        # Active LTS lines only. Node 18 is EOL (2025-04-30) and the package
+        # `engines.node` is `>=20.0.0`. Node 23 was tested previously but it's
+        # a non-LTS interim release and `expect@30` (jest 30 transitive) only
+        # supports `^18.14 || ^20 || ^22 || >=24`, skipping 23.
+        node-version: [ '20', '22', '24' ]
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js

@@ -47,9 +47,9 @@ export interface AssignmentCache {
   has(key: AssignmentCacheEntry): boolean;
 }
 
-export abstract class AbstractAssignmentCache<T extends Map<string, string>>
-  implements AssignmentCache
-{
+export abstract class AbstractAssignmentCache<
+  T extends Map<string, string>,
+> implements AssignmentCache {
   // key -> variation value hash
   protected constructor(protected readonly delegate: T) {}
 

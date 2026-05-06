@@ -610,6 +610,7 @@ describe('ConfigurationRequestor', () => {
           banditModelStore,
         );
 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const ufcResponse = {
           flags: { test_flag: { key: 'test_flag', value: true } },
           banditReferences: {
