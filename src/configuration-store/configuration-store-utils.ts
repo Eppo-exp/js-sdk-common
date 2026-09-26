@@ -10,11 +10,7 @@ import {
 import { IConfigurationStore } from './configuration-store';
 
 export type Entry =
-  | Flag
-  | BanditVariation[]
-  | BanditParameters
-  | PrecomputedFlag
-  | IObfuscatedPrecomputedBandit;
+  Flag | BanditVariation[] | BanditParameters | PrecomputedFlag | IObfuscatedPrecomputedBandit;
 
 export async function hydrateConfigurationStore<T extends Entry>(
   configurationStore: IConfigurationStore<T> | null,
