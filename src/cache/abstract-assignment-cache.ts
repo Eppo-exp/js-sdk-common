@@ -25,12 +25,16 @@ export type AssignmentCacheEntry = AssignmentCacheKey & AssignmentCacheValue;
 
 /** Converts an {@link AssignmentCacheKey} to a string. */
 export function assignmentCacheKeyToString({ subjectKey, flagKey }: AssignmentCacheKey): string {
-  return getMD5Hash([subjectKey, flagKey].join(';'));
+  return getMD5Hash(JSON.stringify([subjectKey, flagKey]));
 }
 
 /** Converts an {@link AssignmentCacheValue} to a string. */
 export function assignmentCacheValueToString(cacheValue: AssignmentCacheValue): string {
-  return getMD5Hash(Object.values(cacheValue).join(';'));
+  const fields =
+    'allocationKey' in cacheValue
+      ? ['variation', cacheValue.allocationKey, cacheValue.variationKey]
+      : ['bandit', cacheValue.banditKey, cacheValue.actionKey];
+  return getMD5Hash(JSON.stringify(fields));
 }
 
 export interface AsyncMap<K, V> {
