@@ -8,9 +8,7 @@ export type ContextAttributes = {
 };
 export type BanditSubjectAttributes = Attributes | ContextAttributes;
 export type BanditActions =
-  | string[]
-  | Record<string, Attributes>
-  | Record<string, ContextAttributes>;
+  string[] | Record<string, Attributes> | Record<string, ContextAttributes>;
 export type Base64String = string;
 export type MD5String = string;
 export type FlagKey = string;
