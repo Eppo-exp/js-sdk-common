@@ -68,6 +68,8 @@ import { shallowClone } from '../util';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
+import { cacheLoggedAssignment, hasLoggedOrQueuedAssignment } from './assignment-logging-cache';
+
 export interface IAssignmentDetails<T extends Variation['value'] | object> {
   variation: T;
   action: string | null;
@@ -1202,7 +1204,13 @@ export default class EppoClient {
   setAssignmentLogger(logger: IAssignmentLogger) {
     this.assignmentLogger = logger;
     // log any assignment events that may have been queued while initializing
-    this.flushQueuedEvents(this.assignmentEventsQueue, this.assignmentLogger?.logAssignment);
+    this.flushQueuedEvents(
+      this.assignmentEventsQueue,
+      this.assignmentLogger?.logAssignment,
+      (event) => {
+        cacheLoggedAssignment(this.assignmentCache, event);
+      },
+    );
   }
 
   setBanditLogger(logger: IBanditLogger) {
@@ -1260,7 +1268,11 @@ export default class EppoClient {
     return this.getConfiguration().getFlags();
   }
 
-  private flushQueuedEvents<T>(eventQueue: BoundedEventQueue<T>, logFunction?: (event: T) => void) {
+  private flushQueuedEvents<T>(
+    eventQueue: BoundedEventQueue<T>,
+    logFunction?: (event: T) => void,
+    onLogged?: (event: T) => void,
+  ) {
     const eventsToFlush = eventQueue.flush();
     if (!logFunction) {
       return;
@@ -1269,6 +1281,7 @@ export default class EppoClient {
     eventsToFlush.forEach((event) => {
       try {
         logFunction(event);
+        onLogged?.(event);
       } catch (error: any) {
         logger.error(`${loggerPrefix} Error flushing event to logger: ${error.message}`);
       }
@@ -1302,33 +1315,19 @@ export default class EppoClient {
       entityId,
     };
 
-    if (variation && allocationKey) {
-      // If already logged, don't log again
-      const hasLoggedAssignment = this.assignmentCache?.has({
-        flagKey,
-        subjectKey,
-        allocationKey,
-        variationKey: variation.key,
-      });
-      if (hasLoggedAssignment) {
-        return;
-      }
+    if (hasLoggedOrQueuedAssignment(this.assignmentCache, event, this.assignmentEventsQueue)) {
+      return;
     }
 
     try {
       if (this.assignmentLogger) {
         this.assignmentLogger.logAssignment(event);
+        cacheLoggedAssignment(this.assignmentCache, event);
       } else {
         // assignment logger may be null while waiting for initialization, queue up events (up to a max)
         // to be flushed when set
         this.assignmentEventsQueue.push(event);
       }
-      this.assignmentCache?.set({
-        flagKey,
-        subjectKey,
-        allocationKey: allocationKey ?? '__eppo_no_allocation',
-        variationKey: variation?.key ?? '__eppo_no_variation',
-      });
     } catch (error: any) {
       logger.error(`${loggerPrefix} Error logging assignment event: ${error.message}`);
     }

@@ -37,6 +37,7 @@ import { Attributes, ContextAttributes, FlagKey } from '../types';
 import { validateNotBlank } from '../validation';
 import { LIB_VERSION } from '../version';
 
+import { cacheLoggedAssignment, hasLoggedOrQueuedAssignment } from './assignment-logging-cache';
 import { checkTypeMatch, IAssignmentDetails } from './eppo-client';
 
 export interface Subject {
@@ -395,7 +396,13 @@ export default class EppoPrecomputedClient {
   public setAssignmentLogger(logger: IAssignmentLogger) {
     this.assignmentLogger = logger;
     // log any assignment events that may have been queued while initializing
-    this.flushQueuedEvents(this.queuedAssignmentEvents, this.assignmentLogger?.logAssignment);
+    this.flushQueuedEvents(
+      this.queuedAssignmentEvents,
+      this.assignmentLogger?.logAssignment,
+      (event) => {
+        cacheLoggedAssignment(this.assignmentCache, event);
+      },
+    );
   }
 
   public setBanditLogger(logger: IBanditLogger) {
@@ -423,7 +430,11 @@ export default class EppoPrecomputedClient {
     this.assignmentCache = cache;
   }
 
-  private flushQueuedEvents<T>(eventQueue: T[], logFunction?: (event: T) => void) {
+  private flushQueuedEvents<T>(
+    eventQueue: T[],
+    logFunction?: (event: T) => void,
+    onLogged?: (event: T) => void,
+  ) {
     const eventsToFlush = [...eventQueue]; // defensive copy
     eventQueue.length = 0; // Truncate the array
 
@@ -434,6 +445,7 @@ export default class EppoPrecomputedClient {
     eventsToFlush.forEach((event) => {
       try {
         logFunction(event);
+        onLogged?.(event);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         logger.error(`${loggerPrefix} Error flushing event to logger: ${error.message}`);
@@ -457,32 +469,19 @@ export default class EppoPrecomputedClient {
       evaluationDetails: null,
     };
 
-    if (variation && allocationKey) {
-      const hasLoggedAssignment = this.assignmentCache?.has({
-        flagKey,
-        subjectKey,
-        allocationKey,
-        variationKey: variation.key,
-      });
-      if (hasLoggedAssignment) {
-        return;
-      }
+    if (hasLoggedOrQueuedAssignment(this.assignmentCache, event, this.queuedAssignmentEvents)) {
+      return;
     }
 
     try {
       if (this.assignmentLogger) {
         this.assignmentLogger.logAssignment(event);
+        cacheLoggedAssignment(this.assignmentCache, event);
       } else if (this.queuedAssignmentEvents.length < MAX_EVENT_QUEUE_SIZE) {
         // assignment logger may be null while waiting for initialization, queue up events (up to a max)
         // to be flushed when set
         this.queuedAssignmentEvents.push(event);
       }
-      this.assignmentCache?.set({
-        flagKey,
-        subjectKey,
-        allocationKey: allocationKey ?? '__eppo_no_allocation',
-        variationKey: variation?.key ?? '__eppo_no_variation',
-      });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       logger.error(`${loggerPrefix} Error logging assignment event: ${error.message}`);
